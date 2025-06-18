@@ -1,0 +1,9 @@
+server:
+  port: 8081
+
+kiwi:
+  host: http://localhost:8080
+
+# Proxy config
+# proxy:
+#   pacFileUrl: file:///path/to/pac/file
