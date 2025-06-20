@@ -3,14 +3,17 @@ package org.kiwi.console;
 import org.kiwi.console.util.ConsoleConfig;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration;
+import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
 
-@SpringBootApplication
+@SpringBootApplication(exclude = { UserDetailsServiceAutoConfiguration.class })
 @EnableTransactionManagement
 @EnableScheduling
 @EnableWebSocket
+@EnableAsync
 public class ConsoleApplication {
 
     public static void main(String[] args) {

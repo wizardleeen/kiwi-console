@@ -6,25 +6,32 @@ import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
+import feign.Feign;
+import feign.RequestInterceptor;
+import feign.gson.GsonDecoder;
+import feign.gson.GsonEncoder;
 import jakarta.annotation.Nullable;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.lang.reflect.Type;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.regex.Pattern;
@@ -85,6 +92,14 @@ public class Utils {
         }
     }
 
+    public static String toPrettyJSONString(Object object) {
+        try {
+            return INDENT_OBJECT_MAPPER.writeValueAsString(object);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Failed to write JSON string, object: " + object, e);
+        }
+    }
+
     public static Object readJSONString(String jsonStr, Type type) {
         try {
             var reader = OBJECT_MAPPER.reader().forType(type);
@@ -110,6 +125,16 @@ public class Utils {
             return f.apply(t);
         else
             return null;
+    }
+
+    public static void removeDirectory(String path) {
+        removeDirectory(Path.of(path));
+    }
+
+    @SneakyThrows
+    public static void removeDirectory(Path path) {
+        clearDirectory(path);
+        Files.delete(path);
     }
 
     public static void clearDirectory(String path) {
@@ -180,6 +205,55 @@ public class Utils {
             throw new AssertionError();
     }
 
+    public static void require(boolean condition, String message) {
+        if (!condition)
+            throw new AssertionError(message);
+    }
+
+    public static String getFirstLine(String s) {
+        var buf = new StringBuilder();
+        for (var i = 0; i < s.length(); i++) {
+            var c = s.charAt(i);
+            if (c == '\r' || c == '\n')
+                break;
+            buf.append(c);
+        }
+        return buf.toString();
+    }
+
+    @SneakyThrows
+    public static <T> T readJsonBytes(InputStream input, Class<T> cls) {
+        return OBJECT_MAPPER.readValue(input, cls);
+    }
+
     public record CommandResult(int exitCode, String output) {}
+
+    public static <T> T createKiwiFeignClient(String url, Class<T> type, long appId) {
+        return createFeignClient(url, type, rt -> {
+            rt.header("X-App-ID", Long.toString(appId));
+            rt.header("X-Refresh-Policy", "none");
+        });
+    }
+
+    private static final GsonEncoder gsonEncoder = new GsonEncoder();
+    private static final GsonDecoder gsonDecoder = new GsonDecoder();
+    private static final FeignErrorDecoder feignErrorDecoder = new FeignErrorDecoder();
+
+    public static <T> T createFeignClient(String url, Class<T> type, RequestInterceptor interceptor) {
+        return Feign.builder()
+                .encoder(gsonEncoder)
+                .decoder(gsonDecoder)
+                .errorDecoder(feignErrorDecoder)
+                .requestInterceptor(interceptor)
+                .target(type, url);
+    }
+
+    public static <T, R> List<R> map(List<T> list, Function<T, R> mapper) {
+        var result = new ArrayList<R>();
+        for (T t : list) {
+            result.add(mapper.apply(t));
+        }
+        return result;
+    }
 
 }

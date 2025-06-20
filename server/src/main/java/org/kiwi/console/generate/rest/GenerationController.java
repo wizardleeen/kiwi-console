@@ -1,0 +1,129 @@
+package org.kiwi.console.generate.rest;
+
+import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
+import org.kiwi.console.generate.GenerationService;
+import org.kiwi.console.generate.event.GenerationListener;
+import org.kiwi.console.kiwi.ApplicationClient;
+import org.kiwi.console.kiwi.Exchange;
+import org.kiwi.console.kiwi.ExchangeClient;
+import org.kiwi.console.kiwi.ExchangeSearchRequest;
+import org.kiwi.console.util.BusinessException;
+import org.kiwi.console.util.ErrorCode;
+import org.kiwi.console.util.SearchResult;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+@RestController
+@RequestMapping("/generate")
+@Slf4j
+public class GenerationController {
+
+    private final GenerationService generationService;
+    private final ApplicationClient applicationClient;
+    private final ExchangeClient exchangeClient;
+
+    public GenerationController(GenerationService generationService, ApplicationClient applicationClient, ExchangeClient exchangeClient) {
+        this.generationService = generationService;
+        this.applicationClient = applicationClient;
+        this.exchangeClient = exchangeClient;
+    }
+
+    @PostMapping
+    public SseEmitter generate(@AuthenticationPrincipal String userId, @RequestBody GenerationRequest request) {
+        if (request.appId() != null)
+            ensureApplicationAuthorized(userId, request.appId());
+        var sseEmitter = new SseEmitter(Long.MAX_VALUE);
+        generationService.generate(request.appId(), request.prompt(), userId, request.skipPageGeneration(), new Emitter(sseEmitter));
+        return sseEmitter;
+    }
+
+    @GetMapping("/reconnect")
+    public SseEmitter reconnect(@AuthenticationPrincipal String userId, @RequestParam("exchange-id") String exchangeId) {
+        ensureExchangeAuthorized(userId, exchangeId);
+        var sseEmitter = new SseEmitter(Long.MAX_VALUE);
+        generationService.reconnect(exchangeId, new Emitter(sseEmitter));
+        return sseEmitter;
+    }
+
+    @PostMapping("/cancel")
+    public void cancel(@AuthenticationPrincipal String userId, @RequestBody CancelRequest request) {
+        ensureExchangeAuthorized(userId, request.exchangeId());
+        generationService.cancel(request);
+    }
+
+    @PostMapping("/retry")
+    public SseEmitter retry(@AuthenticationPrincipal String userId, @RequestBody RetryRequest request) {
+        var sseEmitter = new SseEmitter(Long.MAX_VALUE);
+        ensureExchangeAuthorized(userId, request.exchangeId());
+        generationService.retry(request, new Emitter(sseEmitter));
+        return sseEmitter;
+    }
+
+    @PostMapping("/history")
+    public SearchResult<Exchange> search(@AuthenticationPrincipal String userId, @RequestBody HistoryRequest request) {
+        if (request.appId() == null)
+            throw new BusinessException(ErrorCode.BAD_REQUEST);
+        var app = applicationClient.get(request.appId());
+        if (!app.getMembersIds().contains(userId))
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        var innerReq = new ExchangeSearchRequest(
+                null,
+                request.appId(),
+                null,
+                true,
+                request.page() > 0 ? request.page() : 1,
+                request.pageSize() > 0 ? request.pageSize() : 20
+        );
+        return exchangeClient.search(innerReq);
+    }
+
+
+    private void ensureExchangeAuthorized(String userId, String exchangeId) {
+        var exchange = exchangeClient.get(exchangeId);
+        ensureApplicationAuthorized(userId, exchange.getAppId());
+    }
+
+    private void ensureApplicationAuthorized(String userId, String appId) {
+        var app = applicationClient.get(appId);
+        if (!app.getMembersIds().contains(userId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+    }
+
+    private record Emitter(SseEmitter sseEmitter) implements GenerationListener {
+
+        @Override
+        public void onThought(String thoughtChunk) {
+            log.info("{}", thoughtChunk);
+        }
+
+        @Override
+        public void onContent(String contentChunk) {
+            log.info("{}", contentChunk);
+        }
+
+        @SneakyThrows
+        @Override
+        public void onProgress(Exchange exchange) {
+            try {
+                sseEmitter.send(SseEmitter.event().name("generation").data(exchange));
+            }
+            catch (Exception e) {
+                log.error("Error sending SSE event", e);
+            }
+        }
+
+        @Override
+        public void close() {
+            try {
+                sseEmitter.complete();
+            }
+            catch (Exception e) {
+                log.error("Error completing SSE emitter", e);
+            }
+        }
+    }
+
+}
