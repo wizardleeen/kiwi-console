@@ -22,6 +22,7 @@
         <dependency>
             <groupId>org.kiwi</groupId>
             <artifactId>kiwi-console-server</artifactId>
+            <classifier>executable</classifier>
             <version>1.0-SNAPSHOT</version>
         </dependency>
     </dependencies>

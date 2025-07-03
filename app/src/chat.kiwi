@@ -1,0 +1,79 @@
+import org.metavm.api.Index
+
+class Exchange(
+    val user: User,
+    @Tag(1000001)
+    val app: Application,
+    val prompt: string,
+    val first: bool,
+    var skipPageGeneration: bool
+) {
+
+    var status = ExchangeStatus.PLANNING
+
+    var productURL: string?
+    var managementURL: string?
+
+    var errorMessage: string?
+
+    static val appIdx = Index<Application, Exchange>(false, exch -> exch.app)
+
+    class Stage(val type: StageType) {
+
+        var status = StageStatus.GENERATING
+
+        class Attempt {
+            var status = AttemptStatus.RUNNING
+            var errorMessage: string?
+        }
+
+    }
+
+    fn cancel() {
+        if (!isRunning())
+            throw Exception("Cannot cancel a non-running exchange")
+        status = ExchangeStatus.CANCELLED
+    }
+
+    fn isRunning() -> bool {
+        return status == ExchangeStatus.GENERATING || status == ExchangeStatus.PLANNING
+    }
+
+    fn retry() {
+        if (status != ExchangeStatus.FAILED)
+            throw Exception("Cannot retry a non-failed exchange")
+        status = ExchangeStatus.PLANNING
+    }
+
+}
+
+
+enum ExchangeStatus {
+    PLANNING,
+    GENERATING,
+    SUCCESSFUL,
+    FAILED,
+    CANCELLED
+;
+}
+
+
+enum StageType {
+    BACKEND,
+    FRONTEND,
+    ;
+}
+
+enum StageStatus {
+    GENERATING,
+    COMMITTING,
+    SUCCESSFUL,
+    FAILED
+    ;
+}
+
+enum AttemptStatus {
+    RUNNING,
+    SUCCESSFUL,
+    FAILED;
+}

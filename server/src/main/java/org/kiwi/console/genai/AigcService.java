@@ -2,16 +2,23 @@ package org.kiwi.console.genai;
 
 import lombok.extern.slf4j.Slf4j;
 import org.kiwi.console.genai.rest.dto.GenerateRequest;
+import org.kiwi.console.generate.*;
+import org.kiwi.console.patch.PatchApply;
 import org.kiwi.console.util.BusinessException;
+import org.kiwi.console.util.Constants;
 import org.kiwi.console.util.ErrorCode;
 import org.kiwi.console.util.Utils;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Objects;
+
+import static org.kiwi.console.util.Constants.MAIN_KIWI;
 
 @Slf4j
 @Component
@@ -21,14 +28,14 @@ public class AigcService {
     private final String createPrompt;
     private final String fixPrompt;
     private final String updatePrompt;
-    private final AgentCompiler agentCompiler;
+    private final KiwiCompiler compiler;
 
-    public AigcService(Agent agent, AgentCompiler agentCompiler) {
+    public AigcService(Agent agent, KiwiCompiler compiler) {
         this.agent = agent;
-        this.agentCompiler = agentCompiler;
-        createPrompt = loadPrompt("/prompt/create.md");
-        fixPrompt = loadPrompt("/prompt/fix.md");
-        updatePrompt = loadPrompt("/prompt/update.md");
+        this.compiler = compiler;
+        createPrompt = loadPrompt("/prompt/kiwi-create.md");
+        fixPrompt = loadPrompt("/prompt/kiwi-fix.md");
+        updatePrompt = loadPrompt("/prompt/kiwi-update.md");
     }
 
     private String loadPrompt(String file) {
@@ -41,27 +48,27 @@ public class AigcService {
 
     public void generate(GenerateRequest request, String token) {
         var chat = agent.createChat();
-        var existingCode = agentCompiler.getCode(request.appId());
+        var existingCode = compiler.getCode(request.appId(), MAIN_KIWI);
         String text;
         if (existingCode != null)
             text = buildUpdateText(request.prompt(), existingCode);
         else
             text = buildCreateText(request);
-        log.info("Initial prompt: {}", text);
-        var code = removeMarkdownTags(chat.send(text));
-        log.info("Generated code:");
-        log.info("{}", code);
-        var r = agentCompiler.deploy(request.appId(), token, code);
+        log.info("Initial prompt:\n{}", text);
+        var resp = removeMarkdownTags(generateContent(chat, text));
+        var code = existingCode == null ? resp : PatchApply.apply(existingCode, resp);
+        log.info("Generated code:\n{}", code);
+        var r = deploy(request.appId(), token, code);
         if (r.successful()) {
             log.info("Deployed successfully");
             return;
         }
         for (int i = 0; i < 5; i++) {
-            var fixPrompt = buildFixPrompt(r.output());
-            log.info("Trying to fix error with prompt: {}", fixPrompt);
-            code = removeMarkdownTags(chat.send(fixPrompt));
+            var fixPrompt = buildFixPrompt(code, r.output());
+            log.info("Trying to fix error with prompt:\n{}", fixPrompt);
+            code = PatchApply.apply(code, removeMarkdownTags(generateContent(chat, fixPrompt)));
             log.info("Generated code (Retry #{}):\n{}", i + 1, code);
-            r = agentCompiler.deploy(request.appId(), token, code);
+            r = deploy(request.appId(), token, code);
             if (r.successful()) {
                 log.info("Deployed successfully");
                 return;
@@ -70,16 +77,37 @@ public class AigcService {
         throw new BusinessException(ErrorCode.CODE_GENERATION_FAILED);
     }
 
+    private DeployResult deploy(long appId, String token, String code) {
+        return compiler.run(appId, token, List.of(new SourceFile(MAIN_KIWI, code)));
+    }
+
+    private String generateContent(Chat chat, String prompt) {
+        var buf = new StringBuilder();
+        chat.send(prompt, new ChatStreamListener() {
+            @Override
+            public void onThought(String thoughtChunk) {
+                log.info(thoughtChunk);
+            }
+
+            @Override
+            public void onContent(String contentChunk) {
+                log.info(contentChunk);
+                buf.append(contentChunk);
+            }
+        }, () -> false);
+        return buf.toString();
+    }
+
     private String buildCreateText(GenerateRequest request) {
-        return createPrompt + request.prompt();
+        return Format.format(createPrompt, request.prompt());
     }
 
     private String buildUpdateText(String content, String code) {
-        return updatePrompt + content + "\nHere is the existing code:\n" + code;
+        return Format.format(updatePrompt, content, LineNumAnnotator.annotate(code));
     }
 
-    private String buildFixPrompt(String buildOutput) {
-        return fixPrompt + buildOutput;
+    private String buildFixPrompt(String code, String buildOutput) {
+        return Format.format(fixPrompt, LineNumAnnotator.annotate(code), buildOutput);
     }
 
     public static String removeMarkdownTags(String text) {
@@ -92,17 +120,21 @@ public class AigcService {
     }
 
     public static void main(String[] args) throws IOException {
-        Utils.clearDirectory("/tmp/kiwiworks/1000012000");
+        Utils.removeDirectory("/tmp/kiwi-works/1000015268");
         var apikeyPath = "/Users/leen/develop/gemini/apikey";
         var apikey = Files.readString(Path.of(apikeyPath));
         var chatService = new AigcService(
                 new GeminiAgent(apikey),
-                new AgentCompilerImpl(new DeployClient("http://localhost:8080"))
+                new DefaultKiwiCompiler(
+                        Path.of("/tmp/kiwi-works"),
+                        new DeployClient("http://localhost:8080", HttpClient.newBuilder()
+                        .version(HttpClient.Version.HTTP_1_1)
+                        .build()))
         );
         chatService.generate(new GenerateRequest(
-                1000012000L,
+                1000015268L,
                 "Create a todo list application"
-        ), "f1adbd81-51f3-4398-9c23-d611e1ca4103");
+        ), Constants.TOKEN);
     }
 
 }

@@ -1,0 +1,72 @@
+import org.metavm.api.Index
+import org.metavm.api.Interceptor
+import org.metavm.api.entity.HttpRequest
+import org.metavm.api.entity.HttpResponse
+
+class User(
+    var name: string,
+    password: string
+) {
+
+    priv var passwordHash = secureHash(password, null)
+
+    static val nameIdx = Index<string, User>(true, u -> u.name)
+
+    val applications = new Application[]
+
+    fn checkPassword(password: string) -> bool {
+        return passwordHash == secureHash(password, null)
+    }
+
+}
+
+@Bean
+class UserService {
+
+    fn register(userName: string, password: string) -> User {
+        if (User.nameIdx.getFirst(userName) != null)
+            throw Exception("User already exists")
+        return User(userName, password)
+    }
+
+    fn login(userName: string, password: string) -> string? {
+        var user = User.nameIdx.getFirst(userName)
+        if (user != null && user!!.checkPassword(password)) {
+            val token = secureRandom(128)
+            Session(token, user!!)
+            return token
+        }
+        return null
+    }
+
+    fn logout(token: string) {
+        var s = Session.tokenIdx.getFirst(token)
+        if (s != null)
+            delete s!!
+    }
+
+    fn authenticate(token: string) -> User? {
+        val s = Session.tokenIdx.getFirst(token)
+        if (s != null)
+            return s!!.user
+        else
+            return null
+    }
+
+    fn currentUser() -> User {
+        val user = getContext("user")
+        if (user != null)
+            return user as User
+        throw Exception("Login required")
+    }
+
+}
+
+class Session(
+    val token: string,
+    val user: User
+) {
+
+    static val tokenIdx = Index<string, Session>(true, s -> s.token)
+
+}
