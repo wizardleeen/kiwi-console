@@ -47,6 +47,7 @@ public class AigcService {
     }
 
     public void generate(GenerateRequest request, String token) {
+        compiler.reset(request.appId());
         var chat = agent.createChat();
         var existingCode = compiler.getCode(request.appId(), MAIN_KIWI);
         String text;
@@ -78,7 +79,10 @@ public class AigcService {
     }
 
     private DeployResult deploy(long appId, String token, String code) {
-        return compiler.run(appId, token, List.of(new SourceFile(MAIN_KIWI, code)));
+        var r = compiler.run(appId, token, List.of(new SourceFile(MAIN_KIWI, code)));
+        if (r.successful())
+            compiler.commit(appId, "commit");
+        return r;
     }
 
     private String generateContent(Chat chat, String prompt) {
