@@ -26,32 +26,27 @@ public class ConsoleConfig {
     public static String CONFIG_PATH;
 
     private final GeminiConfig geminiConfig;
-
     private final KiwiConfig kiwiConfig;
-
     private final ServerConfig serverConfig;
-    private final AppConfig appConfig;
+    private final PageConfig pageConfig;
+    private final UrlTemplates urlTemplates;
 
     public ConsoleConfig() {
         var config = getConfig();
         serverConfig = buildServerConfig(config);
         geminiConfig = buildGeminiConfig(config);
         kiwiConfig = buildKiwiConfig(config);
-        appConfig = buildAppConfig(config);
+        pageConfig = buildPageConfig(config);
+        urlTemplates = buildUrlTemplates(config);
         configProxy(config);
     }
 
-    private AppConfig buildAppConfig(YmlConfig config) {
-        return new AppConfig(
-                config.getString("app", "kiwi-works-dir"),
-                config.getString("app", "page-works-dir"),
-                config.getString("app", "product-url-template"),
-                config.getString("app", "management-url-template")
-        );
+    private PageConfig buildPageConfig(YmlConfig config) {
+        return new PageConfig(config.getString("page", "works-dir"));
     }
 
     private void configProxy(YmlConfig config) {
-        var pacFileUrl = config.tryGetString("proxy", "pac-file-url");
+        var pacFileUrl = config.tryGetString("proxy", "pac");
         if (pacFileUrl != null)
             ProxyUtils.setupPacProxy(pacFileUrl);
     }
@@ -62,13 +57,22 @@ public class ConsoleConfig {
 
     private KiwiConfig buildKiwiConfig(YmlConfig config) {
         return new KiwiConfig(config.getString("kiwi", "host"),
-                config.getLong("kiwi", "sys-app-id"),
-                config.getString("kiwi", "token"));
+            config.getLong("kiwi", "sys-app-id"),
+            config.getString("kiwi", "token"),
+            config.getString("kiwi", "works-dir")
+        );
     }
 
     private ServerConfig buildServerConfig(YmlConfig config) {
         var port = Objects.requireNonNullElse(config.tryGetInt("server", "port"), 8080);
         return new ServerConfig(port);
+    }
+
+    private UrlTemplates buildUrlTemplates(YmlConfig config) {
+        return new UrlTemplates(
+                config.getString("url-templates", "product"),
+                config.getString("url-templates", "management")
+        );
     }
 
     private YmlConfig getConfig() {
@@ -96,8 +100,8 @@ public class ConsoleConfig {
                 pageCompiler,
                 exchangeClient,
                 applicationClient,
-                appConfig.productUrlTemplate,
-                appConfig.managementUrlTemplate,
+                urlTemplates.product,
+                urlTemplates.management,
                 kiwiConfig.token,
                 taskExecutor
         );
@@ -105,12 +109,12 @@ public class ConsoleConfig {
 
     @Bean
     public KiwiCompiler kiwiCompiler(DeployService deployService) {
-        return new DefaultKiwiCompiler(Path.of(appConfig.kiwiWorksDir), deployService);
+        return new DefaultKiwiCompiler(Path.of(kiwiConfig.worksDir), deployService);
     }
 
     @Bean
     public PageCompiler pageCompiler() {
-        return new DefaultPageCompiler(Path.of(appConfig.pageWorksDir));
+        return new DefaultPageCompiler(Path.of(pageConfig.worksDir));
     }
 
     @Bean
@@ -152,13 +156,15 @@ public class ConsoleConfig {
 
     public record GeminiConfig(String apiKey) {}
 
-    private record KiwiConfig(String host, long sysAppId, String token) {}
+    private record KiwiConfig(String host, long sysAppId, String token, String worksDir) {}
 
-    public record AppConfig(
-            String kiwiWorksDir,
-            String pageWorksDir,
-            String productUrlTemplate,
-            String managementUrlTemplate
+    public record PageConfig(
+            String worksDir
+    ) {}
+
+    private record UrlTemplates(
+            String product,
+            String management
     ) {}
 
 }
