@@ -49,10 +49,10 @@ public class GenerationService {
     private final Agent agent;
     private final KiwiCompiler kiwiCompiler;
     private final PageCompiler pageCompiler;
-    private final ApplicationClient applicationClient;
-    private final String productUrlTemplate;
-    private final String managementUrlTemplate;
-    private final ExchangeClient exchangeClient;
+    private final ApplicationClient appClient;
+    private final String productUrlTempl;
+    private final String mgmtUrlTempl;
+    private final ExchangeClient exchClient;
     private final Map<String, Task> runningTasks = new ConcurrentHashMap<>();
     private final String token;
     private final TaskExecutor taskExecutor;
@@ -61,20 +61,20 @@ public class GenerationService {
             Agent agent,
             KiwiCompiler kiwiCompiler,
             PageCompiler pageCompiler,
-            ExchangeClient exchangeClient,
-            ApplicationClient applicationClient,
-            String productUrlTemplate,
-            String managementUrlTemplate,
+            ExchangeClient exchClient,
+            ApplicationClient appClient,
+            String productUrlTempl,
+            String mgmtUrlTempl,
             String token,
             TaskExecutor taskExecutor
     ) {
         this.agent = agent;
         this.kiwiCompiler = kiwiCompiler;
         this.pageCompiler = pageCompiler;
-        this.applicationClient = applicationClient;
-        this.productUrlTemplate = productUrlTemplate;
-        this.managementUrlTemplate = managementUrlTemplate;
-        this.exchangeClient = exchangeClient;
+        this.appClient = appClient;
+        this.productUrlTempl = productUrlTempl;
+        this.mgmtUrlTempl = mgmtUrlTempl;
+        this.exchClient = exchClient;
         this.token = token;
         this.taskExecutor = taskExecutor;
     }
@@ -101,7 +101,7 @@ public class GenerationService {
         }
         var sysAppId = getApp(appId).getSystemAppId();
         var exchange = Exchange.create(appId, userId, prompt, creating, skipPageGeneration);
-        exchange.setId(exchangeClient.save(exchange));
+        exchange.setId(exchClient.save(exchange));
         listener.onProgress(exchange);
         var task = new Task(exchange, sysAppId, listener);
         taskExecutor.execute(() -> runTask(task));
@@ -122,7 +122,7 @@ public class GenerationService {
                 var apiSource = kiwiCompiler.generateApi(sysAppId);
                 executeGen(() -> generatePages(apiSource, task));
             }
-            var url = Format.format(productUrlTemplate, sysAppId);
+            var url = Format.format(productUrlTempl, sysAppId);
             task.finish(url);
             log.info("Generation Completed. Application: {}", url);
         } catch (Exception e) {
@@ -144,16 +144,16 @@ public class GenerationService {
     }
 
     public void cancel(CancelRequest request) {
-        exchangeClient.cancel(new ExchangeCancelRequest(request.exchangeId()));
+        exchClient.cancel(new ExchangeCancelRequest(request.exchangeId()));
         var task = runningTasks.get(request.exchangeId());
         if (task != null)
             task.cancel();
     }
 
     public void retry(RetryRequest request, GenerationListener listener) {
-        exchangeClient.retry(new ExchangeRetryRequest(request.exchangeId()));
-        var exch = exchangeClient.get(request.exchangeId());
-        var app = applicationClient.get(exch.getAppId());
+        exchClient.retry(new ExchangeRetryRequest(request.exchangeId()));
+        var exch = exchClient.get(request.exchangeId());
+        var app = appClient.get(exch.getAppId());
         var task = new Task(exch, app.getSystemAppId(), listener);
         taskExecutor.execute(() -> runTask(task));
     }
@@ -266,7 +266,7 @@ public class GenerationService {
         log.info("Kiwi deployed successfully");
         kiwiCompiler.commit(sysAppId, generateKIwiCommitMsg(chat, task));
         log.info("Kiwi source code committed");
-        task.exchange.setManagementURL(Format.format(managementUrlTemplate, sysAppId));
+        task.exchange.setManagementURL(Format.format(mgmtUrlTempl, sysAppId));
         task.exitStage();
     }
 
@@ -288,15 +288,15 @@ public class GenerationService {
     }
 
     private String createApp(String name, String userId) {
-        return applicationClient.save(Application.create(name, userId));
+        return appClient.save(Application.create(name, userId));
     }
 
     public void updateAppName(String appId, String name) {
-        applicationClient.updateName(new UpdateNameRequest(appId, name));
+        appClient.updateName(new UpdateNameRequest(appId, name));
     }
 
     public Application getApp(String id) {
-        return applicationClient.get(id);
+        return appClient.get(id);
     }
 
     private @Nullable String extractAppName(String code) {
@@ -447,7 +447,7 @@ public class GenerationService {
 
         void saveExchange() {
             ensureNotCancelled();
-            exchange = exchangeClient.get(exchangeClient.save(exchange));
+            exchange = exchClient.get(exchClient.save(exchange));
             listener.onProgress(exchange);
         }
 
@@ -510,7 +510,7 @@ public class GenerationService {
                 createFeignClient(ExchangeClient.class, TEST_SYS_APP_ID),
                 new ApplicationService(host, TEST_SYS_APP_ID, TOKEN),
                 "http://{}.metavm.test",
-                "http://localhost:8080",
+                "http://metavm.test/app/{}",
                 TOKEN,
                 new SyncTaskExecutor()
         );

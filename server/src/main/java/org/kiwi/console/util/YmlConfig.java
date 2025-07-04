@@ -46,6 +46,27 @@ public record YmlConfig(Map<String, Object> config) {
             throw new ConfigException("Invalid configuration for: " + key1 + "." + key2 + ", expected String");
     }
 
+
+    public Object get(String key1, String key2, String key3) {
+        Object value = config.get(key1);
+        if (value instanceof Map<?, ?> map1) {
+            value = map1.get(key2);
+            if (value instanceof Map<?, ?> map2) {
+                return map2.get(key3);
+            }
+        }
+        throw new ConfigException("Cannot find configuration for: " + key1 + "." + key2 + "." + key3);
+    }
+
+    public String getString(String key1, String key2, String key3) {
+        Object value = get(key1, key2, key3);
+        if (value instanceof String s) {
+            return s;
+        } else {
+            throw new ConfigException("Invalid configuration for: " + key1 + "." + key2 + "." + key3 + ", expected String");
+        }
+    }
+
     public Integer tryGetInt(String key1, String key2) {
         var value = tryGet(key1, key2);
         if (value != null) {

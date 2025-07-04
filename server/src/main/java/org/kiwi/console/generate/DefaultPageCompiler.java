@@ -16,6 +16,9 @@ public class DefaultPageCompiler extends AbstractCompiler implements PageCompile
 
     @Override
     public DeployResult deploy(long appId, String token) {
+        var r = Utils.executeCommand(getWorkDir(appId).path(), "sh", "deploy.sh");
+        if (r.exitCode() != 0)
+            return new DeployResult(false, r.output());
         return new DeployResult(true, null);
     }
 

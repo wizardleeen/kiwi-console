@@ -83,7 +83,7 @@ Creates a new user account.
 
 Retrieves a paginated list of applications.
 
-*   `POST /app/v2/search`
+*   `POST /app/search`
 *   **Request Body:**
 
 | Parameter        | Required | Default | Description                                                                                                                          |
@@ -96,7 +96,7 @@ Retrieves a paginated list of applications.
 *   **Response Body:** `SearchResult<Application>`
 *   **Example:**
     ```http
-    POST /app/v2/search
+    POST /app/search
     Authorization: Bearer {token}
     Content-Type: application/json
 
@@ -122,7 +122,7 @@ Retrieves a paginated list of applications.
 
 Creates a new application or updates an existing one.
 
-*   `POST /app/v2`
+*   `POST /app`
 *   **Request Body:** `Application`
     *   If `id` is `null` or omitted: Creates a new application.
     *   If `id` is provided: Updates the existing application with that ID.
@@ -130,7 +130,7 @@ Creates a new application or updates an existing one.
 *   **Response Body:** `string` (The application ID)
 *   **Example:**
     ```http
-    POST /app/v2
+    POST /app
     Autorization: Bearer {token}
     Content-Type: application/json
 
@@ -147,12 +147,12 @@ Creates a new application or updates an existing one.
 
 Retrieves an Application.
 
-*   `GET /app/v2/{id}`
+*   `GET /app/{id}`
 *   **Path Parameter:** `id` - The ID of the application to retrieve.
 *   **Response Body:** `Application`
 *   **Example:**
     ```http
-    GET /app/v2/{id}
+    GET /app/{id}
     Authorization: Bearer {token}
     ```
     * Response
@@ -168,12 +168,12 @@ Retrieves an Application.
 
 Deletes an application.
 
-*   `DELETE /app/v2/{id}`
+*   `DELETE /app/{id}`
 *   **Path Parameter:** `id` - The ID of the application to delete.
 *   **Response Body:** No content
 *   **Example:**
     ```http
-    DELETE /app/v2/{id}
+    DELETE /app/{id}
     Authorization: Bearer {token}
     ```
 

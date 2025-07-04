@@ -11,7 +11,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/app/v2")
+@RequestMapping("/app")
 public class ApplicationController {
 
     private final ApplicationClient applicationClient;
