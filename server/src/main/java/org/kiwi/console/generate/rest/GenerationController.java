@@ -4,7 +4,7 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.kiwi.console.generate.GenerationService;
 import org.kiwi.console.generate.event.GenerationListener;
-import org.kiwi.console.kiwi.ApplicationClient;
+import org.kiwi.console.kiwi.AppClient;
 import org.kiwi.console.kiwi.Exchange;
 import org.kiwi.console.kiwi.ExchangeClient;
 import org.kiwi.console.kiwi.ExchangeSearchRequest;
@@ -21,12 +21,12 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class GenerationController {
 
     private final GenerationService generationService;
-    private final ApplicationClient applicationClient;
+    private final AppClient appClient;
     private final ExchangeClient exchangeClient;
 
-    public GenerationController(GenerationService generationService, ApplicationClient applicationClient, ExchangeClient exchangeClient) {
+    public GenerationController(GenerationService generationService, AppClient appClient, ExchangeClient exchangeClient) {
         this.generationService = generationService;
-        this.applicationClient = applicationClient;
+        this.appClient = appClient;
         this.exchangeClient = exchangeClient;
     }
 
@@ -65,8 +65,8 @@ public class GenerationController {
     public SearchResult<Exchange> search(@AuthenticationPrincipal String userId, @RequestBody HistoryRequest request) {
         if (request.appId() == null)
             throw new BusinessException(ErrorCode.BAD_REQUEST);
-        var app = applicationClient.get(request.appId());
-        if (!app.getMembersIds().contains(userId))
+        var app = appClient.get(request.appId());
+        if (!app.getMemberIds().contains(userId))
             throw new BusinessException(ErrorCode.FORBIDDEN);
         var innerReq = new ExchangeSearchRequest(
                 null,
@@ -86,8 +86,8 @@ public class GenerationController {
     }
 
     private void ensureApplicationAuthorized(String userId, String appId) {
-        var app = applicationClient.get(appId);
-        if (!app.getMembersIds().contains(userId)) {
+        var app = appClient.get(appId);
+        if (!app.getMemberIds().contains(userId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN);
         }
     }

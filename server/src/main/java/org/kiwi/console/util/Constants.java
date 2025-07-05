@@ -11,9 +11,11 @@ public class Constants {
 
     public static final String INDEX_TS = "index.ts";
 
-    public static final long TEST_SYS_APP_ID = 1000013053L;
+    public static final long CHAT_APP_ID = 1000013053L;
 
     public static final String TOKEN = "079026ee-80cc-4dbe-95e3-83c795b4dcb4";
 
     public static final String USER_ID = "0182f5d7b90700";
+    public static final String KIWI_WORKDIR = "/Users/leen/develop/kiwi-works";
+    public static final String PAGE_WORKDIR = "/Users/leen/develop/page-works";
 }

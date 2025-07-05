@@ -9,8 +9,6 @@ Kiwi is an infrastructure-free programming langauge that enables application to 
 
 ### Kiwi Example
 
-    import org.metavm.api.Index
-
     @Label("商品")
     class Product(
     @Summary
@@ -32,23 +30,14 @@ Kiwi is an infrastructure-free programming langauge that enables application to 
             stock -= quantity
         }
 
-        @Label("购买")
-        fn buy(customer: Customer, @Label("数量") quantity: int, @Label("优惠券") coupon: Coupon?) -> Order {
-            reduceStock(quantity)
-            var price = this.price.times(quantity)
-            if (coupon != null)
-                price = price.sub(coupon!!.redeem())
-            val order = Order(customer, price)
-            order.Item(this, quantity)
-            return order
-        }
-
     }
 
     @Bean
+    @Label("商品服务")
     class ProductService {
-        
-        fn findByName(name: string) -> Product? {
+
+        @Label("按名称查找商品")
+        fn findProductByName(@Label("名称") name: string) -> Product? {
             return Product.nameIdx.getFirst(name)
         }
 
@@ -56,13 +45,13 @@ Kiwi is an infrastructure-free programming langauge that enables application to 
 
     @Label("优惠券")
     class Coupon(
-        @Summary
-        @Label("标题")
-        val title: string,
-        @Label("折扣") 
-        val discount: Money,
-        @Label("过期时间")
-        val expiry: long
+    @Summary
+    @Label("标题")
+    val title: string,
+    @Label("折扣")
+    val discount: Money,
+    @Label("过期时间")
+    val expiry: long
     ) {
 
         @Label("已核销")
@@ -102,19 +91,23 @@ Kiwi is an infrastructure-free programming langauge that enables application to 
         @Summary
         priv val summary = amount + " " + currency.label()
 
+        @Label("加")
         fn add(@Label("待加金额") that: Money) -> Money {
             return Money(amount + that.getAmount(currency), currency)
         }
 
-        fn sub(that: Money) -> Money {
+        @Label("减")
+        fn sub(@Label("待减金额") that: Money) -> Money {
             return Money(amount - that.getAmount(currency), currency)
         }
 
+        @Label("汇率转化")
         fn getAmount(@Label("目标币种") currency: Currency) -> double {
             return currency.rate / this.currency.rate * amount
         }
 
-        fn times(n: int) -> Money {
+        @Label("乘")
+        fn times(@Label("倍数") n: int) -> Money {
             return Money(amount * n, currency)
         }
 
@@ -128,6 +121,7 @@ Kiwi is an infrastructure-free programming langauge that enables application to 
     @Label("人民币")
     YUAN(7.2) {
 
+            @Label("标签")
             fn label() -> string {
                 return "元"
             }
@@ -136,6 +130,7 @@ Kiwi is an infrastructure-free programming langauge that enables application to 
         @Label("美元")
         DOLLAR(1) {
 
+            @Label("标签")
             fn label() -> string {
                 return "美元"
             }
@@ -144,6 +139,7 @@ Kiwi is an infrastructure-free programming langauge that enables application to 
         @Label("英镑")
         POUND(0.75) {
 
+            @Label("标签")
             fn label() -> string {
                 return "英镑"
             }
@@ -151,11 +147,8 @@ Kiwi is an infrastructure-free programming langauge that enables application to 
         },
     ;
 
+        @Label("标签")
         abstract fn label() -> string
-
-        fn getRate() -> double {
-            return rate
-        }
 
     }
 
@@ -164,13 +157,14 @@ Kiwi is an infrastructure-free programming langauge that enables application to 
     class OrderService {
 
         @Label("下单")
-        fn placeOrder(customer: Customer, @Label("商品列表") products: Product[]) -> Order {
+        fn placeOrder(@Label("客户") customer: Customer, @Label("商品列表") products: Product[], @Label("优惠券") coupon: Coupon?) -> Order {
             require(products.length > 0, "Missing products")
-            val price = products[0].price
-            var i = 1
-            while (i < products.length) {
+            var price = products[0].price
+            for (i in 1...products.length) {
                 price = price.add(products[i].price)
-                i++
+            }
+            if (coupon != null) {
+                price = price.sub(coupon!!.redeem())
             }
             val order = Order(customer, price)
             products.forEach(p -> {
@@ -181,7 +175,7 @@ Kiwi is an infrastructure-free programming langauge that enables application to 
         }
 
         @Label("确认订单")
-        fn confirmOrder(order: Order) {
+        fn confirmOrder(@Label("订单") order: Order) {
             require(order.status == OrderStatus.PENDING, "订单状态不正确")
             order.status = OrderStatus.CONFIRMED
         }
@@ -204,15 +198,17 @@ Kiwi is an infrastructure-free programming langauge that enables application to 
 
     @Label("订单")
     class Order(
-        @Label("客户")
-        val customer: Customer,
-        @Label("总价")
-        val price: Money
+    @Label("客户")
+    val customer: Customer,
+    @Label("总价")
+    val price: Money
     ) {
 
         static val statusIdx = Index<OrderStatus, Order>(false, o -> o.status)
-
-        val createdAt = now() 
+        
+        @Label("创建时间")
+        val createdAt = now()
+        @Label("状态")
         var status = OrderStatus.PENDING
        
         @Label("订单项")
@@ -225,38 +221,54 @@ Kiwi is an infrastructure-free programming langauge that enables application to 
 
     }
 
+    @Label("订单状态")
     enum OrderStatus {
-        PENDING,
-        CONFIRMED,
-        CANCELLED,
-        ;
+    @Label("待确认")
+    PENDING,
+    @Label("已确认")
+    CONFIRMED,
+    @Label("已取消")
+    CANCELLED,
+    ;
     }
 
+    @Label("客户")
     class Customer(
-        @Summary
-        var name: string,
-        val email: string,
-        password: string
+    @Summary
+    @Label("名称")
+    var name: string,
+    @Label("邮箱")
+    val email: string,
+    @Label("密码")
+    password: string
     ) {
-         
+
         priv var passwordHash = secureHash(password, null)
-   
+
         static val emailIdx = Index<string, Customer>(true, c -> c.email)
         
-        fn checkPassword(password: string) -> bool {
+        @Label("校验密码")
+        fn checkPassword(@Label("密码") password: string) -> bool {
             return passwordHash == secureHash(password, null)
         }        
 
     }
 
     @Bean
+    @Label("客户服务")
     class CustomerService {
-    
-        fn login(email: string, password: string) -> Customer? {
+
+        @Label("登录")
+        fn login(@Label("邮箱") email: string, @Label("密码") password: string) -> Customer? {
             val customer = Customer.emailIdx.getFirst(email)
             return customer != null && customer!!.checkPassword(password) ? customer : null
         }
-    
+
+        @Label("注册")
+        fn register(@Label("用户名") name: string, @Label("邮箱") email: string, @Label("密码") password: string) -> Customer {
+            return Customer(name, email, password)
+        }
+
     }
 
 ### Important Kiwi Notes

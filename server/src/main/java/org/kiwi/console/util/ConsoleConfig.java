@@ -1,10 +1,7 @@
 package org.kiwi.console.util;
 
 import org.kiwi.console.generate.*;
-import org.kiwi.console.kiwi.ApplicationClient;
-import org.kiwi.console.kiwi.ApplicationService;
-import org.kiwi.console.kiwi.ExchangeClient;
-import org.kiwi.console.kiwi.UserClient;
+import org.kiwi.console.kiwi.*;
 import org.springframework.beans.factory.annotation.Configurable;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.web.server.ConfigurableWebServerFactory;
@@ -57,8 +54,7 @@ public class ConsoleConfig {
 
     private KiwiConfig buildKiwiConfig(YmlConfig config) {
         return new KiwiConfig(config.getString("kiwi", "host"),
-            config.getLong("kiwi", "sys-app-id"),
-            config.getString("kiwi", "token"),
+            config.getLong("kiwi", "chat-app-id"),
             config.getString("kiwi", "works-dir")
         );
     }
@@ -91,7 +87,7 @@ public class ConsoleConfig {
     public GenerationService generationService(GeminiAgent geminiAgent,
                                                KiwiCompiler kiwiCompiler,
                                                PageCompiler pageCompiler,
-                                               ApplicationClient applicationClient,
+                                               AppClient appClient,
                                                ExchangeClient exchangeClient,
                                                @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor) {
         return new GenerationService(
@@ -99,10 +95,9 @@ public class ConsoleConfig {
                 kiwiCompiler,
                 pageCompiler,
                 exchangeClient,
-                applicationClient,
+                appClient,
                 urlTemplates.product,
                 urlTemplates.management,
-                kiwiConfig.token,
                 taskExecutor
         );
     }
@@ -129,17 +124,22 @@ public class ConsoleConfig {
 
     @Bean
     public ExchangeClient exchangeClient() {
-        return Utils.createKiwiFeignClient(kiwiConfig.host, ExchangeClient.class, kiwiConfig.sysAppId);
+        return Utils.createKiwiFeignClient(kiwiConfig.host, ExchangeClient.class, kiwiConfig.chatAppId);
     }
 
     @Bean
-    public ApplicationClient applicationClient() {
-        return new ApplicationService(kiwiConfig.host, kiwiConfig.sysAppId(), kiwiConfig.token);
+    public AppClient appClient(UserClient userClient) {
+        return new AppService(kiwiConfig.host, kiwiConfig.chatAppId, userClient);
+    }
+
+    @Bean
+    public SysUserClient sysUserClient() {
+        return Utils.createFeignClient(kiwiConfig.host, SysUserClient.class);
     }
 
     @Bean
     public UserClient userClient() {
-        return Utils.createKiwiFeignClient(kiwiConfig.host, UserClient.class, kiwiConfig.sysAppId);
+        return new UserService(kiwiConfig.host, kiwiConfig.chatAppId);
     }
 
     @Bean
@@ -156,7 +156,7 @@ public class ConsoleConfig {
 
     public record GeminiConfig(String apiKey) {}
 
-    private record KiwiConfig(String host, long sysAppId, String token, String worksDir) {}
+    private record KiwiConfig(String host, long chatAppId, String worksDir) {}
 
     public record PageConfig(
             String worksDir

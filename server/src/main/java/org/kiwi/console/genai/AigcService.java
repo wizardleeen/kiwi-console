@@ -5,7 +5,6 @@ import org.kiwi.console.genai.rest.dto.GenerateRequest;
 import org.kiwi.console.generate.*;
 import org.kiwi.console.patch.PatchApply;
 import org.kiwi.console.util.BusinessException;
-import org.kiwi.console.util.Constants;
 import org.kiwi.console.util.ErrorCode;
 import org.kiwi.console.util.Utils;
 import org.springframework.stereotype.Component;
@@ -46,7 +45,7 @@ public class AigcService {
         }
     }
 
-    public void generate(GenerateRequest request, String token) {
+    public void generate(GenerateRequest request) {
         compiler.reset(request.appId());
         var chat = agent.createChat();
         var existingCode = compiler.getCode(request.appId(), MAIN_KIWI);
@@ -59,7 +58,7 @@ public class AigcService {
         var resp = removeMarkdownTags(generateContent(chat, text));
         var code = existingCode == null ? resp : PatchApply.apply(existingCode, resp);
         log.info("Generated code:\n{}", code);
-        var r = deploy(request.appId(), token, code);
+        var r = deploy(request.appId(), code);
         if (r.successful()) {
             log.info("Deployed successfully");
             return;
@@ -69,7 +68,7 @@ public class AigcService {
             log.info("Trying to fix error with prompt:\n{}", fixPrompt);
             code = PatchApply.apply(code, removeMarkdownTags(generateContent(chat, fixPrompt)));
             log.info("Generated code (Retry #{}):\n{}", i + 1, code);
-            r = deploy(request.appId(), token, code);
+            r = deploy(request.appId(), code);
             if (r.successful()) {
                 log.info("Deployed successfully");
                 return;
@@ -78,8 +77,8 @@ public class AigcService {
         throw new BusinessException(ErrorCode.CODE_GENERATION_FAILED);
     }
 
-    private DeployResult deploy(long appId, String token, String code) {
-        var r = compiler.run(appId, token, List.of(new SourceFile(MAIN_KIWI, code)));
+    private DeployResult deploy(long appId, String code) {
+        var r = compiler.run(appId, List.of(new SourceFile(MAIN_KIWI, code)));
         if (r.successful())
             compiler.commit(appId, "commit");
         return r;
@@ -138,7 +137,7 @@ public class AigcService {
         chatService.generate(new GenerateRequest(
                 1000015268L,
                 "Create a todo list application"
-        ), Constants.TOKEN);
+        ));
     }
 
 }

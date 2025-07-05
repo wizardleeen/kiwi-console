@@ -23,10 +23,10 @@ public class AigcController {
     }
 
     @PostMapping("/generate")
-    public Result<Void> generate(HttpServletRequest servletRequest, @RequestBody GenerateRequest request) {
+    public Result<Void> generate(@RequestBody GenerateRequest request) {
         if (request == null || request.appId() <= 0 || request.prompt() == null)
             throw new BusinessException(ErrorCode.BAD_REQUEST);
-        aigcService.generate(request, getToken(servletRequest));
+        aigcService.generate(request);
         return Result.voidSuccess();
     }
 

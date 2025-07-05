@@ -239,13 +239,18 @@ public class Utils {
     private static final GsonDecoder gsonDecoder = new GsonDecoder();
     private static final FeignErrorDecoder feignErrorDecoder = new FeignErrorDecoder();
 
-    public static <T> T createFeignClient(String url, Class<T> type, RequestInterceptor interceptor) {
-        return Feign.builder()
+    public static <T> T createFeignClient(String url, Class<T> type) {
+        return createFeignClient(url, type, null);
+    }
+
+    public static <T> T createFeignClient(String url, Class<T> type, @Nullable RequestInterceptor interceptor) {
+        var builder = Feign.builder()
                 .encoder(gsonEncoder)
                 .decoder(gsonDecoder)
-                .errorDecoder(feignErrorDecoder)
-                .requestInterceptor(interceptor)
-                .target(type, url);
+                .errorDecoder(feignErrorDecoder);
+        if (interceptor != null)
+            builder = builder.requestInterceptor(interceptor);
+        return builder.target(type, url);
     }
 
     public static <T, R> List<R> map(List<T> list, Function<T, R> mapper) {

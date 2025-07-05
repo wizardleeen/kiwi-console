@@ -1,17 +1,15 @@
 package org.kiwi.console.generate;
 
 import org.kiwi.console.kiwi.SystemApp;
-import org.kiwi.console.kiwi.SystemAppClient;
-import org.kiwi.console.util.Result;
+import org.kiwi.console.kiwi.SysAppClient;
 
-public class MockSysAppClient implements SystemAppClient {
+public class MockSysAppClient implements SysAppClient {
     @Override
-    public Result<Long> save(SystemApp application) {
-        return Result.success(TestConstants.SYS_APP_ID);
+    public long save(SystemApp application) {
+        return TestConstants.SYS_APP_ID;
     }
 
     @Override
-    public Result<Void> delete(long id) {
-        return null;
+    public void delete(long id) {
     }
 }

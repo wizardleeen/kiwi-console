@@ -8,4 +8,5 @@ import lombok.Data;
 public class SystemApp {
     private Long id;
     private String name;
+    private String ownerId;
 }

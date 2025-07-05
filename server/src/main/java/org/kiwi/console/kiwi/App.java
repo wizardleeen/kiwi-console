@@ -7,15 +7,15 @@ import java.util.List;
 
 @Data
 @AllArgsConstructor
-public class Application {
+public class App {
     private String id;
     private String name;
     private String ownerId;
     private long systemAppId;
-    private List<String> membersIds;
+    private List<String> memberIds;
 
-    public static Application create(String name, String ownerId) {
-        return new Application(null, name, ownerId, -1, List.of());
+    public static App create(String name, String ownerId) {
+        return new App(null, name, ownerId, -1, List.of());
     }
 
 }
