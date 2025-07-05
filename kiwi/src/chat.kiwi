@@ -1,5 +1,3 @@
-import org.metavm.api.Index
-
 class Exchange(
     val user: User,
     @Tag(1000001)

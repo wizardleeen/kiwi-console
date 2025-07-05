@@ -1,16 +1,13 @@
-import org.metavm.api.Index
-import org.metavm.api.Interceptor
-import org.metavm.api.entity.HttpRequest
-import org.metavm.api.entity.HttpResponse
-
 class User(
     var name: string,
-    password: string
+    password: string,
+    val sysUserId: string
 ) {
 
     priv var passwordHash = secureHash(password, null)
 
     static val nameIdx = Index<string, User>(true, u -> u.name)
+    static val sysUserIdIdx = Index<string, User>(true, u -> u.sysUserId)
 
     val applications = new Application[]
 
@@ -18,25 +15,29 @@ class User(
         return passwordHash == secureHash(password, null)
     }
 
+    fn __sysUserId__() -> string {
+        return "01e0ffd8b90700"
+    }
+
 }
 
 @Bean
 class UserService {
 
-    fn register(userName: string, password: string) -> User {
+    fn register(userName: string, password: string, sysUserId: string) -> User {
         if (User.nameIdx.getFirst(userName) != null)
             throw Exception("User already exists")
-        return User(userName, password)
+        return User(userName, password, sysUserId)
     }
 
-    fn login(userName: string, password: string) -> string? {
+    fn login(userName: string, password: string) -> LoginResponse {
         var user = User.nameIdx.getFirst(userName)
         if (user != null && user!!.checkPassword(password)) {
             val token = secureRandom(128)
             Session(token, user!!)
-            return token
+            return LoginResponse(token, user!!)
         }
-        return null
+        return LoginResponse(null, null)
     }
 
     fn logout(token: string) {
@@ -51,6 +52,13 @@ class UserService {
             return s!!.user
         else
             return null
+    }
+
+    fn getBySysUserId(sysUserId: string) -> User {
+        var user = User.sysUserIdIdx.getFirst(sysUserId)
+        if (user == null)
+            throw Exception("User not found")
+        return user!!
     }
 
     fn currentUser() -> User {
@@ -70,3 +78,8 @@ class Session(
     static val tokenIdx = Index<string, Session>(true, s -> s.token)
 
 }
+
+value class LoginResponse(
+    val token: string?,
+    val user: User?
+)

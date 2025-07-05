@@ -1,7 +1,9 @@
 package org.kiwi.console.generate;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import org.kiwi.console.util.Result;
+import lombok.SneakyThrows;
+import org.kiwi.console.util.BusinessException;
+import org.kiwi.console.util.ErrorCode;
+import org.kiwi.console.util.ErrorResponse;
 import org.kiwi.console.util.Utils;
 
 import java.io.InputStream;
@@ -14,30 +16,26 @@ public class DeployClient implements DeployService {
 
     private final String host;
     private final HttpClient client;
-    public static final String X_APP_ID = "X-App-ID";
 
     public DeployClient(String host, HttpClient client) {
         this.host = host;
         this.client = client;
     }
 
+    @SneakyThrows
     @Override
-    public Result<String> deploy(long appId, String token, InputStream input) {
-        try {
-            var uri = new URI(host + "/type/deploy/" + appId);
-            HttpRequest httpRequest = HttpRequest.newBuilder()
-                    .uri(uri)
-                    .header("Accept", "application/json")
-                    .header("Content-Type", "application/json")
-                    .header("Cookie", "__token_2__=" + token)
-                    .header(X_APP_ID, "2")
-                    .POST(HttpRequest.BodyPublishers.ofByteArray(input.readAllBytes()))
-                    .build();
-            var resp = client.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-            return Utils.readJSONString(resp.body(), new TypeReference<>() {
-            });
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+    public void deploy(long appId, InputStream input) {
+        var uri = new URI(host + "/internal-api/deploy/" + appId);
+        HttpRequest httpRequest = HttpRequest.newBuilder()
+                .uri(uri)
+                .header("Accept", "application/json")
+                .header("Content-Type", "application/octet-stream")
+                .POST(HttpRequest.BodyPublishers.ofByteArray(input.readAllBytes()))
+                .build();
+        var resp = client.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+        if (resp.statusCode() != 200) {
+            var errorResp = Utils.readJSONString(resp.body(), ErrorResponse.class);
+            throw new BusinessException(ErrorCode.DEPLOY_FAILED, errorResp.message());
         }
     }
 

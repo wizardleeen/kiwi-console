@@ -12,6 +12,7 @@ import org.kiwi.console.generate.rest.RetryRequest;
 import org.kiwi.console.kiwi.*;
 import org.kiwi.console.patch.PatchApply;
 import org.kiwi.console.util.BusinessException;
+import org.kiwi.console.util.Constants;
 import org.kiwi.console.util.ErrorCode;
 import org.kiwi.console.util.Utils;
 import org.springframework.core.task.SyncTaskExecutor;
@@ -36,10 +37,8 @@ import static org.kiwi.console.util.Constants.*;
 public class GenerationService {
 
     public static final String NEW_APP_NAME = "New Application";
-    private static final String pageCommitMsgPrompt = loadPrompt("/prompt/page-commit-msg.md");
     private static final String pageCreatePrompt = loadPrompt("/prompt/page-create.md");
     private static final String pageUpdatePrompt = loadPrompt("/prompt/page-update.md");
-    private static final String kiwiCommitMsgPrompt = loadPrompt("/prompt/kiwi-commit-msg.md");
     private static final String createPrompt = loadPrompt("/prompt/kiwi-create.md");
     private static final String updatePrompt = loadPrompt("/prompt/kiwi-update.md");
     private static final String pageFixPrompt = loadPrompt("/prompt/page-fix.md");
@@ -49,12 +48,11 @@ public class GenerationService {
     private final Agent agent;
     private final KiwiCompiler kiwiCompiler;
     private final PageCompiler pageCompiler;
-    private final ApplicationClient appClient;
+    private final AppClient appClient;
     private final String productUrlTempl;
     private final String mgmtUrlTempl;
     private final ExchangeClient exchClient;
     private final Map<String, Task> runningTasks = new ConcurrentHashMap<>();
-    private final String token;
     private final TaskExecutor taskExecutor;
 
     public GenerationService(
@@ -62,10 +60,9 @@ public class GenerationService {
             KiwiCompiler kiwiCompiler,
             PageCompiler pageCompiler,
             ExchangeClient exchClient,
-            ApplicationClient appClient,
+            AppClient appClient,
             String productUrlTempl,
             String mgmtUrlTempl,
-            String token,
             TaskExecutor taskExecutor
     ) {
         this.agent = agent;
@@ -75,7 +72,6 @@ public class GenerationService {
         this.productUrlTempl = productUrlTempl;
         this.mgmtUrlTempl = mgmtUrlTempl;
         this.exchClient = exchClient;
-        this.token = token;
         this.taskExecutor = taskExecutor;
     }
 
@@ -238,7 +234,7 @@ public class GenerationService {
     private void generateKiwi(Task task) {
         var sysAppId = task.sysAppId;
         var userPrompt = task.exchange.getPrompt();
-        task.enterStage(StageType.BACKEND);
+        task.enterStageAndAttempt(StageType.BACKEND);
         var chat = agent.createChat();
         String prompt;
         var existingCode = kiwiCompiler.getCode(sysAppId, MAIN_KIWI);
@@ -246,7 +242,6 @@ public class GenerationService {
             prompt = buildUpdatePrompt(userPrompt, LineNumAnnotator.annotate(existingCode));
         else
             prompt = buildCreatePrompt(userPrompt);
-        task.startAttempt();
         log.info("Kiwi generation prompt: \n{}", prompt);
         var resp = generateContent(chat, prompt, task, true);
         if (existingCode == null) {
@@ -256,7 +251,7 @@ public class GenerationService {
         }
         log.info("Agent Output:\n{}", resp);
         var code = existingCode != null ? PatchApply.apply(existingCode, resp) : resp;
-        var r = kiwiCompiler.run(sysAppId, token, List.of(new SourceFile(MAIN_KIWI, code)));
+        var r = kiwiCompiler.run(sysAppId, List.of(new SourceFile(MAIN_KIWI, code)));
         if (!r.successful()) {
             task.finishAttempt(false, r.output());
             fix(sysAppId, r.output(), task, chat, kiwiCompiler, MAIN_KIWI, kiwiFixPrompt);
@@ -264,10 +259,9 @@ public class GenerationService {
         else
             task.finishAttempt(true, null);
         log.info("Kiwi deployed successfully");
-        kiwiCompiler.commit(sysAppId, generateKIwiCommitMsg(chat, task));
+        kiwiCompiler.commit(sysAppId, generateKIwiCommitMsg(task));
         log.info("Kiwi source code committed");
         task.exchange.setManagementURL(Format.format(mgmtUrlTempl, sysAppId));
-        task.exitStage();
     }
 
     private String generateContent(Chat chat, String prompt, Task task, boolean sanitizeCode) {
@@ -288,14 +282,14 @@ public class GenerationService {
     }
 
     private String createApp(String name, String userId) {
-        return appClient.save(Application.create(name, userId));
+        return appClient.save(App.create(name, userId));
     }
 
     public void updateAppName(String appId, String name) {
         appClient.updateName(new UpdateNameRequest(appId, name));
     }
 
-    public Application getApp(String id) {
+    public App getApp(String id) {
         return appClient.get(id);
     }
 
@@ -309,12 +303,12 @@ public class GenerationService {
         return null;
     }
 
-    private String generateKIwiCommitMsg(Chat chat, Task task) {
-        return generateContent(chat, kiwiCommitMsgPrompt, task, false);
+    private String generateKIwiCommitMsg(Task task) {
+        return task.exchange.getPrompt();
     }
 
-    private String generatePagesCommitMsg(Chat chat, Task task) {
-        return generateContent(chat, pageCommitMsgPrompt, task, false);
+    private String generatePagesCommitMsg(Task task) {
+        return task.exchange.getPrompt();
     }
 
     private void fix(long sysAppId, String error, Task task, Chat chat, Compiler compiler, String sourceName, String promptTemplate) {
@@ -327,7 +321,7 @@ public class GenerationService {
             log.info("Agent Output:\n{}", resp);
             code = PatchApply.apply(code, resp);
             log.info("Generated code (Retry #{}):\n{}", i + 1, code);
-            var r = compiler.run(sysAppId, token, List.of(new SourceFile(sourceName, code)));
+            var r = compiler.run(sysAppId, List.of(new SourceFile(sourceName, code)));
             if (r.successful()) {
                 task.finishAttempt(true, null);
                 return;
@@ -339,7 +333,7 @@ public class GenerationService {
     }
 
     private void generatePages(String apiSource, Task task) {
-        task.enterStage(StageType.FRONTEND);
+        task.enterStageAndAttempt(StageType.FRONTEND);
         var chat = agent.createChat();
         var existingCode = pageCompiler.getCode(task.sysAppId, APP_TSX);
         String prompt;
@@ -347,12 +341,11 @@ public class GenerationService {
             prompt = buildFrontCreatePrompt(task.exchange.getPrompt(), apiSource);
         else
             prompt = buildFrontUpdatePrompt(task.exchange.getPrompt(), LineNumAnnotator.annotate(existingCode), apiSource);
-        task.startAttempt();
         log.info("Page generation prompt:\n{}", prompt);
         var resp = generateContent(chat, prompt, task, true);
         log.info("Agent Output:\n{}", resp);
         var code = existingCode != null ? PatchApply.apply(existingCode, resp) : resp;
-        var r = pageCompiler.run(task.sysAppId, token, List.of(new SourceFile(APP_TSX, code), new SourceFile(API_TS, apiSource)));
+        var r = pageCompiler.run(task.sysAppId, List.of(new SourceFile(APP_TSX, code), new SourceFile(API_TS, apiSource)));
         if (!r.successful()) {
             task.finishAttempt(false, r.output());
             fix(task.sysAppId, r.output(), task, chat, pageCompiler, APP_TSX, pageFixPrompt);
@@ -360,9 +353,8 @@ public class GenerationService {
         else
             task.finishAttempt(true, null);
         log.info("Pages generated successfully");
-        pageCompiler.commit(task.sysAppId, generatePagesCommitMsg(chat, task));
+        pageCompiler.commit(task.sysAppId, generatePagesCommitMsg(task));
         log.info("Page source code committed");
-        task.exitStage();
     }
 
     private String buildFrontUpdatePrompt(String userPrompt, String existingCode, String apiSource) {
@@ -394,10 +386,12 @@ public class GenerationService {
             runningTasks.put(exchange.getId(), this);
         }
 
-        void enterStage(StageType type) {
+        void enterStageAndAttempt(StageType type) {
             if (exchange.getStatus() == ExchangeStatus.PLANNING)
                 exchange.setStatus(ExchangeStatus.GENERATING);
-            exchange.addStage(Stage.create(type));
+            var stage = Stage.create(type);
+            stage.addAttempt(Attempt.create());
+            exchange.addStage(stage);
             saveExchange();
         }
 
@@ -410,16 +404,11 @@ public class GenerationService {
             var attempt = currentAttempt();
             if (successful) {
                 attempt.setStatus(AttemptStatus.SUCCESSFUL);
-                currentStage().setStatus(StageStatus.COMMITTING);
+                currentStage().setStatus(StageStatus.SUCCESSFUL);
             } else {
                 attempt.setStatus(AttemptStatus.FAILED);
                 attempt.setErrorMessage(errorMsg);
             }
-            saveExchange();
-        }
-
-        void exitStage() {
-            currentStage().setStatus(StageStatus.SUCCESSFUL);
             saveExchange();
         }
 
@@ -501,22 +490,25 @@ public class GenerationService {
         var httpClient = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
         var host = "http://localhost:8080";
         var kiwiCompiler = new DefaultKiwiCompiler(
-                Path.of("/tmp/kiwi-works"),
+                Path.of(Constants.KIWI_WORKDIR),
                 new DeployClient(host, httpClient));
         var service = new GenerationService(
                 new GeminiAgent(apikey),
                 kiwiCompiler,
-                new DefaultPageCompiler(Path.of("/tmp/page-works")),
-                createFeignClient(ExchangeClient.class, TEST_SYS_APP_ID),
-                new ApplicationService(host, TEST_SYS_APP_ID, TOKEN),
+                new DefaultPageCompiler(Path.of(PAGE_WORKDIR)),
+                createFeignClient(ExchangeClient.class, CHAT_APP_ID),
+                new AppService(host, CHAT_APP_ID, Utils.createKiwiFeignClient(
+                        host,
+                        UserClient.class,
+                        CHAT_APP_ID
+                )),
                 "http://{}.metavm.test",
-                "http://metavm.test/app/{}",
-                TOKEN,
+                "http://localhost:5173/app/{}",
                 new SyncTaskExecutor()
         );
 //        System.out.println(kiwiCompiler.generateApi(TEST_APP_ID));
-//        testNewApp(service);
-        testUpdateApp(service);
+        testNewApp(service);
+//        testUpdateApp(service);
     }
 
     private static <T> T createFeignClient(Class<T> type, long appId) {
@@ -539,11 +531,12 @@ public class GenerationService {
                 null,
                 "创建一个股票应用",
                 USER_ID,
-                true,
+                false,
                 printListener
         );
     }
 
+    @SuppressWarnings("unused")
     private static void testUpdateApp(GenerationService service) {
         service.generate(
                 APP_ID,
@@ -567,11 +560,6 @@ public class GenerationService {
         public void onContent(String contentChunk) {
             System.out.print(contentChunk);
         }
-
-//        @Override
-//        public void sendEvent(GenerationEvent event) {
-//
-//        }
 
         @Override
         public void onProgress(Exchange exchange) {

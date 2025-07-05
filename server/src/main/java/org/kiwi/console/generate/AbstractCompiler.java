@@ -17,12 +17,12 @@ public abstract class AbstractCompiler implements Compiler {
     }
 
     @Override
-    public DeployResult run(long appId, String token, List<SourceFile> sourceFiles) {
+    public DeployResult run(long appId, List<SourceFile> sourceFiles) {
         var workDir = getWorkDir(appId);
         sourceFiles.forEach(f -> writeSourceFile(workDir, f));
         var r = build(workDir);
         if (r.successful())
-            return deploy(appId, token);
+            return deploy(appId);
         else
             return new DeployResult(false, r.message());
     }
@@ -33,7 +33,7 @@ public abstract class AbstractCompiler implements Compiler {
     }
 
     @Override
-    public abstract DeployResult deploy(long appId, String token);
+    public abstract DeployResult deploy(long appId);
 
     @Override
     public void commit(long appId, String message) {

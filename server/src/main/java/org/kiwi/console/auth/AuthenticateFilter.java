@@ -4,8 +4,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.kiwi.console.kiwi.AuthenticateRequest;
-import org.kiwi.console.kiwi.UserClient;
+import org.kiwi.console.kiwi.*;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -19,9 +18,11 @@ import java.util.List;
 public class AuthenticateFilter extends OncePerRequestFilter {
 
     private final UserClient userClient;
+    private final SysUserClient sysUserClient;
 
-    public AuthenticateFilter(UserClient userClient) {
+    public AuthenticateFilter(UserClient userClient, SysUserClient sysUserClient) {
         this.userClient = userClient;
+        this.sysUserClient = sysUserClient;
     }
 
     @Override
@@ -36,8 +37,9 @@ public class AuthenticateFilter extends OncePerRequestFilter {
             return;
         }
         var token = auth.substring(7);
-        var userId = userClient.authenticate(new AuthenticateRequest(token));
-        if (userId != null) {
+        var sysUserId = sysUserClient.authenticate(new SysAuthenticateRequest(token));
+        if (sysUserId != null) {
+            var userId = userClient.getBySysUserId(new GetBySysUserIdRequest(sysUserId));
             var authToken = new UsernamePasswordAuthenticationToken(userId, null, List.of());
             authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
             SecurityContextHolder.getContext().setAuthentication(authToken);

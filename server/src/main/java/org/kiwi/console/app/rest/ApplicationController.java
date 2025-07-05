@@ -1,8 +1,8 @@
 package org.kiwi.console.app.rest;
 
-import org.kiwi.console.kiwi.Application;
-import org.kiwi.console.kiwi.ApplicationClient;
-import org.kiwi.console.kiwi.ApplicationSearchRequest;
+import org.kiwi.console.kiwi.App;
+import org.kiwi.console.kiwi.AppClient;
+import org.kiwi.console.kiwi.AppSearchRequest;
 import org.kiwi.console.kiwi.DeleteAppRequest;
 import org.kiwi.console.util.BusinessException;
 import org.kiwi.console.util.ErrorCode;
@@ -14,48 +14,48 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/app")
 public class ApplicationController {
 
-    private final ApplicationClient applicationClient;
+    private final AppClient appClient;
 
-    public ApplicationController(ApplicationClient applicationClient) {
-        this.applicationClient = applicationClient;
+    public ApplicationController(AppClient appClient) {
+        this.appClient = appClient;
     }
 
     @PostMapping("/search")
-    public SearchResult<Application> search(@AuthenticationPrincipal String userId, @RequestBody ApplicationSearchRequest request) {
-        var modifiedRequest = new ApplicationSearchRequest(
+    public SearchResult<App> search(@AuthenticationPrincipal String userId, @RequestBody AppSearchRequest request) {
+        var modifiedRequest = new AppSearchRequest(
                 request.name(),
                 userId,
                 request.page(),
                 request.pageSize(),
                 request.newlyChangedId()
         );
-        return applicationClient.search(modifiedRequest);
+        return appClient.search(modifiedRequest);
     }
 
     @PostMapping
-    public String save(@AuthenticationPrincipal String userId, Application application) {
-        if (application.getId() == null)
-            application.setOwnerId(userId);
+    public String save(@AuthenticationPrincipal String userId, App app) {
+        if (app.getId() == null)
+            app.setOwnerId(userId);
         else {
-            var existing = applicationClient.get(application.getId());
+            var existing = appClient.get(app.getId());
             if (!existing.getOwnerId().equals(userId))
                 throw new BusinessException(ErrorCode.FORBIDDEN);
         }
-        return applicationClient.save(application);
+        return appClient.save(app);
     }
 
     @DeleteMapping("/{id}")
     public void delete(@AuthenticationPrincipal String userId, @PathVariable("id") String id) {
-        var existing = applicationClient.get(id);
+        var existing = appClient.get(id);
         if (!existing.getOwnerId().equals(userId))
             throw new BusinessException(ErrorCode.FORBIDDEN);
-        applicationClient.delete(new DeleteAppRequest(id));
+        appClient.delete(new DeleteAppRequest(id));
     }
 
     @GetMapping("/{id}")
-    public Application get(@AuthenticationPrincipal String userId, @PathVariable("id") String id) {
-        var app = applicationClient.get(id);
-        if (!app.getOwnerId().equals(userId) && !app.getMembersIds().contains(userId))
+    public App get(@AuthenticationPrincipal String userId, @PathVariable("id") String id) {
+        var app = appClient.get(id);
+        if (!app.getOwnerId().equals(userId) && !app.getMemberIds().contains(userId))
             throw new BusinessException(ErrorCode.FORBIDDEN);
         else
             return app;

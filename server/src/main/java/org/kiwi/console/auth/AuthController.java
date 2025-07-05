@@ -2,6 +2,8 @@ package org.kiwi.console.auth;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.kiwi.console.kiwi.RegisterRequest;
+import org.kiwi.console.kiwi.SysLogoutRequest;
+import org.kiwi.console.kiwi.SysUserClient;
 import org.kiwi.console.kiwi.UserClient;
 import org.kiwi.console.util.BusinessException;
 import org.kiwi.console.util.ErrorCode;
@@ -17,14 +19,18 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final UserClient userClient;
+    private final SysUserClient sysUserClient;
 
-    public AuthController(UserClient userClient) {
+    public AuthController(UserClient userClient, SysUserClient sysUserClient) {
         this.userClient = userClient;
+        this.sysUserClient = sysUserClient;
     }
 
     @PostMapping("/login")
     public ResponseEntity<LoginResult> login(@RequestBody LoginRequest request) {
-        var token = userClient.login(request);
+        var userId = userClient.login(request).userId();
+        var user = userClient.get(userId);
+        var token = sysUserClient.issueToken(new IssueTokenRequest(user.getSysUserId()));
         if (token == null)
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         return ResponseEntity.ok(new LoginResult(token));
@@ -36,12 +42,12 @@ public class AuthController {
         if (auth == null || !auth.startsWith("Bearer "))
             throw new BusinessException(ErrorCode.AUTHENTICATION_ERROR, "Invalid token");
         var token = auth.substring(7);
-        userClient.logout(new LogoutRequest(token));
+        sysUserClient.logout(new SysLogoutRequest(token));
     }
 
     @PostMapping("/register")
-    public void register(@RequestBody RegisterRequest request) {
-        userClient.register(request);
+    public void register(@RequestBody org.kiwi.console.auth.RegisterRequest request) {
+        userClient.register(new RegisterRequest(request.userName(), request.password()));
     }
 
 }

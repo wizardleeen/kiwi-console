@@ -2,10 +2,7 @@ package org.kiwi.console.generate;
 
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import org.kiwi.console.util.Constants;
-import org.kiwi.console.util.ContextUtil;
-import org.kiwi.console.util.Result;
-import org.kiwi.console.util.Utils;
+import org.kiwi.console.util.*;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -22,12 +19,14 @@ public class DefaultKiwiCompiler extends AbstractCompiler implements KiwiCompile
     }
 
     @Override
-    public DeployResult deploy(long appId, String token) {
-        var r1 = deploy(appId, token, getWorkDir(appId));
-        if (r1.isSuccessful())
-            return new DeployResult(true, "");
-        else
-            return new DeployResult(false, r1.message());
+    public DeployResult deploy(long appId) {
+        try {
+            deploy(appId, getWorkDir(appId));
+            return new DeployResult(true, null);
+        }
+        catch (BusinessException e) {
+            return new DeployResult(false, e.getMessage());
+        }
     }
 
     @SneakyThrows
@@ -48,22 +47,19 @@ public class DefaultKiwiCompiler extends AbstractCompiler implements KiwiCompile
         return new BuildResult(false, r.output());
     }
 
-    private Result<String> deploy(long appId, String token, WorkDir workDir) {
-        ContextUtil.setAppId(appId);
+    private void deploy(long appId, WorkDir workDir) {
         try (var pkgInput = workDir.openTargetInput()) {
-            return deployService.deploy(appId, token, pkgInput);
+            deployService.deploy(appId, pkgInput);
         } catch (IOException e) {
             throw new RuntimeException(e);
-        } finally {
-            ContextUtil.setAppId(Constants.PLATFORM_APP_ID);
         }
     }
 
     public static void main(String[] args) {
         var compiler = new DefaultKiwiCompiler(Path.of("/tmp/kiwi-works"), new MockDeployService());
         var code = "class Foo(var name: string)";
-        compiler.deploy(1000015059L, "");
-        var deployedCode = compiler.getCode(1000015059L, Constants.MAIN_KIWI);
+        compiler.deploy(1000037184L);
+        var deployedCode = compiler.getCode(1000037184L, Constants.MAIN_KIWI);
         Utils.require(code.equals(deployedCode));
     }
 

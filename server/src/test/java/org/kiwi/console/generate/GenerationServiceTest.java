@@ -7,7 +7,7 @@ import org.kiwi.console.generate.rest.CancelRequest;
 import org.kiwi.console.generate.rest.RetryRequest;
 import org.kiwi.console.kiwi.Exchange;
 import org.kiwi.console.kiwi.ExchangeStatus;
-import org.kiwi.console.kiwi.MockApplicationClient;
+import org.kiwi.console.kiwi.MockAppClient;
 import org.kiwi.console.kiwi.MockExChangeClient;
 import org.kiwi.console.util.BusinessException;
 import org.kiwi.console.util.ErrorCode;
@@ -27,14 +27,13 @@ public class GenerationServiceTest extends TestCase {
     public void testChat() {
         var kiwiCompiler = new MockCompiler();
         var pageCompiler = new MockCompiler();
-        var appClient = new MockApplicationClient();
+        var appClient = new MockAppClient();
         var exchangeClient = new MockExChangeClient();
         var chatService = new GenerationService(new MockAgent(), kiwiCompiler, pageCompiler,
                 exchangeClient,
                 appClient,
                 "http://{}.metavm.test",
                 "http://localhost:8080",
-                "",
                 new SyncTaskExecutor()
         );
         var prompt = """
@@ -105,10 +104,9 @@ public class GenerationServiceTest extends TestCase {
         var exchClient = new MockExChangeClient();
         var generationService = new GenerationService(new MockAgent(), kiwiCompiler, pageCompiler,
                 exchClient,
-                new MockApplicationClient(),
+                new MockAppClient(),
                 "http://{}.metavm.test",
                 "http://localhost:8080",
-                "",
                 taskExecutor
         );
         generationService.generate(null, "class Foo{}", "001", false, discardListener);
@@ -130,20 +128,19 @@ public class GenerationServiceTest extends TestCase {
             boolean failing = true;
 
             @Override
-            public DeployResult run(long appId, String token, List<SourceFile> sourceFiles) {
+            public DeployResult run(long appId, List<SourceFile> sourceFiles) {
                 if (failing)
                     throw new RuntimeException("Failed");
-                return super.run(appId, token, sourceFiles);
+                return super.run(appId, sourceFiles);
             }
         };
         var pageCompiler = new MockCompiler();
         var exchClient = new MockExChangeClient();
         var generationService = new GenerationService(new MockAgent(), kiwiCompiler, pageCompiler,
                 exchClient,
-                new MockApplicationClient(),
+                new MockAppClient(),
                 "http://{}.metavm.test",
                 "http://localhost:8080",
-                "",
                 new SyncTaskExecutor()
         );
         try {

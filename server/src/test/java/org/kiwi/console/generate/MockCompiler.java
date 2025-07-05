@@ -12,7 +12,7 @@ class MockCompiler implements KiwiCompiler, PageCompiler {
     private final List<Commit> commits = new ArrayList<>();
 
     @Override
-    public DeployResult run(long appId, String token, List<SourceFile> sourceFiles) {
+    public DeployResult run(long appId, List<SourceFile> sourceFiles) {
         var files = new HashMap<String, String>();
         sourceFiles.forEach(f -> files.put(f.name(), f.content()));
         working.put(appId, files);
@@ -23,7 +23,7 @@ class MockCompiler implements KiwiCompiler, PageCompiler {
     }
 
     @Override
-    public DeployResult deploy(long appId, String token) {
+    public DeployResult deploy(long appId) {
         return new DeployResult(true, "");
     }
 

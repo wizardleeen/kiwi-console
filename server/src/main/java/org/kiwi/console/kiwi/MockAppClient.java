@@ -6,13 +6,13 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Random;
 
-public class MockApplicationClient implements ApplicationClient {
+public class MockAppClient implements AppClient {
 
-    private final Map<String, Application> apps = new LinkedHashMap<>();
+    private final Map<String, App> apps = new LinkedHashMap<>();
     private final Random random = new Random();
 
     @Override
-    public SearchResult<Application> search(ApplicationSearchRequest request) {
+    public SearchResult<App> search(AppSearchRequest request) {
         var matches = apps.values().stream().filter(app ->  match(app, request)).toList();
         return new SearchResult<>(
                 matches.subList(
@@ -23,14 +23,14 @@ public class MockApplicationClient implements ApplicationClient {
         );
     }
 
-    private boolean match(Application application, ApplicationSearchRequest searchRequest) {
-        if (searchRequest.name() != null && !application.getName().contains(searchRequest.name()))
+    private boolean match(App app, AppSearchRequest searchRequest) {
+        if (searchRequest.name() != null && !app.getName().contains(searchRequest.name()))
             return false;
-        return searchRequest.ownerId() == null || application.getOwnerId().equals(searchRequest.ownerId());
+        return searchRequest.ownerId() == null || app.getOwnerId().equals(searchRequest.ownerId());
     }
 
     @Override
-    public Application get(String id) {
+    public App get(String id) {
         var app = apps.get(id);
         if (app == null)
             throw new IllegalArgumentException("Application with ID " + id + " not found.");
@@ -38,19 +38,19 @@ public class MockApplicationClient implements ApplicationClient {
     }
 
     @Override
-    public String save(Application application) {
-        application = copy(application);
-        if (application.getId() == null) {
-            application.setId(Long.toString(System.currentTimeMillis()));
-            application.setSystemAppId(random.nextInt(10000));
+    public String save(App app) {
+        app = copy(app);
+        if (app.getId() == null) {
+            app.setId(Long.toString(System.currentTimeMillis()));
+            app.setSystemAppId(random.nextInt(10000));
         }
-        apps.put(application.getId(), application);
-        return application.getId();
+        apps.put(app.getId(), app);
+        return app.getId();
     }
 
-    private Application copy(Application application) {
-        return new Application(application.getId(), application.getName(), application.getOwnerId(),
-                application.getSystemAppId(), application.getMembersIds());
+    private App copy(App app) {
+        return new App(app.getId(), app.getName(), app.getOwnerId(),
+                app.getSystemAppId(), app.getMemberIds());
     }
 
     @Override

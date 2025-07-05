@@ -6,9 +6,9 @@ import java.util.List;
 
 public interface Compiler {
 
-    DeployResult run(long appId, String token, List<SourceFile> sourceFiles);
+    DeployResult run(long appId, List<SourceFile> sourceFiles);
 
-    DeployResult deploy(long appId, String token);
+    DeployResult deploy(long appId);
 
     void commit(long appId, String message);
 

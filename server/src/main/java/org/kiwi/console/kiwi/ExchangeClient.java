@@ -35,20 +35,33 @@ public interface ExchangeClient {
         var client = Utils.createKiwiFeignClient(
                 "http://localhost:8080",
                 ExchangeClient.class,
-                Constants.TEST_SYS_APP_ID
+                Constants.CHAT_APP_ID
         );
-        var r = client.search(new ExchangeSearchRequest(
-           null,
-           null,
-                null,
-                true,
-                1,
-                20
-        ));
-        System.out.println(r.total());
-        for (Exchange e : r.items()) {
-            System.out.println(e.getId() + " " + e.getStatus());
+
+        var id = "0190fcdab90700";
+        var exch = client.get(id);
+
+
+        for (int i = 0; i < 1000; i++) {
+            exch.setStatus(i % 2 == 0 ? ExchangeStatus.SUCCESSFUL : ExchangeStatus.FAILED);
+            client.save(exch);
         }
+
+        System.out.println(id);
+
+
+//        var r = client.search(new ExchangeSearchRequest(
+//           null,
+//           null,
+//                null,
+//                true,
+//                1,
+//                20
+//        ));
+//        System.out.println(r.total());
+//        for (Exchange e : r.items()) {
+//            System.out.println(e.getId() + " " + e.getStatus());
+//        }
     }
 
 }
