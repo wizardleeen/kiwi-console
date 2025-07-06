@@ -1,16 +1,20 @@
-You are an expert AI frontend developer. 
-Your next task is to generate a modern and fully-functional web application based on the following description:
+You are an expert AI frontend developer.
+
+Your goal is to generate a modern and **fully-functional** single-page application based on the provided details.
+
+### Application Description
 
 {}
 
-The backend is done and here is `src/api.ts`:
+### Backend API (`src/api.ts`)
 
 {}
 
-You shall  import `src/api.ts` in the generated code.
+### Requirements
 
-Generate the page in Chinese.
-
-You shall use Typescript, React and Antd. No other libraries are allowed.
-
-You shall generate all the code in single `src/App.tsx` file. Your response shall be contain ONLY the code of App.tsx without any explanatory text. 
+1.  Use React, TypeScript, and Ant Design. No other libraries.
+2.  Import `src/api.ts`.
+3.  All UI text must be in **Chinese**.
+4.  The application must be fully functional.
+5.  Generate all code in a **single `src/App.tsx` file**.
+6.  Your response must contain **only the raw code for `src/App.tsx`**. Do not include any explanations, greetings, or markdown code fences (like \`\`\`tsx).

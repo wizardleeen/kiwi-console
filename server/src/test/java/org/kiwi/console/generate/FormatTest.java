@@ -14,6 +14,13 @@ public class FormatTest extends TestCase {
                 "Hello Kiwi {}",
                 Format.format("Hello {} {}", "Kiwi")
         );
-
     }
+
+    public void testFormatKeyed() {
+        assertEquals(
+                "class Foo {}",
+                Format.formatKeyed("{example}", "example", "class Foo {}")
+        );
+    }
+
 }

@@ -3,7 +3,7 @@ package org.kiwi.console.util;
 public enum ErrorCode {
     BAD_REQUEST(101, "Bad request"),
     REQUEST_ERROR(102, "{}"),
-    VERIFICATION_FAILED(401, "Verification failed"),
+    AUTHENTICATION_FAILED(401, "Authentication failed"),
     GEMINI_NOT_CONFIGURED(1801, "Gemini not configured"),
     CODE_GENERATION_FAILED(1802, "Code generation failed"),
 
@@ -11,7 +11,6 @@ public enum ErrorCode {
 
     APP_CREATION_FAILURE(2001, "Application creation failed: {}"),
     APP_NOT_FOUND(2002,  "Application not found: {}"),
-    AUTHENTICATION_ERROR(3001, "Authentication error: {}"),
     FORBIDDEN(3002, "You do not have permission to perform this action"),
 
     // Generation

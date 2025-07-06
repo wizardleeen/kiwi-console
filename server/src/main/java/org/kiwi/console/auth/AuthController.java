@@ -29,10 +29,10 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<LoginResult> login(@RequestBody LoginRequest request) {
         var userId = userClient.login(request).userId();
+        if (userId == null)
+            throw new BusinessException(ErrorCode.AUTHENTICATION_FAILED);
         var user = userClient.get(userId);
         var token = sysUserClient.issueToken(new IssueTokenRequest(user.getSysUserId()));
-        if (token == null)
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         return ResponseEntity.ok(new LoginResult(token));
     }
 
@@ -40,7 +40,7 @@ public class AuthController {
     public void logout(HttpServletRequest request) {
         var auth = request.getHeader("Authorization");
         if (auth == null || !auth.startsWith("Bearer "))
-            throw new BusinessException(ErrorCode.AUTHENTICATION_ERROR, "Invalid token");
+            throw new BusinessException(ErrorCode.AUTHENTICATION_FAILED, "Invalid token");
         var token = auth.substring(7);
         sysUserClient.logout(new SysLogoutRequest(token));
     }

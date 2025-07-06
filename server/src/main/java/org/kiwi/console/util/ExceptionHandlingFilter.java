@@ -28,14 +28,13 @@ public class ExceptionHandlingFilter extends OncePerRequestFilter {
             BusinessException bizExp = extractBusinessException(e);
             if(bizExp != null) {
                 Result<?> failureResult = Result.failure(bizExp.getErrorCode(), bizExp.getArgs());
-                if(bizExp.getErrorCode() == ErrorCode.VERIFICATION_FAILED)
+                if(bizExp.getErrorCode() == ErrorCode.AUTHENTICATION_FAILED)
                     response.setStatus(401);
                 else
                     response.setStatus(400);
-                response.setHeader("content-type","application/json;charset=UTF-8");
+                response.setHeader("Content-Type","application/json;charset=UTF-8");
                 response.setCharacterEncoding("UTF-8");
                 response.getOutputStream().write(Utils.toJSONString(failureResult).getBytes(StandardCharsets.UTF_8));
-                logger.info("business exception", bizExp);
             }
             else {
                 throw e;

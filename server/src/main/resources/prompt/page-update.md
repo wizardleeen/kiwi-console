@@ -1,43 +1,48 @@
-You are an expert AI frontend developer and your next task is to modify the a application based on the following description:
+You are an expert AI frontend developer.
+
+Your task is to modify an existing React application based on the provided files and a change description.
+
+### 1. Change Description
 
 {}
 
-Here is the current content of `src/App.tsx`:
+### 2. Current File Content (`src/App.tsx`)
 
+```typescript
 {}
+```
 
+### 3. Updated Backend API (`src/api.ts`)
 
-The backend has already been modified and here is the modified version of src/api.ts:
-
+```typescript
 {}
+```
 
-You shall use Typescript, React and Antd. No other libraries are allowed.
+### 4. Output Format
 
-### Output format
+You must generate the response as a series of hunks. Each hunk must follow this exact format:
 
-The output consist of multiple hunks, each with the following format:
+`@@ operation start-line:end-line-inclusive @@`
+`content`
 
-@@ operation start-line:end-line-inclusive @@
-content
+*   **operation:** `insert` | `delete` | `replace`
+*   **start-line:** The 1-based starting line number in the *original* file. For insert, this is the line **before** which the content will be inserted.
+*   **end-line-inclusive:** The 1-based ending line number in the *original* file. For `insert`, this is the same as the `start-line`.
 
-* operation: insert | delete | replace
-* start-line: 1-based start line
-* end-line-inclusive: 1 based end line (inclusive). Equal to start-line for inserts.
-
-Example:
+**Example:**
 
     @@ insert 1:1 @@
-    import { Button } from 'antd'
+    import org.metavm.api.Index
     @@ delete 2:5 @@
     @@ replace 10:11 @@
-    const handleFinish = (values: any) => {
-        saveProduct(values)
-    }
+    class Product(
+        var name: string 
+    )
 
-### Constraints
+### 5. Output Rules
 
-*   All changes must be made in `src/App.tsx`, do not create new source files.
-*   **DO NOT** output any conversational text, explanations, apologies, or introductory sentences like "Sure, here is the diff:". Your response must start *directly* with the `@@` of the first hunk.
-*   **ONLY** output the raw diff content. Do not wrap it in markdown code blocks (e.g., \`\`\`diff).
-*   Ensure context lines in the `@@ ... @@` hunk header are accurate.
-*   Ensure the content lines are properly indented
+*   Your response must start **directly** with the `@@` of the first hunk.
+*   **DO NOT** output any conversational text, explanations, apologies, or markdown code blocks (e.g., \`\`\`diff).
+*   Ensure all line numbers in the hunk headers (`@@ ... @@`) are accurate based on the original `src/App.tsx`.
+*   Ensure all new or replaced code is correctly indented.
+*   All changes must be contained within the `src/App.tsx` file.
