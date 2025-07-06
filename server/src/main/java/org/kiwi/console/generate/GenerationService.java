@@ -11,10 +11,7 @@ import org.kiwi.console.generate.rest.CancelRequest;
 import org.kiwi.console.generate.rest.RetryRequest;
 import org.kiwi.console.kiwi.*;
 import org.kiwi.console.patch.PatchApply;
-import org.kiwi.console.util.BusinessException;
-import org.kiwi.console.util.Constants;
-import org.kiwi.console.util.ErrorCode;
-import org.kiwi.console.util.Utils;
+import org.kiwi.console.util.*;
 import org.springframework.core.task.SyncTaskExecutor;
 import org.springframework.core.task.TaskExecutor;
 
@@ -37,13 +34,14 @@ import static org.kiwi.console.util.Constants.*;
 public class GenerationService {
 
     public static final String NEW_APP_NAME = "New Application";
-    private static final String pageCreatePrompt = loadPrompt("/prompt/page-create.md");
-    private static final String pageUpdatePrompt = loadPrompt("/prompt/page-update.md");
-    private static final String createPrompt = loadPrompt("/prompt/kiwi-create.md");
-    private static final String updatePrompt = loadPrompt("/prompt/kiwi-update.md");
-    private static final String pageFixPrompt = loadPrompt("/prompt/page-fix.md");
-    private static final String kiwiFixPrompt = loadPrompt("/prompt/kiwi-fix.md");
-    private static final String planPrompt = loadPrompt("/prompt/plan.md");
+    private static final String example = TextUtil.indent(loadResource("/prompt/src/example.kiwi"));
+    private static final String pageCreatePrompt = loadResource("/prompt/page-create.md");
+    private static final String pageUpdatePrompt = loadResource("/prompt/page-update.md");
+    private static final String kiwiCreatePrompt = Format.formatKeyed(loadResource("/prompt/kiwi-create.md"), "example", example);
+    private static final String kiwiUpdatePrompt = Format.formatKeyed(loadResource("/prompt/kiwi-update.md"), "example", example);
+    private static final String pageFixPrompt = loadResource("/prompt/page-fix.md");
+    private static final String kiwiFixPrompt = loadResource("/prompt/kiwi-fix.md");
+    private static final String planPrompt = loadResource("/prompt/plan.md");
 
     private final Agent agent;
     private final KiwiCompiler kiwiCompiler;
@@ -75,7 +73,7 @@ public class GenerationService {
         this.taskExecutor = taskExecutor;
     }
 
-    public static String loadPrompt(String file) {
+    public static String loadResource(String file) {
         try (var input = GenerationService.class.getResourceAsStream(file)) {
             return new String(Objects.requireNonNull(input).readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException e) {
@@ -188,13 +186,17 @@ public class GenerationService {
         var pageCode = pageCompiler.getCode(task.sysAppId, APP_TSX);
         var chat = agent.createChat();
         var buf = new StringBuilder();
-        chat.send(createPlanPrompt(exch.getPrompt(), kiwiCode, pageCode), new ChatStreamListener() {
+        var planPrompt = createPlanPrompt(exch.getPrompt(), kiwiCode, pageCode);
+        log.info("Plan prompt:\n{}", planPrompt);
+        chat.send(planPrompt, new ChatStreamListener() {
             @Override
             public void onThought(String thoughtChunk) {
+                log.info("\n{}", thoughtChunk);
             }
 
             @Override
             public void onContent(String contentChunk) {
+                log.info("\n{}", contentChunk);
                 buf.append(contentChunk);
             }
         }, () -> task.cancelled);
@@ -366,11 +368,11 @@ public class GenerationService {
     }
 
     private String buildCreatePrompt(String prompt) {
-        return Format.format(createPrompt, prompt);
+        return Format.format(kiwiCreatePrompt, prompt);
     }
 
     private String buildUpdatePrompt(String prompt, String code) {
-        return Format.format(updatePrompt, prompt, code);
+        return Format.format(kiwiUpdatePrompt, prompt, code);
     }
 
     private class Task implements ChatStreamListener {
