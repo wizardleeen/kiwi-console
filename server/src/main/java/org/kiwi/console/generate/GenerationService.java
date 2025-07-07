@@ -50,6 +50,7 @@ public class GenerationService {
     private final String productUrlTempl;
     private final String mgmtUrlTempl;
     private final ExchangeClient exchClient;
+    private final UserClient userClient;
     private final Map<String, Task> runningTasks = new ConcurrentHashMap<>();
     private final TaskExecutor taskExecutor;
 
@@ -59,7 +60,7 @@ public class GenerationService {
             PageCompiler pageCompiler,
             ExchangeClient exchClient,
             AppClient appClient,
-            String productUrlTempl,
+            UserClient userClient, String productUrlTempl,
             String mgmtUrlTempl,
             TaskExecutor taskExecutor
     ) {
@@ -70,6 +71,7 @@ public class GenerationService {
         this.productUrlTempl = productUrlTempl;
         this.mgmtUrlTempl = mgmtUrlTempl;
         this.exchClient = exchClient;
+        this.userClient = userClient;
         this.taskExecutor = taskExecutor;
     }
 
@@ -96,8 +98,9 @@ public class GenerationService {
         var sysAppId = getApp(appId).getSystemAppId();
         var exchange = Exchange.create(appId, userId, prompt, creating, skipPageGeneration);
         exchange.setId(exchClient.save(exchange));
-        listener.onProgress(exchange);
-        var task = new Task(exchange, sysAppId, listener);
+        var showAttempt = userClient.shouldShowAttempts(new UserIdRequest(userId));
+        var task = new Task(exchange, sysAppId, showAttempt, listener);
+        task.sendProgress();
         taskExecutor.execute(() -> runTask(task));
     }
 
@@ -133,8 +136,8 @@ public class GenerationService {
         var task = runningTasks.get(exchangeId);
         if (task == null)
             throw new BusinessException(ErrorCode.TASK_NOT_RUNNING);
-        listener.onProgress(task.exchange);
         task.changeListener(listener);
+        task.sendProgress();
     }
 
     public void cancel(CancelRequest request) {
@@ -144,11 +147,12 @@ public class GenerationService {
             task.cancel();
     }
 
-    public void retry(RetryRequest request, GenerationListener listener) {
+    public void retry(String userId, RetryRequest request, GenerationListener listener) {
         exchClient.retry(new ExchangeRetryRequest(request.exchangeId()));
         var exch = exchClient.get(request.exchangeId());
         var app = appClient.get(exch.getAppId());
-        var task = new Task(exch, app.getSystemAppId(), listener);
+        var showAttempts = userClient.shouldShowAttempts(new UserIdRequest(userId));
+        var task = new Task(exch, app.getSystemAppId(), showAttempts, listener);
         taskExecutor.execute(() -> runTask(task));
     }
 
@@ -380,11 +384,13 @@ public class GenerationService {
         private Exchange exchange;
         private final long sysAppId;
         private boolean cancelled;
+        private final boolean showAttempts;
 
-        public Task(Exchange exchange, long sysAppId, @Nonnull GenerationListener listener) {
+        public Task(Exchange exchange, long sysAppId, boolean showAttempts, @Nonnull GenerationListener listener) {
             this.listener = listener;
             this.sysAppId = sysAppId;
             this.exchange = exchange;
+            this.showAttempts = showAttempts;
             runningTasks.put(exchange.getId(), this);
         }
 
@@ -439,7 +445,11 @@ public class GenerationService {
         void saveExchange() {
             ensureNotCancelled();
             exchange = exchClient.get(exchClient.save(exchange));
-            listener.onProgress(exchange);
+            sendProgress();
+        }
+
+        void sendProgress() {
+            listener.onProgress(showAttempts ? exchange : exchange.clearAttempts());
         }
 
         boolean isBackendSuccessful() {
@@ -504,7 +514,7 @@ public class GenerationService {
                         UserClient.class,
                         CHAT_APP_ID
                 )),
-                "http://{}.metavm.test",
+                Utils.createKiwiFeignClient(host, UserClient.class, CHAT_APP_ID), "http://{}.metavm.test",
                 "http://localhost:5173/app/{}",
                 new SyncTaskExecutor()
         );

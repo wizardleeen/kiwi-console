@@ -11,7 +11,7 @@ public class Constants {
 
     public static final String INDEX_TS = "index.ts";
 
-    public static final long CHAT_APP_ID = 1000013053L;
+    public static final long CHAT_APP_ID = 1000061024L;
 
     public static final String TOKEN = "079026ee-80cc-4dbe-95e3-83c795b4dcb4";
 

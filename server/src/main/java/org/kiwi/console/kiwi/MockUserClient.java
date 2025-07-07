@@ -1,0 +1,51 @@
+package org.kiwi.console.kiwi;
+
+import org.kiwi.console.auth.LoginRequest;
+import org.kiwi.console.auth.LogoutRequest;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+public class MockUserClient implements UserClient {
+
+    private final Map<String, User> userMap = new HashMap<>();
+
+    @Override
+    public User get(String id) {
+        return Objects.requireNonNull(userMap.get(id), "User not found: " + id);
+    }
+
+    @Override
+    public String authenticate(AuthenticateRequest request) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public LoginResponse login(LoginRequest request) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void logout(LogoutRequest request) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public String register(RegisterRequest request) {
+        var user = new User(System.currentTimeMillis() + "", request.userName(), request.sysUserId(), List.of());
+        userMap.put(user.getId(), user);
+        return user.getId();
+    }
+
+    @Override
+    public String getBySysUserId(GetBySysUserIdRequest request) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean shouldShowAttempts(UserIdRequest request) {
+        return true;
+    }
+}

@@ -88,6 +88,7 @@ public class ConsoleConfig {
                                                KiwiCompiler kiwiCompiler,
                                                PageCompiler pageCompiler,
                                                AppClient appClient,
+                                               UserClient userClient,
                                                ExchangeClient exchangeClient,
                                                @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor) {
         return new GenerationService(
@@ -96,6 +97,7 @@ public class ConsoleConfig {
                 pageCompiler,
                 exchangeClient,
                 appClient,
+                userClient,
                 urlTemplates.product,
                 urlTemplates.management,
                 taskExecutor

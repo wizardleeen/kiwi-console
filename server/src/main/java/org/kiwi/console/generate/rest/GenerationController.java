@@ -4,13 +4,11 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.kiwi.console.generate.GenerationService;
 import org.kiwi.console.generate.event.GenerationListener;
-import org.kiwi.console.kiwi.AppClient;
-import org.kiwi.console.kiwi.Exchange;
-import org.kiwi.console.kiwi.ExchangeClient;
-import org.kiwi.console.kiwi.ExchangeSearchRequest;
+import org.kiwi.console.kiwi.*;
 import org.kiwi.console.util.BusinessException;
 import org.kiwi.console.util.ErrorCode;
 import org.kiwi.console.util.SearchResult;
+import org.kiwi.console.util.Utils;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -23,11 +21,13 @@ public class GenerationController {
     private final GenerationService generationService;
     private final AppClient appClient;
     private final ExchangeClient exchangeClient;
+    private final UserClient userClient;
 
-    public GenerationController(GenerationService generationService, AppClient appClient, ExchangeClient exchangeClient) {
+    public GenerationController(GenerationService generationService, AppClient appClient, ExchangeClient exchangeClient, UserClient userClient) {
         this.generationService = generationService;
         this.appClient = appClient;
         this.exchangeClient = exchangeClient;
+        this.userClient = userClient;
     }
 
     @PostMapping
@@ -57,7 +57,7 @@ public class GenerationController {
     public SseEmitter retry(@AuthenticationPrincipal String userId, @RequestBody RetryRequest request) {
         var sseEmitter = new SseEmitter(Long.MAX_VALUE);
         ensureExchangeAuthorized(userId, request.exchangeId());
-        generationService.retry(request, new Emitter(sseEmitter));
+        generationService.retry(userId, request, new Emitter(sseEmitter));
         return sseEmitter;
     }
 
@@ -76,7 +76,16 @@ public class GenerationController {
                 request.page() > 0 ? request.page() : 1,
                 request.pageSize() > 0 ? request.pageSize() : 20
         );
-        return exchangeClient.search(innerReq);
+        var showAttempts = userClient.shouldShowAttempts(new UserIdRequest(userId));
+        var r = exchangeClient.search(innerReq);
+        if (showAttempts)
+            return r;
+        else {
+            return new SearchResult<>(
+                    Utils.map(r.items(), Exchange::clearAttempts),
+                    r.total()
+            );
+        }
     }
 
 

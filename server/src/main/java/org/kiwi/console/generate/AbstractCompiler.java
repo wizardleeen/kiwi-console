@@ -2,12 +2,14 @@ package org.kiwi.console.generate;
 
 import jakarta.annotation.Nullable;
 import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 import org.kiwi.console.util.Utils;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
+@Slf4j
 public abstract class AbstractCompiler implements Compiler {
 
     protected final Path baseDir;
@@ -69,6 +71,13 @@ public abstract class AbstractCompiler implements Compiler {
             return Files.readString(path);
         else
             return null;
+    }
+
+    public void delete(long appId) {
+        var workDir = WorkDir.from(baseDir, appId);
+        var r = Utils.executeCommand(Path.of("."), "rm", "-rf", workDir.path().toString());
+        if (r.exitCode() != 0)
+            log.warn("Failed to delete work directory for app {}: {}", appId, r.output());
     }
 
     protected abstract BuildResult build(WorkDir workDir);

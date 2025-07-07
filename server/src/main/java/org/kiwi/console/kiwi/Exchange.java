@@ -3,6 +3,7 @@ package org.kiwi.console.kiwi;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import org.kiwi.console.util.TextWriter;
+import org.kiwi.console.util.Utils;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
@@ -58,4 +59,19 @@ public class Exchange {
         writer.deIndent();
     }
 
+    public Exchange clearAttempts() {
+        return new Exchange(
+                id,
+                appId,
+                userId,
+                prompt,
+                status,
+                Utils.map(stages, Stage::clearAttempts),
+                productURL,
+                managementURL,
+                errorMessage,
+                first,
+                skipPageGeneration
+        );
+    }
 }

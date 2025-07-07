@@ -29,4 +29,8 @@ public class Stage {
         attempts.forEach(attempt -> attempt.write(writer));
         writer.deIndent();
     }
+
+    public Stage clearAttempts() {
+        return new Stage(id, type, status, List.of());
+    }
 }

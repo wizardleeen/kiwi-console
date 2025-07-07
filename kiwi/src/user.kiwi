@@ -10,6 +10,11 @@ class User(
     static val sysUserIdIdx = Index<string, User>(true, u -> u.sysUserId)
 
     val applications = new Application[]
+    val genConfig = GenerationConfig(false)
+
+    fn __genConfig__() -> GenerationConfig {
+        return GenerationConfig(true)
+    }
 
     fn checkPassword(password: string) -> bool {
         return passwordHash == secureHash(password, null)
@@ -20,6 +25,10 @@ class User(
     }
 
 }
+
+class GenerationConfig(
+    var showAttempts: bool
+)
 
 @Bean
 class UserService {
@@ -66,6 +75,10 @@ class UserService {
         if (user != null)
             return user as User
         throw Exception("Login required")
+    }
+
+    fn shouldShowAttempts(user: User) -> bool {
+        return user.genConfig.showAttempts
     }
 
 }

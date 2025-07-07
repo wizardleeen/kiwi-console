@@ -5,10 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.kiwi.console.generate.event.GenerationListener;
 import org.kiwi.console.generate.rest.CancelRequest;
 import org.kiwi.console.generate.rest.RetryRequest;
-import org.kiwi.console.kiwi.Exchange;
-import org.kiwi.console.kiwi.ExchangeStatus;
-import org.kiwi.console.kiwi.MockAppClient;
-import org.kiwi.console.kiwi.MockExChangeClient;
+import org.kiwi.console.kiwi.*;
 import org.kiwi.console.util.BusinessException;
 import org.kiwi.console.util.ErrorCode;
 import org.springframework.core.task.SyncTaskExecutor;
@@ -29,10 +26,10 @@ public class GenerationServiceTest extends TestCase {
         var pageCompiler = new MockCompiler();
         var appClient = new MockAppClient();
         var exchangeClient = new MockExChangeClient();
-        var chatService = new GenerationService(new MockAgent(), kiwiCompiler, pageCompiler,
+        var genService = new GenerationService(new MockAgent(), kiwiCompiler, pageCompiler,
                 exchangeClient,
                 appClient,
-                "http://{}.metavm.test",
+                new MockUserClient(), "http://{}.metavm.test",
                 "http://localhost:8080",
                 new SyncTaskExecutor()
         );
@@ -40,7 +37,7 @@ public class GenerationServiceTest extends TestCase {
                 // Test App
                 class Foo {}
                 """;
-        chatService.generate(null, prompt, "tk", false, discardListener);
+        genService.generate(null, prompt, "tk", false, discardListener);
         var appId = exchangeClient.getLast().getAppId();
         var app = appClient.get(appId);
         var sysAppId = app.getSystemAppId();
@@ -60,7 +57,7 @@ public class GenerationServiceTest extends TestCase {
                 exchangeClient.getLast().toString()
         );
 
-        chatService.generate(appId, "class Bar{}", "tk", false, discardListener);
+        genService.generate(appId, "class Bar{}", "tk", false, discardListener);
         assertEquals("class Bar{}\n", kiwiCompiler.getCode(sysAppId, MAIN_KIWI));
         assertEquals("class Bar{}\n", pageCompiler.getCode(sysAppId, APP_TSX));
         assertEquals(
@@ -76,7 +73,7 @@ public class GenerationServiceTest extends TestCase {
         );
 
 
-        chatService.generate(appId, "class Error{}", "tk", false, discardListener);
+        genService.generate(appId, "class Error{}", "tk", false, discardListener);
         assertEquals("class Fixed{}\n", kiwiCompiler.getCode(sysAppId, MAIN_KIWI));
         assertEquals("class Fixed{}\n", pageCompiler.getCode(sysAppId, APP_TSX));
         assertEquals(
@@ -105,7 +102,7 @@ public class GenerationServiceTest extends TestCase {
         var generationService = new GenerationService(new MockAgent(), kiwiCompiler, pageCompiler,
                 exchClient,
                 new MockAppClient(),
-                "http://{}.metavm.test",
+                new MockUserClient(), "http://{}.metavm.test",
                 "http://localhost:8080",
                 taskExecutor
         );
@@ -122,6 +119,52 @@ public class GenerationServiceTest extends TestCase {
         assertSame(ExchangeStatus.CANCELLED, exch1.getStatus());
     }
 
+
+    public void testHideAttempts() {
+        var kiwiCompiler = new MockCompiler();
+        var pageCompiler = new MockCompiler();
+        var appClient = new MockAppClient();
+        var exchangeClient = new MockExChangeClient();
+        var userService = new MockUserClient() {
+
+            @Override
+            public boolean shouldShowAttempts(UserIdRequest request) {
+                return false;
+            }
+        };
+
+        var genService = new GenerationService(new MockAgent(), kiwiCompiler, pageCompiler,
+                exchangeClient,
+                appClient,
+                userService,
+                "http://{}.metavm.test",
+                "http://localhost:8080",
+                new SyncTaskExecutor()
+        );
+        var exchanges = new ArrayList<Exchange>();
+        genService.generate(null, "class Foo {}", "", false, new GenerationListener() {
+            @Override
+            public void onThought(String thoughtChunk) {
+
+            }
+
+            @Override
+            public void onContent(String contentChunk) {
+
+            }
+
+            @Override
+            public void onProgress(Exchange exchange) {
+                exchanges.add(exchange);
+            }
+        });
+        for (Exchange exchange : exchanges) {
+            for (Stage stage : exchange.getStages()) {
+                assertEquals(0, stage.getAttempts().size());
+            }
+        }
+    }
+
     public void testRetry() {
         var kiwiCompiler = new MockCompiler() {
 
@@ -136,10 +179,12 @@ public class GenerationServiceTest extends TestCase {
         };
         var pageCompiler = new MockCompiler();
         var exchClient = new MockExChangeClient();
+        var userClient = new MockUserClient();
+        var userId = userClient.register(new RegisterRequest("leen", "123456"));
         var generationService = new GenerationService(new MockAgent(), kiwiCompiler, pageCompiler,
                 exchClient,
                 new MockAppClient(),
-                "http://{}.metavm.test",
+                userClient, "http://{}.metavm.test",
                 "http://localhost:8080",
                 new SyncTaskExecutor()
         );
@@ -151,7 +196,7 @@ public class GenerationServiceTest extends TestCase {
         var exch = exchClient.getFirst();
         assertSame(ExchangeStatus.FAILED, exch.getStatus());
         kiwiCompiler.failing = false;
-        generationService.retry(new RetryRequest(exch.getId()), discardListener);
+        generationService.retry(userId, new RetryRequest(exch.getId()), discardListener);
         var exch1 = exchClient.getFirst();
         assertSame(ExchangeStatus.SUCCESSFUL, exch1.getStatus());
     }
