@@ -46,3 +46,4 @@ You must generate the response as a series of hunks. Each hunk must follow this 
 *   Ensure all line numbers in the hunk headers (`@@ ... @@`) are accurate based on the original `src/App.tsx`.
 *   Ensure all new or replaced code is correctly indented.
 *   All changes must be contained within the `src/App.tsx` file.
+*   Do not use `useCallback` hook.
