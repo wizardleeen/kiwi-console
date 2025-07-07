@@ -6,6 +6,7 @@ import org.kiwi.console.util.Constants;
 import org.kiwi.console.util.Utils;
 
 import java.util.List;
+import java.util.Random;
 
 public class UserService implements UserClient {
     private final SysUserClient sysUserClient;
@@ -50,17 +51,36 @@ public class UserService implements UserClient {
         return userClient.getBySysUserId(request);
     }
 
+    @Override
+    public boolean shouldShowAttempts(UserIdRequest request) {
+        return userClient.shouldShowAttempts(request);
+    }
+
     public static void main(String[] args) {
         var client = new UserService(
                 "http://localhost:8080",
                 Constants.CHAT_APP_ID
         );
+
+//        var user = client.get("01e6f0ddb90700");
+
+//        System.out.println("System user ID " + user.getSysUserId());
+
+
+        var rand = new Random();
+        for (int i = 0; i < 10; i++) {
+            var userId = client.register(new RegisterRequest(
+                    "user" + rand.nextInt(10000),
+                    "123456"
+            ));
+            var user = client.get(userId);
+            client.getBySysUserId(new GetBySysUserIdRequest(user.getSysUserId()));
+        }
 //        var userId = client.register(new RegisterRequest(
 //                "hqq", "123456"
 //        ));
 
-
-        client.sysUserClient.logout(new SysLogoutRequest("1d950468-aee7-4422-9842-668ca1e9cb0c"));
+//        client.sysUserClient.logout(new SysLogoutRequest("1d950468-aee7-4422-9842-668ca1e9cb0c"));
 
 //        var userId = client.login(new LoginRequest("leen", "123456")).userId();
 //        var user = client.get(userId);
@@ -69,16 +89,16 @@ public class UserService implements UserClient {
 //
 //        var token = client.sysUserClient.issueToken(new IssueTokenRequest(user.getSysUserId()));
 //
-        String token = "1d950468-aee7-4422-9842-668ca1e9cb0c";
-
-        System.out.println("Token: " + token);
-
-        var sysUserId = client.sysUserClient.authenticate(new SysAuthenticateRequest(token));
-
-        System.out.println("System user ID: " + sysUserId);
-
-        var userId2 = client.getBySysUserId(new GetBySysUserIdRequest(sysUserId));
-        System.out.println("User ID: " + userId2);
+//        String token = "1d950468-aee7-4422-9842-668ca1e9cb0c";
+//
+//        System.out.println("Token: " + token);
+//
+//        var sysUserId = client.sysUserClient.authenticate(new SysAuthenticateRequest(token));
+//
+//        System.out.println("System user ID: " + sysUserId);
+//
+//        var userId2 = client.getBySysUserId(new GetBySysUserIdRequest(sysUserId));
+//        System.out.println("User ID: " + userId2);
     }
 
 }

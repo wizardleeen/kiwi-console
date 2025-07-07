@@ -16,4 +16,6 @@ public interface Compiler {
 
     @Nullable
     String getCode(long appId, String fileName);
+
+    void delete(long appId);
 }

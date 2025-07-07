@@ -14,22 +14,33 @@ Kiwi is an infrastructure-free programming langauge that enables application to 
 ### Important Kiwi Notes
 
 1. Unlike kotlin, Kiwi uses `->` to denote function return type.
-2. Array creation syntax is `new ElementType[]`, e.g., `new string[]`
-3. To add an element into an array, invoke the the `append` method on the array object
-4. There's no `toString` method. When concatenating objects with strings, the objects are automatically converted into string.
-5. Available primitive types: `int`, `long`, `float`, `double`, `string` and `bool`
-6. Parameter default values are not supported
-7. `@Summary` field must be string
-8. Value objects: value objects are immutable and identity-less objects. There are two common use cases for value objects:
-   * Representing values in domain models, e.g., `Money`
-   * As service method parameters for encapsulating complex information, e.g., `OrderPlacementRequest`
-9. Smart cast is not yet supported. For example, `!!` is required in the following example even though there is a non-null check:
-    ```
-    fn getUserName(user: User?) -> string {
-        return user != null ? user!!.name : "N/A"        
-    }
+2. Unlike Kotlin `if-else` constructs can not be used as expressions. Use conditional expression instead.
+    * For example, the following program **won't compile**:
    ```
-10. Modifying captured variable is not yet supported. For example, the following method won't compile:
+   var max = if (a > b) a else b
+   ```    
+    * Change to conditional expression to fix it:
+   ```
+   var  max = a > b ? a : b
+   ```
+3. Search APIs are automatically generated. Don't try to implement it manually.
+4. Array creation syntax is `new ElementType[]`, e.g., `new string[]`
+5. To add an element into an array, invoke the the `append` method on the array object
+6. There's no `toString` method. When concatenating objects with strings, the objects are automatically converted into string.
+7. Available primitive types: `int`, `long`, `float`, `double`, `string` and `bool`
+8. Common methods/fields that are currently missing: array.find, array.filter, string.length. So avoid using them.
+9. Parameter default values are not supported
+10. `@Summary` field must be string
+11. Value objects: value objects are immutable and identity-less objects. There are two common use cases for value objects:
+    * Representing values in domain models, e.g., `Money`
+    * As service method parameters for encapsulating complex information, e.g., `OrderPlacementRequest`
+12. Smart cast is not yet supported. For example, `!!` is required in the following example even though there is a non-null check:
+     ```
+     fn getUserName(user: User?) -> string {
+         return user != null ? user!!.name : "N/A"        
+     }
+    ```
+13. Modifying captured variable is not yet supported. For example, the following method won't compile:
     ```
     fn sum(values: int[]) -> int {
         var sum = 0
@@ -45,6 +56,8 @@ Kiwi is an infrastructure-free programming langauge that enables application to 
         return sum
     }
     ```
+14. Integration with external systems is not yet supported such as payments system or AI.
+
 
 ### Data Migration
 

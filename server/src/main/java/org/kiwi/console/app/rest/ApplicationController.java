@@ -1,5 +1,7 @@
 package org.kiwi.console.app.rest;
 
+import org.kiwi.console.generate.KiwiCompiler;
+import org.kiwi.console.generate.PageCompiler;
 import org.kiwi.console.kiwi.App;
 import org.kiwi.console.kiwi.AppClient;
 import org.kiwi.console.kiwi.AppSearchRequest;
@@ -15,9 +17,13 @@ import org.springframework.web.bind.annotation.*;
 public class ApplicationController {
 
     private final AppClient appClient;
+    private final KiwiCompiler kiwiCompiler;
+    private final PageCompiler pageCompiler;
 
-    public ApplicationController(AppClient appClient) {
+    public ApplicationController(AppClient appClient, KiwiCompiler kiwiCompiler, PageCompiler pageCompiler) {
         this.appClient = appClient;
+        this.kiwiCompiler = kiwiCompiler;
+        this.pageCompiler = pageCompiler;
     }
 
     @PostMapping("/search")
@@ -46,9 +52,11 @@ public class ApplicationController {
 
     @DeleteMapping("/{id}")
     public void delete(@AuthenticationPrincipal String userId, @PathVariable("id") String id) {
-        var existing = appClient.get(id);
-        if (!existing.getOwnerId().equals(userId))
+        var app = appClient.get(id);
+        if (!app.getOwnerId().equals(userId))
             throw new BusinessException(ErrorCode.FORBIDDEN);
+        pageCompiler.delete(app.getSystemAppId());
+        kiwiCompiler.delete(app.getSystemAppId());
         appClient.delete(new DeleteAppRequest(id));
     }
 

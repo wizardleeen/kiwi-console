@@ -58,6 +58,11 @@ class MockCompiler implements KiwiCompiler, PageCompiler {
     }
 
     @Override
+    public void delete(long appId) {
+        working.remove(appId);
+    }
+
+    @Override
     public String generateApi(long appId) {
         return "api";
     }
