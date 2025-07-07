@@ -56,7 +56,24 @@ Important Notes:
         return sum
     }
     ```
-14. Integration with external systems is not yet supported such as payments system or AI. 
+14. Only methods defined in service beans are exposed in API.
+    For example, the `cancel` method below is not accessible through API:
+    ```
+    class Order {
+       fn cancel() {
+       }
+    }
+    ```
+    To support order cancellation in API, you need to define a method in the service bean:
+    ```
+    @Bean
+    class OrderService {
+       fn cancelOrder(order: Order) {
+         order.cancel()
+       }
+    }
+    ```
+15. Integration with external systems is not yet supported such as payments system or AI. 
 
 Output Format:
 
