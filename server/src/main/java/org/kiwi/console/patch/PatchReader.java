@@ -1,7 +1,5 @@
 package org.kiwi.console.patch;
 
-import org.kiwi.console.generate.CorruptPatchException;
-
 import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,7 +22,7 @@ class PatchReader {
         var hunks = new ArrayList<Hunk>();
         String line;
         while ((line = readLine()) != null) {
-            if (line.startsWith("@@")) {
+            if (isHunkHeader(line)) {
                 hunks.add(new Hunk(header, buf.toString()));
                 header = parseHunkHeader(line);
                 buf.setLength(0);
@@ -35,27 +33,24 @@ class PatchReader {
         return new Patch(hunks);
     }
 
+    private boolean isHunkHeader(String line) {
+        for (int i = 0; i < line.length(); i++) {
+            var c = line.charAt(i);
+            switch (c) {
+                case ' ', '\t' -> {}
+                case '@' -> {
+                    return i < line.length() - 1 && line.charAt(i + 1) == '@';
+                }
+                default -> {
+                    return false;
+                }
+            }
+        }
+        return false;
+    }
 
     public HunkHeader parseHunkHeader(String line) {
-        var parts = line.split(" ");
-        if (parts.length != 4 || !parts[0].equals("@@") || !parts[3].equals("@@"))
-            throw new CorruptPatchException("Invalid hunk header: " + line);
-        var op = switch (parts[1]) {
-            case "insert" -> Operation.insert;
-            case "delete" -> Operation.delete;
-            case "replace" -> Operation.replace;
-            default -> throw new CorruptPatchException("Unknown operation: " + parts[1]);
-        };
-        var liens = parts[2].split(":");
-        if (liens.length != 2)
-            throw new CorruptPatchException("Invalid line numbers: " + parts[2]);
-        try {
-            var startLn = Integer.parseInt(liens[0]);
-            var endLn = Integer.parseInt(liens[1]);
-            return new HunkHeader(op, startLn, endLn);
-        } catch (NumberFormatException e) {
-            throw new CorruptPatchException("Invalid line numbers: " + parts[2]);
-        }
+        return new HunkHeaderParser(line).parse();
     }
 
     private @Nullable String readLine() {
