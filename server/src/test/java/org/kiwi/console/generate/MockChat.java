@@ -13,8 +13,7 @@ class MockChat implements Chat {
         var prompt = MockPromptParser.parse(text);
         lastCode = switch (prompt.kind()) {
             case PLAN -> "3";
-            case CREATE, PAGE_CREATE-> prompt.prompt();
-            case UPDATE, PAGE_UPDATE -> "@@ replace 1:10000 @@\n" + prompt.prompt();
+            case CREATE, PAGE_CREATE, UPDATE, PAGE_UPDATE -> prompt.prompt();
             case PAGE_COMMIT_MSG -> "commit front";
             case FIX -> requireNonNull(lastCode).replace("Error", "Fixed");
             case COMMIT_MSG -> "commit";

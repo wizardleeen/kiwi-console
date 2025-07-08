@@ -3,7 +3,6 @@ package org.kiwi.console.genai;
 import lombok.extern.slf4j.Slf4j;
 import org.kiwi.console.genai.rest.dto.GenerateRequest;
 import org.kiwi.console.generate.*;
-import org.kiwi.console.patch.PatchApply;
 import org.kiwi.console.util.BusinessException;
 import org.kiwi.console.util.ErrorCode;
 import org.kiwi.console.util.Utils;
@@ -55,8 +54,7 @@ public class AigcService {
         else
             text = buildCreateText(request);
         log.info("Initial prompt:\n{}", text);
-        var resp = removeMarkdownTags(generateContent(chat, text));
-        var code = existingCode == null ? resp : PatchApply.apply(existingCode, resp);
+        var code = removeMarkdownTags(generateContent(chat, text));
         log.info("Generated code:\n{}", code);
         var r = deploy(request.appId(), code);
         if (r.successful()) {
@@ -66,7 +64,7 @@ public class AigcService {
         for (int i = 0; i < 5; i++) {
             var fixPrompt = buildFixPrompt(code, r.output());
             log.info("Trying to fix error with prompt:\n{}", fixPrompt);
-            code = PatchApply.apply(code, removeMarkdownTags(generateContent(chat, fixPrompt)));
+            code = removeMarkdownTags(generateContent(chat, fixPrompt)); //PatchApply.apply(code, removeMarkdownTags(generateContent(chat, fixPrompt)));
             log.info("Generated code (Retry #{}):\n{}", i + 1, code);
             r = deploy(request.appId(), code);
             if (r.successful()) {
@@ -106,11 +104,11 @@ public class AigcService {
     }
 
     private String buildUpdateText(String content, String code) {
-        return Format.format(updatePrompt, content, LineNumAnnotator.annotate(code));
+        return Format.format(updatePrompt, content, code);
     }
 
     private String buildFixPrompt(String code, String buildOutput) {
-        return Format.format(fixPrompt, LineNumAnnotator.annotate(code), buildOutput);
+        return Format.format(fixPrompt, code, buildOutput);
     }
 
     public static String removeMarkdownTags(String text) {

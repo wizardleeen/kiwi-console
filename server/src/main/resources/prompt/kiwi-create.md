@@ -73,7 +73,18 @@ Important Notes:
        }
     }
     ```
-15. Integration with external systems is not yet supported such as payments system or AI. 
+15. Tuples are not supported.
+    For example, the following code won't compile:
+    ```
+    var userAndTaskStatus = (user, task.status)
+    ```
+    To fix the problem, you need to create a value class to represent the pair:
+    ```
+    value class UserAndTaskStatus(val user: User, val taskStatus: TaskStatus)
+
+    var userAndTaskStatus = UserAndTaskStatus(user, task.status)
+    ```
+16. Integration with external systems is not yet supported such as payments system or AI. 
 
 Output Format:
 

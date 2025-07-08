@@ -10,7 +10,6 @@ import org.kiwi.console.generate.event.GenerationListener;
 import org.kiwi.console.generate.rest.CancelRequest;
 import org.kiwi.console.generate.rest.RetryRequest;
 import org.kiwi.console.kiwi.*;
-import org.kiwi.console.patch.PatchApply;
 import org.kiwi.console.util.*;
 import org.springframework.core.task.SyncTaskExecutor;
 import org.springframework.core.task.TaskExecutor;
@@ -245,7 +244,7 @@ public class GenerationService {
         String prompt;
         var existingCode = kiwiCompiler.getCode(sysAppId, MAIN_KIWI);
         if (existingCode != null)
-            prompt = buildUpdatePrompt(userPrompt, LineNumAnnotator.annotate(existingCode));
+            prompt = buildUpdatePrompt(userPrompt, existingCode);
         else
             prompt = buildCreatePrompt(userPrompt);
         log.info("Kiwi generation prompt: \n{}", prompt);
@@ -276,16 +275,7 @@ public class GenerationService {
     private DeployResult runCompiler(Compiler compiler, long appId, List<Patch> patches) {
         var files = new ArrayList<SourceFile>();
         for (Patch patch : patches) {
-            String code;
-            if (patch.existingCode != null) {
-                try {
-                    code = PatchApply.apply(patch.existingCode, patch.agentResponse);
-                } catch (MalformedHunkException e) {
-                    return new DeployResult(false, e.getMessage());
-                }
-            }
-            else
-                code = patch.agentResponse;
+            var code = patch.agentResponse;
             files.add(new SourceFile(patch.fileName, code));
         }
         return compiler.run(appId, files);
@@ -342,12 +332,11 @@ public class GenerationService {
         for (int i = 0; i < 5; i++) {
             task.startAttempt();
             var code = Objects.requireNonNull(compiler.getCode(sysAppId, sourceName));
-            var fixPrompt = Format.format(promptTemplate, LineNumAnnotator.annotate(code), error);
+            var fixPrompt = Format.format(promptTemplate, code, error);
             log.info("Fix prompt:\n{}", fixPrompt);
             var resp = generateContent(chat, fixPrompt, task, true);
             log.info("Agent Output:\n{}", resp);
-            code = PatchApply.apply(code, resp);
-            log.info("Generated code (Retry #{}):\n{}", i + 1, code);
+            log.info("Generated code (Retry #{}):\n{}", i + 1, resp);
             var r = runCompiler(compiler, sysAppId, code, resp, sourceName);
             if (r.successful()) {
                 task.finishAttempt(true, null);
@@ -367,7 +356,7 @@ public class GenerationService {
         if (existingCode == null)
             prompt = buildFrontCreatePrompt(task.exchange.getPrompt(), apiSource);
         else
-            prompt = buildFrontUpdatePrompt(task.exchange.getPrompt(), LineNumAnnotator.annotate(existingCode), apiSource);
+            prompt = buildFrontUpdatePrompt(task.exchange.getPrompt(), existingCode, apiSource);
         log.info("Page generation prompt:\n{}", prompt);
         var resp = generateContent(chat, prompt, task, true);
         log.info("Agent Output:\n{}", resp);
