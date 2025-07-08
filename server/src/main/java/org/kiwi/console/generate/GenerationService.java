@@ -21,7 +21,7 @@ import java.io.IOException;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -256,8 +256,7 @@ public class GenerationService {
                 updateAppName(task.exchange.getAppId(), appName);
         }
         log.info("Agent Output:\n{}", resp);
-        var code = existingCode != null ? PatchApply.apply(existingCode, resp) : resp;
-        var r = kiwiCompiler.run(sysAppId, List.of(new SourceFile(MAIN_KIWI, code)));
+        var r = runCompiler(kiwiCompiler, sysAppId, existingCode, resp, MAIN_KIWI);
         if (!r.successful()) {
             task.finishAttempt(false, r.output());
             fix(sysAppId, r.output(), task, chat, kiwiCompiler, MAIN_KIWI, kiwiFixPrompt);
@@ -268,6 +267,28 @@ public class GenerationService {
         kiwiCompiler.commit(sysAppId, generateKIwiCommitMsg(task));
         log.info("Kiwi source code committed");
         task.exchange.setManagementURL(Format.format(mgmtUrlTempl, sysAppId));
+    }
+
+    private DeployResult runCompiler(Compiler compiler, long appId, @Nullable String existingCode, String agentResp,  String fileName) {
+        return runCompiler(compiler, appId, List.of(new Patch(fileName, existingCode, agentResp)));
+    }
+
+    private DeployResult runCompiler(Compiler compiler, long appId, List<Patch> patches) {
+        var files = new ArrayList<SourceFile>();
+        for (Patch patch : patches) {
+            String code;
+            if (patch.existingCode != null) {
+                try {
+                    code = PatchApply.apply(patch.existingCode, patch.agentResponse);
+                } catch (MalformedHunkException e) {
+                    return new DeployResult(false, e.getMessage());
+                }
+            }
+            else
+                code = patch.agentResponse;
+            files.add(new SourceFile(patch.fileName, code));
+        }
+        return compiler.run(appId, files);
     }
 
     private String generateContent(Chat chat, String prompt, Task task, boolean sanitizeCode) {
@@ -327,7 +348,7 @@ public class GenerationService {
             log.info("Agent Output:\n{}", resp);
             code = PatchApply.apply(code, resp);
             log.info("Generated code (Retry #{}):\n{}", i + 1, code);
-            var r = compiler.run(sysAppId, List.of(new SourceFile(sourceName, code)));
+            var r = runCompiler(compiler, sysAppId, code, resp, sourceName);
             if (r.successful()) {
                 task.finishAttempt(true, null);
                 return;
@@ -350,8 +371,10 @@ public class GenerationService {
         log.info("Page generation prompt:\n{}", prompt);
         var resp = generateContent(chat, prompt, task, true);
         log.info("Agent Output:\n{}", resp);
-        var code = existingCode != null ? PatchApply.apply(existingCode, resp) : resp;
-        var r = pageCompiler.run(task.sysAppId, List.of(new SourceFile(APP_TSX, code), new SourceFile(API_TS, apiSource)));
+        var r = runCompiler(pageCompiler, task.sysAppId, List.of(
+                new Patch(APP_TSX, existingCode, resp),
+                new Patch(API_TS, null, apiSource)
+        ));
         if (!r.successful()) {
             task.finishAttempt(false, r.output());
             fix(task.sysAppId, r.output(), task, chat, pageCompiler, APP_TSX, pageFixPrompt);
@@ -366,6 +389,12 @@ public class GenerationService {
     private String buildFrontUpdatePrompt(String userPrompt, String existingCode, String apiSource) {
         return Format.format(pageUpdatePrompt, userPrompt, existingCode, apiSource);
     }
+
+    private record Patch(
+            String fileName,
+            @Nullable String existingCode,
+            String agentResponse
+    ) {}
 
     private String buildFrontCreatePrompt(String userPrompt, String apiSource) {
         return Format.format(pageCreatePrompt, userPrompt, apiSource);
@@ -498,16 +527,16 @@ public class GenerationService {
 
     public static void main(String[] args) throws IOException {
         var apikeyPath = "/Users/leen/develop/gemini/apikey";
-        var apikey = Files.readString(Path.of(apikeyPath));
+        var apikey = Files.readString(java.nio.file.Path.of(apikeyPath));
         var httpClient = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
         var host = "http://localhost:8080";
         var kiwiCompiler = new DefaultKiwiCompiler(
-                Path.of(Constants.KIWI_WORKDIR),
+                java.nio.file.Path.of(Constants.KIWI_WORKDIR),
                 new DeployClient(host, httpClient));
         var service = new GenerationService(
                 new GeminiAgent(apikey),
                 kiwiCompiler,
-                new DefaultPageCompiler(Path.of(PAGE_WORKDIR)),
+                new DefaultPageCompiler(java.nio.file.Path.of(PAGE_WORKDIR)),
                 createFeignClient(ExchangeClient.class, CHAT_APP_ID),
                 new AppService(host, CHAT_APP_ID, Utils.createKiwiFeignClient(
                         host,
