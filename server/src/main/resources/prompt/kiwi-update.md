@@ -73,7 +73,18 @@ Kiwi is an infrastructure-free programming langauge that enables application to 
        }
     }
     ```
-15. Integration with external systems is not yet supported such as payments system or AI.
+15. Tuples are not supported.
+    For example, the following code won't compile:
+    ```
+    var userAndTaskStatus = (user, task.status)
+    ```
+    To fix the problem, you need to create a value class to represent the pair:
+    ```
+    value class UserAndTaskStatus(val user: User, val taskStatus: TaskStatus)
+
+    var userAndTaskStatus = UserAndTaskStatus(user, task.status)
+    ```
+    16. Integration with external systems is not yet supported such as payments system or    AI.
 
 
 ### Data Migration
@@ -178,30 +189,10 @@ Here is the content of `src/main.kiwi` annotated with line number:
 
 ### Output format
     
-The output consist of multiple hunks, each with the following format:
-
-@@ operation start-line:end-line-inclusive @@
-content
-
-*   **operation:** `insert` | `delete` | `replace`
-*   **start-line:** The 1-based starting line number in the *original* file. For insert, this is the line **before** which the content will be inserted.
-*   **end-line-inclusive:** The 1-based ending line number in the *original* file. For `insert`, this is the same as the `start-line`.
-
-
-**Example:**
-
-    @@ insert 1:1 @@
-    import org.metavm.api.Index
-    @@ delete 2:5 @@
-    @@ replace 10:11 @@
-    class Product(
-        var name: string 
-    )
+Output the full content of `src/main.kiwi`. You must output the full content even if there's only one line of change.
+Your output must ONLY contain the raw code. ABSOLUTELY NOTHING ELSE. No explanation, no markdown tags.
 
 ### Constraints
 
 *   All changes must be made in `src/main.kiwi`, do not create new source files.
-*   **DO NOT** output any conversational text, explanations, apologies, or introductory sentences like "Sure, here is the diff:". Your response must start *directly* with the `@@` of the first hunk.
-*   **ONLY** output the raw diff content. Do not wrap it in markdown code blocks (e.g., \`\`\`diff).
-*   Ensure context lines in the `@@ ... @@` hunk header are accurate. 
-*   Ensure the content lines are properly indented
+*   **DO NOT** output any conversational text, explanations, apologies, or introductory sentences like "Sure, here is the code:". 
