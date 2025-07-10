@@ -1,4 +1,4 @@
-Your task is to generate a Kiwi program for based on a description. 
+Your task is to generate a Kiwi program for based on a description.
 
 Kiwi is an infrastructure-free programming langauge that enables application to focus on business logic.
 
@@ -15,11 +15,11 @@ Important Notes:
 
 1. Unlike Kotlin, Kiwi uses `->` to denote function return type.
 2. Unlike Kotlin `if-else` constructs can not be used as expressions. Use conditional expression instead.
-   * For example, the following program **won't compile**:
+    * For example, the following program **won't compile**:
    ```
    var max = if (a > b) a else b
    ```    
-   * Change to conditional expression to fix it:
+    * Change to conditional expression to fix it:
    ```
    var  max = a > b ? a : b
    ```
@@ -32,8 +32,8 @@ Important Notes:
 9. Parameter default values are not supported
 10. `@Summary` field must be string
 11. Value objects: value objects are immutable and identity-less objects. There are two common use cases for value objects:
-     * Representing values in domain models, e.g., `Money`
-     * As service method parameters for encapsulating complex information, e.g., `OrderPlacementRequest`
+    * Representing values in domain models, e.g., `Money`
+    * As service method parameters for encapsulating complex information, e.g., `OrderPlacementRequest`
 12. Smart cast is not yet supported. For example, `!!` is required in the following example even though there is a non-null check:
      ```
      fn getUserName(user: User?) -> string {
@@ -84,7 +84,42 @@ Important Notes:
 
     var userAndTaskStatus = UserAndTaskStatus(user, task.status)
     ```
-16. Integration with external systems is not yet supported such as payments system or AI. 
+16. Do not introduce duplicate method names across beans because bean method names are used as API names.
+    For example the following program is problematic:
+    ```
+    @Bean
+    class ProductionTaskService {
+       fn assignTask(task: ProductionTask, employee: Employee) {
+          task.assignTo(employee)
+       }
+    }
+
+    @Bean
+    class InspectionTaskService {
+       fn assignTask(task: InspectionTask, employee: Employee) {
+          task.assignTo(employee)
+       }
+    }
+    ```
+    To fix the issue, you need to use different method names:
+
+    ```
+    @Bean
+    class ProductionTaskService {
+       fn assignProductionTask(task: ProductionTask, employee: Employee) {
+          task.assignTo(employee)
+       }
+    }
+
+    @Bean
+    class InspectionTaskService {
+       fn assignInspectionTask(task: InspectionTask, employee: Employee) {
+          task.assignTo(employee)
+       }
+    }
+    ```
+    *Note:* This constraint only apply to bean methods, other method names don't have to be unique across classes.
+17. Integration with external systems is not yet supported such as payments system or AI.
 
 Output Format:
 

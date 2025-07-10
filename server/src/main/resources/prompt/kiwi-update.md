@@ -84,14 +84,53 @@ Kiwi is an infrastructure-free programming langauge that enables application to 
 
     var userAndTaskStatus = UserAndTaskStatus(user, task.status)
     ```
-    16. Integration with external systems is not yet supported such as payments system or    AI.
+16. Do not introduce duplicate method names across beans because bean method names are used as API names.
+    For example the following program is problematic:
+    ```
+    @Bean
+    class ProductionTaskService {
+       fn assignTask(task: ProductionTask, employee: Employee) {
+          task.assignTo(employee)
+       }
+    }
+
+    @Bean
+    class InspectionTaskService {
+       fn assignTask(task: InspectionTask, employee: Employee) {
+          task.assignTo(employee)
+       }
+    }
+    ```
+    To fix the issue, you need to use different method names:
+
+    ```
+    @Bean
+    class ProductionTaskService {
+       fn assignProductionTask(task: ProductionTask, employee: Employee) {
+          task.assignTo(employee)
+       }
+    }
+
+    @Bean
+    class InspectionTaskService {
+       fn assignInspectionTask(task: InspectionTask, employee: Employee) {
+          task.assignTo(employee)
+       }
+    }
+    ```
+    *Note:* This constraint only apply to bean methods, other method names don't have to be unique across classes.
+17. Integration with external systems is not yet supported such as payments system or AI.
 
 
 ### Data Migration
 
-When you add new fields or change types of existing fields, you need to define transformation functions so that Kiwi runtime
-knows how to migrate data from the old model to the new model. Here is an example, involving field addition, changing of 
-field type:
+When you add new fields or change types of existing fields, you need to define migration functions so that Kiwi runtime
+knows how to migrate data to the new model. Note that you **must not** throw exceptions in migration functions.
+
+**Example 1:**
+
+This example involves field addition and changing of  field type:
+
 
 Before:
 
@@ -136,7 +175,9 @@ After
         OUT_OF_STOCK
     }
 
-Here is another example involving introducing child objects and moving some fields to the child objects. Suppose we introduce
+**Example 2:**
+
+This example involving introducing child objects and moving some fields to the child objects. Suppose we introduce
 SKU to the previous example:
 
     class Product(
@@ -176,19 +217,49 @@ SKU to the previous example:
 
 There are several important details in this example:
 1. When you need to access removed fields in the data migration task, you can mark them as `deleted` instead of deleting them directly.
-When a field is marked with `deleted`, you need to change its type to nullable and make it private. 
+   When a field is marked with `deleted`, you need to change its type to nullable and make it private.
 2. When you modify a Kiwi program that contains `__run__` methods, you need to remove them in your updated code, otherwise these functions
-would get rerun when your code is deployed.
+   would get rerun when your code is deployed.
+
+
+**Example 3:**
+
+This example involves creating a new class and a field referencing the new class at the same time.
+The key challenge is that to successfully migrate the new field, a object of the new class is required. However, as it is a new class, there must be no existing instances.
+The solution is to try to find an existing instance of the new class and if not found create a new one in the migration function of the new field.
+
+Before
+
+    class ProductionTask(val plannedAmount: double, var finishedAmount: double)
+
+After
+
+    class ProductionLine(var name: string) {
+        static allIdx = Index<bool, ProductionLine>(false, p -> true)
+    }
+
+    class ProductionTask(val plannedAmount: double, val productionLine: ProductionLine) {
+        
+        var finishedAmount: double
+
+        fn __productionLine__() -> ProductionLine {
+            val existingPl = ProductionLine.allIdx.getFirst(true)
+            return existingPl == null ? ProductionLine("N/A") : existingPl!!
+        }
+
+    }
+
+Note: The technique used in this example is also applicable to other situations where you need an instance of a class in a migration function but you are not sure if the instance exists.
 
 Here is the description of how the user want to modify the program:
 {}
 
-Here is the content of `src/main.kiwi` annotated with line number:
-    
+Here is the content of `src/main.kiwi`
+
 {}
 
 ### Output format
-    
+
 Output the full content of `src/main.kiwi`. You must output the full content even if there's only one line of change.
 Your output must ONLY contain the raw code. ABSOLUTELY NOTHING ELSE. No explanation, no markdown tags.
 
