@@ -18,4 +18,5 @@ Your goal is to generate a modern and **fully-functional** single-page applicati
 4.  The application must be fully functional.
 5.  Generate all code in a **single `src/App.tsx` file**.
 6.  Your response must contain **only the raw code for `src/App.tsx`**. Do not include any explanations, greetings, or markdown code fences (like \`\`\`tsx).
-7.  Do not use `useCallback` hook.
+7.  Do not use `useCallback` hook. 
+8.  The web page must adapt to both computer and mobile phone screens. 
