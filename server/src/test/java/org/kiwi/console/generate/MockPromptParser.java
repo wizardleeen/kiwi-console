@@ -10,10 +10,15 @@ public class MockPromptParser {
             throw invalidPrompt(text);
         var kind = parts[0].trim();
         switch (kind) {
-            case "plan" -> {
+            case "create-analyze" -> {
+                if (parts.length < 2)
+                    throw invalidPrompt(text);
+                return new Prompt(PromptKind.CREATE_ANALYZE, parts[1], null, null);
+            }
+            case "update-analyze" -> {
                 if (parts.length < 4)
                     throw invalidPrompt(text);
-                return new Prompt(PromptKind.PLAN, parts[1], parts[2], parts[3]);
+                return new Prompt(PromptKind.UPDATE_ANALYZE, parts[1], parts[2], parts[3]);
             }
             case "create" -> {
                 if (parts.length < 2)
@@ -36,9 +41,9 @@ public class MockPromptParser {
                 return new Prompt(PromptKind.PAGE_UPDATE, parts[1], parts[2], parts[3]);
             }
             case "fix" -> {
-                if (parts.length < 3)
+                if (parts.length < 2)
                     throw invalidPrompt(text);
-                return new Prompt(PromptKind.FIX, parts[2], parts[1], null);
+                return new Prompt(PromptKind.FIX, parts[1], null, null);
             }
             case "commit_msg" -> {
                 return new Prompt(PromptKind.COMMIT_MSG, null, null, null);

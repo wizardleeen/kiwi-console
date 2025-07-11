@@ -1,0 +1,12 @@
+package domain
+
+@Label("类目")
+enum Category {
+    @Label("电子产品")
+    ELECTRONICS,
+    @Label("服装")
+    CLOTHING,
+    @Label("其他")
+    OTHER
+    ;
+}

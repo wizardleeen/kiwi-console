@@ -7,5 +7,7 @@ public enum PromptKind {
     PAGE_CREATE,
     PAGE_UPDATE,
     PAGE_COMMIT_MSG,
-    PLAN, FIX
+    CREATE_ANALYZE,
+    UPDATE_ANALYZE,
+    FIX
 }

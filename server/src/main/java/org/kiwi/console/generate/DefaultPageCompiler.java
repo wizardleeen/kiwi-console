@@ -16,7 +16,7 @@ public class DefaultPageCompiler extends AbstractCompiler implements PageCompile
 
     @Override
     public DeployResult deploy(long appId) {
-        var r = Utils.executeCommand(getWorkDir(appId).path(), "sh", "deploy.sh");
+        var r = Utils.executeCommand(getWorkDir(appId).root(), "sh", "deploy.sh");
         if (r.exitCode() != 0)
             return new DeployResult(false, r.output());
         return new DeployResult(true, null);
@@ -25,12 +25,12 @@ public class DefaultPageCompiler extends AbstractCompiler implements PageCompile
     @SneakyThrows
     @Override
     protected void initWorkDir(WorkDir workDir, long appId) {
-        if(!workDir.path().toFile().exists()) {
-            var r = Utils.executeCommand(workDir.path().getParent(), "cp", "-r", "template",
-                    workDir.path().getFileName().toString());
+        if(!workDir.root().toFile().exists()) {
+            var r = Utils.executeCommand(workDir.root().getParent(), "cp", "-r", "template",
+                    workDir.root().getFileName().toString());
             if (r.exitCode() != 0)
                 throw new RuntimeException("Failed to initialized frontend workspace");
-            var r1 = Utils.executeCommand(workDir.path(), "npm", "install");
+            var r1 = Utils.executeCommand(workDir.root(), "npm", "install");
             if (r1.exitCode() != 0)
                 throw new RuntimeException("Failed to run `npm install`: " + r1.output());
             var envFilePath = workDir.getSrcPath().resolve("env.ts");
@@ -39,7 +39,7 @@ public class DefaultPageCompiler extends AbstractCompiler implements PageCompile
     }
     protected BuildResult build(WorkDir workDir) {
         Utils.CommandResult r;
-        r = Utils.executeCommand(workDir.path(), "npm", "run", "build");
+        r = Utils.executeCommand(workDir.root(), "npm", "run", "build");
         if (r.exitCode() == 0)
             return new BuildResult(true, null);
         log.info("Build failed: {}", r.output());

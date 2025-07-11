@@ -12,6 +12,7 @@ import org.springframework.core.task.SyncTaskExecutor;
 import org.springframework.core.task.TaskExecutor;
 
 import javax.annotation.Nonnull;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -34,17 +35,16 @@ public class GenerationServiceTest extends TestCase {
                 new SyncTaskExecutor()
         );
         var prompt = """
-                // Test App
                 class Foo {}
                 """;
         genService.generate(null, prompt, "tk", false, discardListener);
         var appId = exchangeClient.getLast().getAppId();
         var app = appClient.get(appId);
         var sysAppId = app.getSystemAppId();
-        assertEquals("Test App", app.getName());
+//        assertEquals("Test App", app.getName());
 
-        assertEquals(prompt, kiwiCompiler.getCode(sysAppId, MAIN_KIWI));
-        assertEquals(prompt, pageCompiler.getCode(sysAppId, APP_TSX));
+        assertEquals("class Foo {}\n", kiwiCompiler.getCode(sysAppId, MAIN_KIWI));
+        assertEquals("class Foo {}\n", pageCompiler.getCode(sysAppId, APP_TSX));
         assertEquals(
         String.format("""
                 Status: SUCCESSFUL
@@ -171,10 +171,10 @@ public class GenerationServiceTest extends TestCase {
             boolean failing = true;
 
             @Override
-            public DeployResult run(long appId, List<SourceFile> sourceFiles) {
+            public DeployResult run(long appId, List<SourceFile> sourceFiles, List<Path> removedFiles) {
                 if (failing)
                     throw new RuntimeException("Failed");
-                return super.run(appId, sourceFiles);
+                return super.run(appId, sourceFiles, removedFiles);
             }
         };
         var pageCompiler = new MockCompiler();

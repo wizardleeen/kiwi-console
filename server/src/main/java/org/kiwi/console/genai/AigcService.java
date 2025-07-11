@@ -3,6 +3,7 @@ package org.kiwi.console.genai;
 import lombok.extern.slf4j.Slf4j;
 import org.kiwi.console.genai.rest.dto.GenerateRequest;
 import org.kiwi.console.generate.*;
+import org.kiwi.console.patch.PatchReader;
 import org.kiwi.console.util.BusinessException;
 import org.kiwi.console.util.ErrorCode;
 import org.kiwi.console.util.Utils;
@@ -15,8 +16,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
-
-import static org.kiwi.console.util.Constants.MAIN_KIWI;
 
 @Slf4j
 @Component
@@ -47,10 +46,10 @@ public class AigcService {
     public void generate(GenerateRequest request) {
         compiler.reset(request.appId());
         var chat = agent.createChat();
-        var existingCode = compiler.getCode(request.appId(), MAIN_KIWI);
+        var existingCode = compiler.getSourceFiles(request.appId());
         String text;
-        if (existingCode != null)
-            text = buildUpdateText(request.prompt(), existingCode);
+        if (!existingCode.isEmpty())
+            text = buildUpdateText(request.prompt(), PatchReader.buildCode(existingCode));
         else
             text = buildCreateText(request);
         log.info("Initial prompt:\n{}", text);
@@ -76,7 +75,7 @@ public class AigcService {
     }
 
     private DeployResult deploy(long appId, String code) {
-        var r = compiler.run(appId, List.of(new SourceFile(MAIN_KIWI, code)));
+        var r = compiler.run(appId, new PatchReader(code).read().addedFiles(), List.of());
         if (r.successful())
             compiler.commit(appId, "commit");
         return r;

@@ -1,0 +1,25 @@
+package domain
+
+@Label("优惠券")
+class Coupon(
+    @Summary
+    @Label("标题")
+    val title: string,
+    @Label("折扣")
+    val discount: Money,
+    @Label("过期时间")
+    val expiry: long
+) {
+
+    @Label("已核销")
+    var redeemed = false
+
+    @Label("核销")
+    fn redeem() -> Money {
+        require(now() > expiry, "优惠券已过期")
+        require(redeemed, "优惠券已核销")
+        redeemed = true
+        return discount
+    }
+
+}

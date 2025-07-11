@@ -19,8 +19,12 @@ public abstract class AbstractCompiler implements Compiler {
     }
 
     @Override
-    public DeployResult run(long appId, List<SourceFile> sourceFiles) {
+    public DeployResult run(long appId, List<SourceFile> sourceFiles, List<Path> removedFiles) {
         var workDir = getWorkDir(appId);
+        for (Path removedFile : removedFiles) {
+            if (workDir.exist(removedFile))
+                workDir.removeFile(removedFile);
+        }
         sourceFiles.forEach(f -> writeSourceFile(workDir, f));
         var r = build(workDir);
         if (r.successful())
@@ -31,7 +35,12 @@ public abstract class AbstractCompiler implements Compiler {
 
     @SneakyThrows
     private void writeSourceFile(WorkDir workDir, SourceFile sourceFile) {
-        workDir.writeSource(sourceFile.name(), sourceFile.content());
+        workDir.writeSource(sourceFile.path(), sourceFile.content());
+    }
+
+    @Override
+    public List<SourceFile> getSourceFiles(long appId) {
+        return getWorkDir(appId).getAllSourceFiles();
     }
 
     @Override
@@ -40,20 +49,20 @@ public abstract class AbstractCompiler implements Compiler {
     @Override
     public void commit(long appId, String message) {
         var workDir = getWorkDir(appId);
-        Utils.executeCommand(workDir.path(), "git", "add", "src");
-        Utils.executeCommand(workDir.path(), "git", "commit", "-m", "\"" + message + "\"");
+        Utils.executeCommand(workDir.root(), "git", "add", "src");
+        Utils.executeCommand(workDir.root(), "git", "commit", "-m", "\"" + message + "\"");
     }
 
     @Override
     public void reset(long appId) {
-        Utils.executeCommand(getWorkDir(appId).path(), "git", "reset", "--hard", "HEAD");
+        Utils.executeCommand(getWorkDir(appId).root(), "git", "reset", "--hard", "HEAD");
     }
 
     protected WorkDir getWorkDir(long appId) {
         var workDir = WorkDir.from(baseDir, appId);
-        if (!workDir.path().toFile().exists()) {
+        if (!workDir.root().toFile().exists()) {
             initWorkDir(workDir, appId);
-            Utils.executeCommand(workDir.path(), "git", "init");
+            Utils.executeCommand(workDir.root(), "git", "init");
         }
         return workDir;
     }
@@ -63,7 +72,6 @@ public abstract class AbstractCompiler implements Compiler {
     }
 
     @SneakyThrows
-    @Override
     public @Nullable String getCode(long appId, String fileName) {
         var workdir = WorkDir.from(baseDir, appId);
         var path = workdir.getSrcPath().resolve(fileName);
@@ -75,7 +83,7 @@ public abstract class AbstractCompiler implements Compiler {
 
     public void delete(long appId) {
         var workDir = WorkDir.from(baseDir, appId);
-        var r = Utils.executeCommand(Path.of("."), "rm", "-rf", workDir.path().toString());
+        var r = Utils.executeCommand(Path.of("."), "rm", "-rf", workDir.root().toString());
         if (r.exitCode() != 0)
             log.warn("Failed to delete work directory for app {}: {}", appId, r.output());
     }

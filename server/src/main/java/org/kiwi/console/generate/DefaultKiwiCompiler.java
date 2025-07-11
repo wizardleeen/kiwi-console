@@ -32,15 +32,15 @@ public class DefaultKiwiCompiler extends AbstractCompiler implements KiwiCompile
     @SneakyThrows
     public String generateApi(long appId) {
         var wd = WorkDir.from(baseDir, appId);
-        var r = Utils.executeCommand(wd.path(), "kiwi", "gen-api");
+        var r = Utils.executeCommand(wd.root(), "kiwi", "gen-api");
         if (r.exitCode() != 0)
             throw new RuntimeException("Failed to generate API: " + r.output());
-        return Files.readString(wd.path().resolve("apigen").resolve("api.ts"));
+        return Files.readString(wd.root().resolve("apigen").resolve("api.ts"));
     }
 
     protected BuildResult build(WorkDir workDir) {
         Utils.CommandResult r;
-        r = Utils.executeCommand(workDir.path(), "kiwi", "build");
+        r = Utils.executeCommand(workDir.root(), "kiwi", "build");
         if (r.output().isEmpty())
             return new BuildResult(true, null);
         log.info("Build failed: {}", r.output());
