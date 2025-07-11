@@ -10,37 +10,40 @@ import org.kiwi.console.generate.event.GenerationListener;
 import org.kiwi.console.generate.rest.CancelRequest;
 import org.kiwi.console.generate.rest.RetryRequest;
 import org.kiwi.console.kiwi.*;
+import org.kiwi.console.patch.PatchReader;
 import org.kiwi.console.util.*;
 import org.springframework.core.task.SyncTaskExecutor;
 import org.springframework.core.task.TaskExecutor;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.StringReader;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static org.kiwi.console.generate.CodeSanitizer.sanitizeCode;
 import static org.kiwi.console.util.Constants.*;
 
 @Slf4j
 public class GenerationService {
 
     public static final String NEW_APP_NAME = "New Application";
-    private static final String example = TextUtil.indent(loadResource("/prompt/src/example.kiwi"));
     private static final String pageCreatePrompt = loadResource("/prompt/page-create.md");
     private static final String pageUpdatePrompt = loadResource("/prompt/page-update.md");
-    private static final String kiwiCreatePrompt = Format.formatKeyed(loadResource("/prompt/kiwi-create.md"), "example", example);
-    private static final String kiwiUpdatePrompt = Format.formatKeyed(loadResource("/prompt/kiwi-update.md"), "example", example);
+    private static final String kiwiCreatePrompt = loadResource("/prompt/kiwi-create.md");
+    private static final String kiwiUpdatePrompt = loadResource("/prompt/kiwi-update.md");
     private static final String pageFixPrompt = loadResource("/prompt/page-fix.md");
     private static final String kiwiFixPrompt = loadResource("/prompt/kiwi-fix.md");
-    private static final String planPrompt = loadResource("/prompt/plan.md");
+    private static final String createAnalyzePrompt = loadResource("/prompt/create-analyze.md");
+    private static final String updateAnalyzePrompt = loadResource("/prompt/update-analyze.md");
 
     private final Agent agent;
     private final KiwiCompiler kiwiCompiler;
@@ -110,6 +113,9 @@ public class GenerationService {
             pageCompiler.reset(sysAppId);
             runningTasks.put(task.exchange.getId(), task);
             var plan = plan(task);
+            if (task.exchange.isFirst() && plan.appName != null) {
+                updateAppName(task.exchange.getAppId(), plan.appName);
+            }
             log.info("{}", plan);
             if (plan.generateKiwi) {
                 executeGen(() -> generateKiwi(task));
@@ -155,15 +161,15 @@ public class GenerationService {
         taskExecutor.execute(() -> runTask(task));
     }
 
-    private record Plan(boolean generateKiwi, boolean generatePage) {
+    private record Plan(boolean generateKiwi, boolean generatePage, @Nullable String appName) {
 
-        public static final Plan none = new Plan(false, false);
+        public static final Plan none = new Plan(false, false, null);
 
-        public static final Plan kiwiOnly = new Plan(true, false);
+        public static final Plan kiwiOnly = new Plan(true, false, null);
 
-        public static final Plan pageOnly = new Plan(false, true);
+        public static final Plan pageOnly = new Plan(false, true, null);
 
-        public static final Plan all = new Plan(true, true);
+        public static final Plan all = new Plan(true, true, null);
 
         @Override
         public String toString() {
@@ -174,36 +180,31 @@ public class GenerationService {
         }
     }
 
+    @SneakyThrows
     private Plan plan(Task task) {
         var exch = task.exchange;
         if (exch.isSkipPageGeneration())
             return task.isStageSuccessful(StageType.BACKEND) ? Plan.none : Plan.kiwiOnly;
-        if (exch.isFirst()) {
-            if (task.isStageSuccessful(StageType.FRONTEND))
-                return Plan.none;
-            if (task.isStageSuccessful(StageType.BACKEND))
-                return Plan.pageOnly;
-            return Plan.all;
-        }
-        var kiwiCode = kiwiCompiler.getCode(task.sysAppId, MAIN_KIWI);
-        var pageCode = pageCompiler.getCode(task.sysAppId, APP_TSX);
+        var kiwiCode = PatchReader.buildCode(kiwiCompiler.getSourceFiles(task.sysAppId));
+        var pageCode = PatchReader.buildCode(pageCompiler.getSourceFiles(task.sysAppId));
         var chat = agent.createChat();
         var buf = new StringBuilder();
-        var planPrompt = createPlanPrompt(exch.getPrompt(), kiwiCode, pageCode);
+        var planPrompt = createPlanPrompt(exch, kiwiCode, pageCode);
         log.info("Plan prompt:\n{}", planPrompt);
         chat.send(planPrompt, new ChatStreamListener() {
             @Override
             public void onThought(String thoughtChunk) {
-                log.info("\n{}", thoughtChunk);
+                System.out.print(thoughtChunk);
             }
 
             @Override
             public void onContent(String contentChunk) {
-                log.info("\n{}", contentChunk);
+                System.out.print(contentChunk);
                 buf.append(contentChunk);
             }
         }, () -> task.cancelled);
-        var r = Integer.parseInt(buf.toString());
+        var text = new BufferedReader(new StringReader(buf.toString()));
+        var r = Integer.parseInt(text.readLine());
         return switch (r) {
             case 0 -> Plan.none;
             case 1 -> task.isBackendSuccessful() ?
@@ -215,13 +216,19 @@ public class GenerationService {
                     yield Plan.none;
                 if (task.isBackendSuccessful())
                     yield Plan.pageOnly;
+                if (task.exchange.isFirst()) {
+                    yield new Plan(true, true, text.readLine());
+                }
                 yield Plan.all;
             }
         };
     }
 
-    private String createPlanPrompt(String userPrompt, String kiwiCode, String pageCode) {
-        return Format.format(planPrompt, userPrompt, kiwiCode, pageCode);
+    private String createPlanPrompt(Exchange exch, String kiwiCode, String pageCode) {
+        if (exch.isFirst())
+            return Format.format(createAnalyzePrompt, exch.getPrompt());
+        else
+            return Format.format(updateAnalyzePrompt, exch.getPrompt(), kiwiCode, pageCode);
     }
 
     private void executeGen(Runnable run) {
@@ -242,23 +249,22 @@ public class GenerationService {
         task.enterStageAndAttempt(StageType.BACKEND);
         var chat = agent.createChat();
         String prompt;
-        var existingCode = kiwiCompiler.getCode(sysAppId, MAIN_KIWI);
-        if (existingCode != null)
-            prompt = buildUpdatePrompt(userPrompt, existingCode);
+        var existingFiles = kiwiCompiler.getSourceFiles(sysAppId);
+        if (!existingFiles.isEmpty())
+            prompt = buildUpdatePrompt(userPrompt, PatchReader.buildCode(existingFiles));
         else
             prompt = buildCreatePrompt(userPrompt);
         log.info("Kiwi generation prompt: \n{}", prompt);
         var resp = generateContent(chat, prompt, task, true);
-        if (existingCode == null) {
-            var appName = extractAppName(resp);
-            if (appName != null)
-                updateAppName(task.exchange.getAppId(), appName);
-        }
-        log.info("Agent Output:\n{}", resp);
-        var r = runCompiler(kiwiCompiler, sysAppId, existingCode, resp, MAIN_KIWI);
+//        if (existingFiles == null) {
+//            var appName = extractAppName(resp);
+//            if (appName != null)
+//                updateAppName(task.exchange.getAppId(), appName);
+//        }
+        var r = runCompiler(kiwiCompiler, sysAppId, resp.addedFiles(), resp.removedFiles());
         if (!r.successful()) {
             task.finishAttempt(false, r.output());
-            fix(sysAppId, r.output(), task, chat, kiwiCompiler, MAIN_KIWI, kiwiFixPrompt);
+            fix(sysAppId, r.output(), task, chat, kiwiCompiler, kiwiFixPrompt);
         }
         else
             task.finishAttempt(true, null);
@@ -268,20 +274,11 @@ public class GenerationService {
         task.exchange.setManagementURL(Format.format(mgmtUrlTempl, sysAppId));
     }
 
-    private DeployResult runCompiler(Compiler compiler, long appId, @Nullable String existingCode, String agentResp,  String fileName) {
-        return runCompiler(compiler, appId, List.of(new Patch(fileName, existingCode, agentResp)));
+    private DeployResult runCompiler(Compiler compiler, long appId, List<SourceFile> files, List<Path> removedFiles) {
+        return compiler.run(appId, files, removedFiles);
     }
 
-    private DeployResult runCompiler(Compiler compiler, long appId, List<Patch> patches) {
-        var files = new ArrayList<SourceFile>();
-        for (Patch patch : patches) {
-            var code = patch.agentResponse;
-            files.add(new SourceFile(patch.fileName, code));
-        }
-        return compiler.run(appId, files);
-    }
-
-    private String generateContent(Chat chat, String prompt, Task task, boolean sanitizeCode) {
+    private org.kiwi.console.patch.Patch generateContent(Chat chat, String prompt, Task task, boolean sanitizeCode) {
         var buf = new StringBuilder();
         chat.send(prompt, new ChatStreamListener() {
             @Override
@@ -295,7 +292,7 @@ public class GenerationService {
                 buf.append(contentChunk);
             }
         }, () -> task.cancelled);
-        return sanitizeCode ? sanitizeCode(buf.toString()) : buf.toString();
+        return new PatchReader(buf.toString()).read();
     }
 
     private String createApp(String name, String userId) {
@@ -328,16 +325,14 @@ public class GenerationService {
         return task.exchange.getPrompt();
     }
 
-    private void fix(long sysAppId, String error, Task task, Chat chat, Compiler compiler, String sourceName, String promptTemplate) {
+    private void fix(long sysAppId, String error, Task task, Chat chat, Compiler compiler, String promptTemplate) {
         for (int i = 0; i < 5; i++) {
             task.startAttempt();
-            var code = Objects.requireNonNull(compiler.getCode(sysAppId, sourceName));
-            var fixPrompt = Format.format(promptTemplate, code, error);
+            var fixPrompt = Format.format(promptTemplate, error);
             log.info("Fix prompt:\n{}", fixPrompt);
             var resp = generateContent(chat, fixPrompt, task, true);
-            log.info("Agent Output:\n{}", resp);
             log.info("Generated code (Retry #{}):\n{}", i + 1, resp);
-            var r = runCompiler(compiler, sysAppId, code, resp, sourceName);
+            var r = runCompiler(compiler, sysAppId, resp.addedFiles(), resp.removedFiles());
             if (r.successful()) {
                 task.finishAttempt(true, null);
                 return;
@@ -351,22 +346,20 @@ public class GenerationService {
     private void generatePages(String apiSource, Task task) {
         task.enterStageAndAttempt(StageType.FRONTEND);
         var chat = agent.createChat();
-        var existingCode = pageCompiler.getCode(task.sysAppId, APP_TSX);
+        var existingFiles = pageCompiler.getSourceFiles(task.sysAppId);
         String prompt;
-        if (existingCode == null)
+        if (existingFiles.stream().noneMatch(f -> f.path().toString().equals(APP_TSX)))
             prompt = buildFrontCreatePrompt(task.exchange.getPrompt(), apiSource);
         else
-            prompt = buildFrontUpdatePrompt(task.exchange.getPrompt(), existingCode, apiSource);
+            prompt = buildFrontUpdatePrompt(task.exchange.getPrompt(), PatchReader.buildCode(existingFiles), apiSource);
         log.info("Page generation prompt:\n{}", prompt);
         var resp = generateContent(chat, prompt, task, true);
-        log.info("Agent Output:\n{}", resp);
-        var r = runCompiler(pageCompiler, task.sysAppId, List.of(
-                new Patch(APP_TSX, existingCode, resp),
-                new Patch(API_TS, null, apiSource)
-        ));
+        var files = new ArrayList<>(resp.addedFiles());
+        files.add(new SourceFile(Path.of(API_TS), apiSource));
+        var r = runCompiler(pageCompiler, task.sysAppId, files, resp.removedFiles());
         if (!r.successful()) {
             task.finishAttempt(false, r.output());
-            fix(task.sysAppId, r.output(), task, chat, pageCompiler, APP_TSX, pageFixPrompt);
+            fix(task.sysAppId, r.output(), task, chat, pageCompiler, pageFixPrompt);
         }
         else
             task.finishAttempt(true, null);
@@ -512,7 +505,7 @@ public class GenerationService {
         }
     }
 
-    public static final String APP_ID = "0182d4d7b90700";
+    public static final String APP_ID = "0196b0e0b90700";
 
     public static void main(String[] args) throws IOException {
         var apikeyPath = "/Users/leen/develop/gemini/apikey";
@@ -559,7 +552,7 @@ public class GenerationService {
     private static void testNewApp(GenerationService service) {
         service.generate(
                 null,
-                "创建一个股票应用",
+                "Create a stock trading system",
                 USER_ID,
                 false,
                 printListener
@@ -571,11 +564,10 @@ public class GenerationService {
         service.generate(
                 APP_ID,
                 """
-                       After registering success, the web page is not automatically navigated to the login page
-                       but stayed in the register page confusing the user as to whether the registration was successful.
+                       Remove the workstation feature
                         """,
                 USER_ID,
-                true,
+                false,
                 printListener
         );
     }

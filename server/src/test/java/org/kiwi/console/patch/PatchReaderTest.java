@@ -6,78 +6,62 @@ public class PatchReaderTest extends TestCase {
 
     public void testInsert() {
         var patch = new PatchReader("""
-                @@ insert 1:1 @@
+                @@ src/main.kiwi @@
                 import org.metavm.api.Index
                 """).read();
-        assertEquals(1, patch.hunks().size());
-        var hunk = patch.hunks().getFirst();
-        assertEquals(Operation.insert, hunk.op());
-        assertEquals(1, hunk.startLine());
-        assertEquals(1, hunk.endLine());
-        assertEquals("import org.metavm.api.Index\n", hunk.content());
+        assertEquals(1, patch.addedFiles().size());
+        var file = patch.addedFiles().getFirst();
+        assertEquals("import org.metavm.api.Index\n", file.content());
     }
 
     public void testInsertWithEmptyFirstLine() {
         var patch = new PatchReader("""
-                @@ insert 1:1 @@
+                @@ src/main.kiwi @@
                 
                 import org.metavm.api.Index
                 """).read();
-        assertEquals(1, patch.hunks().size());
-        var hunk = patch.hunks().getFirst();
-        assertEquals(Operation.insert, hunk.op());
-        assertEquals(1, hunk.startLine());
-        assertEquals(1, hunk.endLine());
+        assertEquals(1, patch.addedFiles().size());
+        var hunk = patch.addedFiles().getFirst();
         assertEquals("\nimport org.metavm.api.Index\n", hunk.content());
     }
 
 
     public void testDelete() {
-        var patch = new PatchReader("@@ delete 2:3 @@").read();
-        assertEquals(1, patch.hunks().size());
-        var hunk = patch.hunks().getFirst();
-        assertEquals(Operation.delete, hunk.op());
-        assertEquals(2, hunk.startLine());
-        assertEquals(3, hunk.endLine());
-        assertEquals("", hunk.content());
+        var patch = new PatchReader("""
+                @@ --src/main.kiwi @@
+                @@ --src/test.kiwi @@
+                """).read();
+        assertEquals(0, patch.addedFiles().size());
+        assertEquals(2, patch.removedFiles().size());
+        assertEquals("src/main.kiwi", patch.removedFiles().getFirst().toString());
+        assertEquals("src/test.kiwi", patch.removedFiles().get(1).toString());
     }
 
-    public void testReplace() {
+    public void testExtraTextInTheBeginning() {
         var patch = new PatchReader("""
-                @@ replace 5:7 @@
-                class Product(
-                    var name: string,
-                    var price: double,
-                    vr stock: int
-                )
+                Extra Text
+                @@ src/main.kiwi @@
+                import org.metavm.api.Index
                 """).read();
-        assertEquals(1, patch.hunks().size());
-        var hunk = patch.hunks().getFirst();
-        assertEquals(Operation.replace, hunk.op());
-        assertEquals(5, hunk.startLine());
-        assertEquals(7, hunk.endLine());
-        assertEquals("""
-                class Product(
-                    var name: string,
-                    var price: double,
-                    vr stock: int
-                )
-                """, hunk.content());
+        assertEquals(1, patch.addedFiles().size());
+        var file = patch.addedFiles().getFirst();
+        assertEquals("import org.metavm.api.Index\n", file.content());
     }
 
     public void testMultiHunks() {
         var patch = new PatchReader("""
-                @@ insert 1:1 @@
+                @@ src/order.kiwi @@
                 import org.metavm.api.Index
-                @@ delete 2:3 @@
-                @@ replace 5:7 @@
+                @@ src/product.kiwi @@
                 class Product(
                     var name: string,
                     var price: double,
                     var stock: int
                 )
+                @@ --src/coupon.kiwi @@
                 """).read();
-        assertEquals(3, patch.hunks().size());
+        assertEquals(2, patch.addedFiles().size());
+        assertEquals(1, patch.removedFiles().size());
     }
 
 }

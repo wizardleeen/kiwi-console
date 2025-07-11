@@ -1,0 +1,42 @@
+package domain
+
+@Label("订单")
+class Order(
+    @Label("客户")
+    val customer: Customer,
+    @Label("总价")
+    val price: Money
+) {
+
+    static val statusIdx = Index<OrderStatus, Order>(false, o -> o.status)
+
+    @Label("创建时间")
+    val createdAt = now()
+    @Label("状态")
+    var status = OrderStatus.PENDING
+
+    @Label("确认")
+    fn confirm() {
+        require(status == OrderStatus.PENDING, "订单状态不允许确认")
+        status = OrderStatus.CONFIRMED
+    }
+
+    @Label("取消")
+    fn cancel() {
+        require(status == OrderStatus.PENDING, "订单状态不允许取消")
+        status = OrderStatus.CANCELLED
+        for (child in children) {
+            if (child is Item item)
+                item.product.restock(item.quantity)
+        }
+    }
+
+    @Label("订单项")
+    class Item(
+        @Label("商品")
+        val product: Product,
+        @Label("数量")
+        val quantity: int
+    )
+
+}

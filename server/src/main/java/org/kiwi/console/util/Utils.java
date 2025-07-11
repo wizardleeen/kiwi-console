@@ -19,19 +19,25 @@ import feign.gson.GsonEncoder;
 import jakarta.annotation.Nullable;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.kiwi.console.generate.SourceFile;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.lang.reflect.Type;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.regex.Pattern;
@@ -261,4 +267,32 @@ public class Utils {
         return result;
     }
 
+    public static String getResourcePath(String resourcePath) {
+        // Ensure the path uses forward slashes, standard for resources
+        String normalizedPath = resourcePath.replace('\\', '/');
+        // Remove leading slash if present, as getResource expects a path relative to the root
+        if (normalizedPath.startsWith("/")) {
+            normalizedPath = normalizedPath.substring(1);
+        }
+
+        // Use the class loader of the current class to find the resource
+        URL resourceUrl = Utils.class.getClassLoader().getResource(normalizedPath);
+        Objects.requireNonNull(resourceUrl, "Resource not found in classpath: " + normalizedPath);
+
+        try {
+            URI resourceUri = resourceUrl.toURI();
+            // Handle resources potentially inside JAR files (though less common for src/test/resources during tests)
+            // For regular file system resources, this works directly.
+            Path path = Paths.get(resourceUri);
+            return path.toString();
+        } catch (URISyntaxException e) {
+            throw new IllegalArgumentException("Invalid URI syntax for resource: " + normalizedPath, e);
+        } catch (java.nio.file.FileSystemNotFoundException e) {
+            // Handle case where the resource might be inside a JAR/ZIP (less common for src/test/resources)
+            // This might require more complex handling depending on how 'deploy' consumes the path.
+            // For now, assume 'deploy' needs a standard file path. If it can handle URLs or InputStreams, that's better.
+            System.err.println("Warning: Resource might be inside a JAR/ZIP, returning URL path: " + resourceUrl.getPath());
+            return resourceUrl.getPath(); // Fallback, might not work if 'deploy' strictly needs a file system path
+        }
+    }
 }

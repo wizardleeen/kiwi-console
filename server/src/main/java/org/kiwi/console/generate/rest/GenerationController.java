@@ -105,12 +105,12 @@ public class GenerationController {
 
         @Override
         public void onThought(String thoughtChunk) {
-            log.info("{}", thoughtChunk);
+            System.out.print(thoughtChunk);
         }
 
         @Override
         public void onContent(String contentChunk) {
-            log.info("{}", contentChunk);
+            System.out.print(contentChunk);
         }
 
         @SneakyThrows

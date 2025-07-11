@@ -12,8 +12,9 @@ class MockChat implements Chat {
     public void send(String text, ChatStreamListener listener, ChatController ctrl) {
         var prompt = MockPromptParser.parse(text);
         lastCode = switch (prompt.kind()) {
-            case PLAN -> "3";
-            case CREATE, PAGE_CREATE, UPDATE, PAGE_UPDATE -> prompt.prompt();
+            case CREATE_ANALYZE, UPDATE_ANALYZE -> "3";
+            case CREATE, UPDATE -> "@@ src/main.kiwi @@\n" + prompt.prompt();
+            case PAGE_CREATE, PAGE_UPDATE -> "@@  src/App.tsx @@\n" + prompt.prompt();
             case PAGE_COMMIT_MSG -> "commit front";
             case FIX -> requireNonNull(lastCode).replace("Error", "Fixed");
             case COMMIT_MSG -> "commit";

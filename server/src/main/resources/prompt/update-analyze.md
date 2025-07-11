@@ -23,6 +23,15 @@ Here is a list of Kiwi's key features:
 
 {}
 
+### Limitations
+
+* The generated application cannot communicate with external systems, such as payments system, google search or AI chatbot.
+* Image uploading is not yet supported.
+* The frontend is only allowed to uses the following libraries: Vite, React and Ant Design.
+* Specifying programming language or other implementation detail is not supported.
+* The generated application is a WEB application.
+* Document parsing and processing is not supported. e.g., PDF, word, Excel.
+
 ### Output Format
 
 You shall output a single number:
@@ -32,5 +41,3 @@ You shall output a single number:
 * `3`: Both backend and frontend code generation required.
 
 **DO NOT** output any conversational text, explanations, or introductory sentences like "Sure, here is the decision:". Your response must start *directly* with decision number.
-
-

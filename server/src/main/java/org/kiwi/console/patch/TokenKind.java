@@ -22,6 +22,8 @@ enum TokenKind {
         }
     },
 
+    PATH
+
     ;
 
     @Override

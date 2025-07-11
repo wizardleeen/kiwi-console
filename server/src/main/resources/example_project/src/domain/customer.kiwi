@@ -1,0 +1,23 @@
+package domain
+
+@Label("客户")
+class Customer(
+    @Summary
+    @Label("名称")
+    var name: string,
+    @Label("邮箱")
+    val email: string,
+    @Label("密码")
+    password: string
+) {
+
+    priv var passwordHash = secureHash(password, null)
+
+    static val emailIdx = Index<string, Customer>(true, c -> c.email)
+
+    @Label("校验密码")
+    fn checkPassword(@Label("密码") password: string) -> bool {
+        return passwordHash == secureHash(password, null)
+    }
+
+}

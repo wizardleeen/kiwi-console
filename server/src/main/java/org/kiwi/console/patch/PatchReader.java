@@ -1,10 +1,14 @@
 package org.kiwi.console.patch;
 
+import org.kiwi.console.generate.MalformedHunkException;
+import org.kiwi.console.generate.SourceFile;
+
 import javax.annotation.Nullable;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
-class PatchReader {
+public class PatchReader {
 
     private final String patch;
     private int pos;
@@ -13,27 +17,36 @@ class PatchReader {
         this.patch = patch;
     }
 
-    Patch read() {
+    public Patch read() {
         var headerLn = readLine();
+        while (headerLn != null && !headerLn.trim().startsWith("@@"))
+            headerLn = readLine();
         if (headerLn == null)
-            return new Patch(List.of());
-        var header = parseHunkHeader(headerLn);
+            return new Patch(List.of(), List.of());
+        var header = parseHeader(headerLn);
         var buf = new StringBuilder();
-        var hunks = new ArrayList<Hunk>();
+        var files = new ArrayList<SourceFile>();
+        var removeFiles = new ArrayList<Path>();
         String line;
         while ((line = readLine()) != null) {
-            if (isHunkHeader(line)) {
-                hunks.add(new Hunk(header, buf.toString()));
-                header = parseHunkHeader(line);
+            if (isHeader(line)) {
+                if (header.removal)
+                    removeFiles.add(header.path);
+                else
+                    files.add(new SourceFile(header.path, buf.toString()));
+                header = parseHeader(line);
                 buf.setLength(0);
             } else
                 buf.append(line).append('\n');
         }
-        hunks.add(new Hunk(header, buf.toString()));
-        return new Patch(hunks);
+        if (header.removal)
+            removeFiles.add(header.path);
+        else
+            files.add(new SourceFile(header.path, buf.toString()));
+        return new Patch(files, removeFiles);
     }
 
-    private boolean isHunkHeader(String line) {
+    private boolean isHeader(String line) {
         for (int i = 0; i < line.length(); i++) {
             var c = line.charAt(i);
             switch (c) {
@@ -49,8 +62,17 @@ class PatchReader {
         return false;
     }
 
-    public HunkHeader parseHunkHeader(String line) {
-        return new HunkHeaderParser(line).parse();
+    private record Header(Path path, boolean removal) {}
+
+    private Header parseHeader(String line) {
+        line = line.trim();
+        if (line.length() <= 4 || !line.startsWith("@@") || !line.endsWith("@@"))
+            throw new MalformedHunkException(line, 0);
+        var text = line.substring(2, line.length() - 2).trim();
+        if(text.startsWith("--"))
+            return new Header(Path.of(text.substring(2).trim()), true);
+        else
+            return new Header(Path.of(text.trim()), false);
     }
 
     private @Nullable String readLine() {
@@ -97,6 +119,15 @@ class PatchReader {
     private void skipWhitespaces() {
         while (!isEof() && Character.isWhitespace(get()))
             next();
+    }
+
+    public static String buildCode(List<SourceFile> sourceFiles) {
+        var buf = new StringBuilder();
+        for (SourceFile file : sourceFiles) {
+            buf.append("@@ ").append(file.path().toString()).append(" @@\n");
+            buf.append(file.content()).append('\n');
+        }
+        return buf.toString();
     }
 
 }

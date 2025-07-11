@@ -1,10 +1,13 @@
 package org.kiwi.console;
 
+import java.nio.file.Path;
+
 public class Lab {
 
     public static void main(String[] args) {
-
-        System.out.println(System.currentTimeMillis() + 1000 * 60 * 60);
+        var p1 = Path.of("/root");
+        var p2 = Path.of("/root/workdir");
+        System.out.println(p1.relativize(p2));
     }
 
 }

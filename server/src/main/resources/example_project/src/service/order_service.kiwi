@@ -1,0 +1,55 @@
+package service
+
+import domain.Customer
+import domain.Product
+import domain.Coupon
+import domain.Order
+import domain.OrderStatus
+
+@Bean
+@Label("订单服务")
+class OrderService {
+
+    @Label("下单")
+    fn placeOrder(@Label("客户") customer: Customer, @Label("商品列表") products: Product[], @Label("优惠券") coupon: Coupon?) -> Order {
+        require(products.length > 0, "Missing products")
+        var price = products[0].price
+        for (i in 1...products.length) {
+            price = price.add(products[i].price)
+        }
+        if (coupon != null) {
+            price = price.sub(coupon!!.redeem())
+        }
+        val order = Order(customer, price)
+        products.forEach(p -> {
+            p.reduceStock(1)
+            order.Item(p, 1)
+        })
+        return order
+    }
+
+    @Label("确认订单")
+    fn confirmOrder(@Label("订单") order: Order) {
+        order.confirm()
+    }
+
+    @Label("取消订单")
+    fn confirmOrder(@Label("订单") order: Order) {
+        order.cancel()
+    }
+
+    @Label("取消所有待处理订单")
+    fn cancelAllPendingOrders() {
+        val orders = Order.statusIdx.getAll(OrderStatus.PENDING)
+        orders.forEach(o -> o.cancel())
+    }
+
+    @Label("删除所有已取消订单")
+    fn deleteAllCancelledOrders() {
+        val orders = Order.statusIdx.getAll(OrderStatus.CANCELLED)
+        orders.forEach(o -> {
+            delete o
+        })
+    }
+
+}

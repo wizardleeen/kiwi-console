@@ -6,8 +6,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
-public record WorkDir(Path path) {
+public record WorkDir(Path root) {
 
     public static WorkDir from(Path baseDir, long appId) {
         return new WorkDir(baseDir.resolve(Long.toString(appId)));
@@ -15,8 +17,8 @@ public record WorkDir(Path path) {
 
     public void init() {
         try {
-            if (!path.toFile().exists()) {
-                Files.createDirectory(path);
+            if (!root.toFile().exists()) {
+                Files.createDirectory(root);
                 Files.createDirectory(getSrcPath());
             }
         } catch (IOException e) {
@@ -25,17 +27,33 @@ public record WorkDir(Path path) {
     }
 
     Path getSrcPath() {
-        return path.resolve("src");
+        return root.resolve("src");
     }
 
     @SneakyThrows
-    void writeSource(String fileName, String text) {
-        Files.writeString(getSrcPath().resolve(fileName), text);
+    void writeSource(Path path, String text) {
+        path = root.resolve(path);
+        Files.createDirectories(path.getParent());
+        Files.writeString(path, text);
+    }
+
+    boolean exist(Path path) {
+        return Files.exists(root.resolve(path));
+    }
+
+    @SneakyThrows
+    void removeFile(Path path) {
+        Files.delete(root.resolve(path));
+    }
+
+    @SneakyThrows
+    List<SourceFile> getAllSourceFiles() {
+        return SourceFile.getAllSourceFiles(root);
     }
 
     public InputStream openTargetInput() {
         try {
-            return Files.newInputStream(path.resolve("target").resolve("target.mva"));
+            return Files.newInputStream(root.resolve("target").resolve("target.mva"));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

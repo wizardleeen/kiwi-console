@@ -1,0 +1,41 @@
+package domain
+
+@Label("币种")
+enum Currency(
+    @Label("汇率")
+    val rate: double
+) {
+
+    @Label("人民币")
+    YUAN(7.2) {
+
+        @Label("标签")
+        fn label() -> string {
+            return "元"
+        }
+
+    },
+    @Label("美元")
+    DOLLAR(1) {
+
+        @Label("标签")
+        fn label() -> string {
+            return "美元"
+        }
+
+    },
+    @Label("英镑")
+    POUND(0.75) {
+
+        @Label("标签")
+        fn label() -> string {
+            return "英镑"
+        }
+
+    },
+;
+
+    @Label("标签")
+    abstract fn label() -> string
+
+}

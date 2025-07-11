@@ -17,7 +17,9 @@ public enum ErrorCode {
     TASK_NOT_RUNNING(4001, "Generation task not running"),
     TASK_CANCELLED(4002, "Generation task cancelled"),
 
-    DEPLOY_FAILED(4003, "{}")
+    DEPLOY_FAILED(4003, "{}"),
+
+    REQUIREMENT_REJECTED(4004, "{}")
 
     ;
     private final int code;
