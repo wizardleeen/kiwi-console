@@ -33,4 +33,19 @@ public class Stage {
     public Stage clearAttempts() {
         return new Stage(id, type, status, List.of());
     }
+
+    public boolean isRunning() {
+        return status == StageStatus.GENERATING;
+    }
+
+    public void fail(String errMsg) {
+        if (!isRunning())
+            throw new IllegalStateException("Stage is not running, cannot fail it.");
+        this.status = StageStatus.FAILED;
+        for (Attempt attempt : attempts) {
+            if (attempt.isRunning())
+                attempt.fail(errMsg);
+        }
+    }
+
 }

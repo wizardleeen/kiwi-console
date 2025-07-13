@@ -3,12 +3,11 @@ package org.kiwi.console.kiwi;
 import org.kiwi.console.util.SearchResult;
 import org.kiwi.console.util.Utils;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.Objects;
+import java.util.*;
 
 public class MockExChangeClient implements ExchangeClient {
+
+    public static final long TIMEOUT = 60 * 1000;
 
     private final Map<String, Exchange> exchanges = new LinkedHashMap<>();
 
@@ -49,7 +48,8 @@ public class MockExChangeClient implements ExchangeClient {
                 exchange.getManagementURL(),
                 exchange.getErrorMessage(),
                 exchange.isFirst(),
-                exchange.isSkipPageGeneration()
+                exchange.isSkipPageGeneration(),
+                exchange.getLastHeartBeatAt()
         );
     }
 
@@ -87,6 +87,36 @@ public class MockExChangeClient implements ExchangeClient {
         if (exch.getStatus() != ExchangeStatus.FAILED)
             throw new IllegalStateException("Exchange is not in FAILED state");
         exch.setStatus(ExchangeStatus.PLANNING);
+    }
+
+    @Override
+    public List<String> failExpiredExchanges() {
+        var expired = new ArrayList<String>();
+        exchanges.values().forEach(exch -> {
+            if (exch.isRunning() && exch.getLastHeartBeatAt() < System.currentTimeMillis() - TIMEOUT) {
+                exch.fail("Timeout");
+                expired.add(exch.getId());
+            }
+        });
+        return expired;
+    }
+
+    @Override
+    public void sendHeartBeat(ExchangeHeartBeatRequest request) {
+        var exch = Objects.requireNonNull(exchanges.get(request.exchangeId()), "Exchange not found: " + request.exchangeId());
+        if (exch.isRunning())
+            throw new IllegalStateException("Exchange is not running: " + request.exchangeId() +
+                    " (status: " + exch.getStatus() + ")");
+        exch.setLastHeartBeatAt(System.currentTimeMillis());
+    }
+
+    @Override
+    public boolean isGenerating(IsGeneratingRequest request) {
+        for (Exchange exch : exchanges.values()) {
+            if (exch.getAppId().equals(request.appId()) && exch.isRunning())
+                return true;
+        }
+        return false;
     }
 
     public Exchange getFirst() {

@@ -132,6 +132,7 @@ Kiwi is an infrastructure-free programming langauge that enables application to 
     ```
     order.Item(product, 1)
     ```
+19. Use `as` to perform type cast. for example: `var i = l as int`
 20. Integration with external systems is not yet supported such as payments system or AI.
 
 

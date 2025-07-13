@@ -14,7 +14,11 @@ class Exchange(
 
     var errorMessage: string?
 
+    var lastHeartBeatAt = now()
+
     static val appIdx = Index<Application, Exchange>(false, exch -> exch.app)
+
+    static val statusAndLastHeartBeatAtIdx = Index<RunningAndTimestamp, Exchange>(false, exch -> RunningAndTimestamp(exch.isRunning(), exch.lastHeartBeatAt))
 
     class Stage(val type: StageType) {
 
@@ -25,6 +29,15 @@ class Exchange(
             var errorMessage: string?
         }
 
+    }
+
+    fn __lastHeartBeat__() -> long {
+        return now()
+    }
+
+    fn sendHeartBeat() {
+        require(isRunning(), "Cannot send heartbeat for a non-running exchange")
+        lastHeartBeatAt = now()
     }
 
     fn cancel() {
@@ -41,6 +54,46 @@ class Exchange(
         if (status != ExchangeStatus.FAILED)
             throw Exception("Cannot retry a non-failed exchange")
         status = ExchangeStatus.PLANNING
+    }
+
+    fn fail(errMsg: string) {
+        require(isRunning(), "Cannot fail a non-running exchange: " + prompt)
+        status = ExchangeStatus.FAILED
+        errorMessage = errMsg
+        for (c in children) {
+            if (c is Stage stage && stage.status == StageStatus.GENERATING) {
+                stage.status = StageStatus.FAILED
+                for (c2 in stage.children) {
+                    if (c2 is Stage.Attempt attempt && attempt.status == AttemptStatus.RUNNING)
+                        attempt.status = AttemptStatus.FAILED
+                }
+            }
+        }
+    }
+
+}
+
+value class RunningAndTimestamp(val running: bool, val timestamp: long)
+
+@Bean
+class ExchangeService {
+
+    static val TIMEOUT = 60000
+
+    fn failExpiredExchanges() -> Exchange[] {
+        val expired = Exchange.statusAndLastHeartBeatAtIdx.query(
+            RunningAndTimestamp(true, 0),
+            RunningAndTimestamp(true, now() - TIMEOUT)
+        )
+        for (exch in expired) {
+            exch.fail("Timeout")
+        }
+        return expired
+    }
+
+    fn isGenerating(app: Application) -> bool {
+        val exch = Exchange.appIdx.getLast(app)
+        return exch != null && exch!!.isRunning()
     }
 
 }

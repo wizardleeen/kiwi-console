@@ -23,4 +23,13 @@ public class Attempt {
             writer.deIndent();;
         }
     }
+
+    public boolean isRunning() {
+        return status == AttemptStatus.RUNNING;
+    }
+
+    public void fail(String errMsg) {
+        this.status = AttemptStatus.FAILED;
+        this.errorMessage = errMsg;
+    }
 }
