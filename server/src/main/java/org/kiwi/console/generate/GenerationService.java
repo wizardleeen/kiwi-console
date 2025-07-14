@@ -11,9 +11,13 @@ import org.kiwi.console.generate.rest.CancelRequest;
 import org.kiwi.console.generate.rest.RetryRequest;
 import org.kiwi.console.kiwi.*;
 import org.kiwi.console.patch.PatchReader;
-import org.kiwi.console.util.*;
+import org.kiwi.console.util.BusinessException;
+import org.kiwi.console.util.Constants;
+import org.kiwi.console.util.ErrorCode;
+import org.kiwi.console.util.Utils;
 import org.springframework.core.task.SyncTaskExecutor;
 import org.springframework.core.task.TaskExecutor;
+import org.springframework.scheduling.annotation.Scheduled;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -85,15 +89,16 @@ public class GenerationService {
         }
     }
 
-    public void generate(String appId,
+    public String generate(String appId,
                          String prompt,
                          String userId,
                          boolean skipPageGeneration,
                          GenerationListener listener) {
         boolean creating;
-        if (appId != null)
+        if (appId != null) {
             creating = false;
-        else {
+            ensureNotGenerating(appId);
+        } else {
             appId = createApp(NEW_APP_NAME, userId);
             creating = true;
         }
@@ -104,6 +109,16 @@ public class GenerationService {
         var task = new Task(exchange, sysAppId, showAttempt, listener);
         task.sendProgress();
         taskExecutor.execute(() -> runTask(task));
+        return appId;
+    }
+
+    void discardTask(String exchangeId) {
+        runningTasks.remove(exchangeId);
+    }
+
+    private void ensureNotGenerating(String appId) {
+        if(exchClient.isGenerating(new IsGeneratingRequest(appId)))
+            throw new BusinessException(ErrorCode.GENERATION_ALREADY_RUNNING);
     }
 
     private void runTask(Task task) {
@@ -111,7 +126,6 @@ public class GenerationService {
             var sysAppId = task.sysAppId;
             kiwiCompiler.reset(sysAppId);
             pageCompiler.reset(sysAppId);
-            runningTasks.put(task.exchange.getId(), task);
             var plan = plan(task);
             if (task.exchange.isFirst() && plan.appName != null) {
                 updateAppName(task.exchange.getAppId(), plan.appName);
@@ -137,6 +151,18 @@ public class GenerationService {
 
     }
 
+    @Scheduled(fixedDelay = 60 * 1000)
+    public void failExpiredExchanges() {
+        var expiredIds = exchClient.failExpiredExchanges();
+        for (String id : expiredIds) {
+            var task = runningTasks.get(id);
+            if (task != null) {
+                task.reloadExchange();
+                task.sendProgress();
+            }
+        }
+    }
+
     public void reconnect(String exchangeId, GenerationListener listener) {
         var task = runningTasks.get(exchangeId);
         if (task == null)
@@ -153,11 +179,14 @@ public class GenerationService {
     }
 
     public void retry(String userId, RetryRequest request, GenerationListener listener) {
-        exchClient.retry(new ExchangeRetryRequest(request.exchangeId()));
         var exch = exchClient.get(request.exchangeId());
         var app = appClient.get(exch.getAppId());
+        ensureNotGenerating(app.getId());
+        exchClient.retry(new ExchangeRetryRequest(request.exchangeId()));
+        exch = exchClient.get(request.exchangeId());  // Reload
         var showAttempts = userClient.shouldShowAttempts(new UserIdRequest(userId));
         var task = new Task(exch, app.getSystemAppId(), showAttempts, listener);
+        task.sendProgress();
         taskExecutor.execute(() -> runTask(task));
     }
 
@@ -188,23 +217,11 @@ public class GenerationService {
         var kiwiCode = PatchReader.buildCode(kiwiCompiler.getSourceFiles(task.sysAppId));
         var pageCode = PatchReader.buildCode(pageCompiler.getSourceFiles(task.sysAppId));
         var chat = agent.createChat();
-        var buf = new StringBuilder();
         var planPrompt = createPlanPrompt(exch, kiwiCode, pageCode);
         log.info("Plan prompt:\n{}", planPrompt);
-        chat.send(planPrompt, new ChatStreamListener() {
-            @Override
-            public void onThought(String thoughtChunk) {
-                System.out.print(thoughtChunk);
-            }
-
-            @Override
-            public void onContent(String contentChunk) {
-                System.out.print(contentChunk);
-                buf.append(contentChunk);
-            }
-        }, () -> task.cancelled);
-        var text = new BufferedReader(new StringReader(buf.toString()));
-        var r = Integer.parseInt(text.readLine());
+        var text = generateContent(chat, planPrompt, task);
+        var reader = new BufferedReader(new StringReader(text));
+        var r = Integer.parseInt(reader.readLine());
         return switch (r) {
             case 0 -> Plan.none;
             case 1 -> task.isBackendSuccessful() ?
@@ -217,7 +234,7 @@ public class GenerationService {
                 if (task.isBackendSuccessful())
                     yield Plan.pageOnly;
                 if (task.exchange.isFirst()) {
-                    yield new Plan(true, true, text.readLine());
+                    yield new Plan(true, true, reader.readLine());
                 }
                 yield Plan.all;
             }
@@ -246,53 +263,63 @@ public class GenerationService {
     private void generateKiwi(Task task) {
         var sysAppId = task.sysAppId;
         var userPrompt = task.exchange.getPrompt();
-        task.enterStageAndAttempt(StageType.BACKEND);
-        var chat = agent.createChat();
-        String prompt;
-        var existingFiles = kiwiCompiler.getSourceFiles(sysAppId);
-        if (!existingFiles.isEmpty())
-            prompt = buildUpdatePrompt(userPrompt, PatchReader.buildCode(existingFiles));
-        else
-            prompt = buildCreatePrompt(userPrompt);
-        log.info("Kiwi generation prompt: \n{}", prompt);
-        var resp = generateContent(chat, prompt, task, true);
+        var stageIdx = task.enterStageAndAttempt(StageType.BACKEND);
+        try {
+            var chat = agent.createChat();
+            String prompt;
+            var existingFiles = kiwiCompiler.getSourceFiles(sysAppId);
+            if (!existingFiles.isEmpty())
+                prompt = buildUpdatePrompt(userPrompt, PatchReader.buildCode(existingFiles));
+            else
+                prompt = buildCreatePrompt(userPrompt);
+            log.info("Kiwi generation prompt: \n{}", prompt);
+            var resp = generateCode(chat, prompt, task);
 //        if (existingFiles == null) {
 //            var appName = extractAppName(resp);
 //            if (appName != null)
 //                updateAppName(task.exchange.getAppId(), appName);
 //        }
-        var r = runCompiler(kiwiCompiler, sysAppId, resp.addedFiles(), resp.removedFiles());
-        if (!r.successful()) {
-            task.finishAttempt(false, r.output());
-            fix(sysAppId, r.output(), task, chat, kiwiCompiler, kiwiFixPrompt);
+            var r = runCompiler(kiwiCompiler, sysAppId, resp.addedFiles(), resp.removedFiles());
+            if (!r.successful()) {
+                task.finishAttempt(false, r.output());
+                fix(sysAppId, r.output(), task, chat, kiwiCompiler, kiwiFixPrompt);
+            } else
+                task.finishAttempt(true, null);
+            log.info("Kiwi deployed successfully");
+            kiwiCompiler.commit(sysAppId, generateKIwiCommitMsg(task));
+            log.info("Kiwi source code committed");
+            task.exchange.setManagementURL(Format.format(mgmtUrlTempl, sysAppId));
+        } catch (Exception e) {
+            task.failStage(stageIdx, e.getMessage());
+            throw e;
         }
-        else
-            task.finishAttempt(true, null);
-        log.info("Kiwi deployed successfully");
-        kiwiCompiler.commit(sysAppId, generateKIwiCommitMsg(task));
-        log.info("Kiwi source code committed");
-        task.exchange.setManagementURL(Format.format(mgmtUrlTempl, sysAppId));
     }
 
     private DeployResult runCompiler(Compiler compiler, long appId, List<SourceFile> files, List<Path> removedFiles) {
         return compiler.run(appId, files, removedFiles);
     }
 
-    private org.kiwi.console.patch.Patch generateContent(Chat chat, String prompt, Task task, boolean sanitizeCode) {
+    private org.kiwi.console.patch.Patch generateCode(Chat chat, String prompt, Task task) {
+        return new PatchReader(generateContent(chat, prompt, task)).read();
+    }
+
+    private String generateContent(Chat chat, String prompt, Task task) {
         var buf = new StringBuilder();
         chat.send(prompt, new ChatStreamListener() {
             @Override
             public void onThought(String thoughtChunk) {
                 task.onThought(thoughtChunk);
+                task.sendHeartBeatIfRequired();
             }
 
             @Override
             public void onContent(String contentChunk) {
                 task.onContent(contentChunk);
+                task.sendHeartBeatIfRequired();
                 buf.append(contentChunk);
             }
         }, () -> task.cancelled);
-        return new PatchReader(buf.toString()).read();
+        return buf.toString();
     }
 
     private String createApp(String name, String userId) {
@@ -305,16 +332,6 @@ public class GenerationService {
 
     public App getApp(String id) {
         return appClient.get(id);
-    }
-
-    private @Nullable String extractAppName(String code) {
-        var line = Utils.getFirstLine(code).trim();
-        if (line.startsWith("//")) {
-            var appname = line.substring(2).trim();
-            if (!appname.isEmpty())
-                return appname;
-        }
-        return null;
     }
 
     private String generateKIwiCommitMsg(Task task) {
@@ -330,7 +347,7 @@ public class GenerationService {
             task.startAttempt();
             var fixPrompt = Format.format(promptTemplate, error);
             log.info("Fix prompt:\n{}", fixPrompt);
-            var resp = generateContent(chat, fixPrompt, task, true);
+            var resp = generateCode(chat, fixPrompt, task);
             log.info("Generated code (Retry #{}):\n{}", i + 1, resp);
             var r = runCompiler(compiler, sysAppId, resp.addedFiles(), resp.removedFiles());
             if (r.successful()) {
@@ -344,39 +361,37 @@ public class GenerationService {
     }
 
     private void generatePages(String apiSource, Task task) {
-        task.enterStageAndAttempt(StageType.FRONTEND);
-        var chat = agent.createChat();
-        var existingFiles = pageCompiler.getSourceFiles(task.sysAppId);
-        String prompt;
-        if (existingFiles.stream().noneMatch(f -> f.path().toString().equals(APP_TSX)))
-            prompt = buildFrontCreatePrompt(task.exchange.getPrompt(), apiSource);
-        else
-            prompt = buildFrontUpdatePrompt(task.exchange.getPrompt(), PatchReader.buildCode(existingFiles), apiSource);
-        log.info("Page generation prompt:\n{}", prompt);
-        var resp = generateContent(chat, prompt, task, true);
-        var files = new ArrayList<>(resp.addedFiles());
-        files.add(new SourceFile(Path.of(API_TS), apiSource));
-        var r = runCompiler(pageCompiler, task.sysAppId, files, resp.removedFiles());
-        if (!r.successful()) {
-            task.finishAttempt(false, r.output());
-            fix(task.sysAppId, r.output(), task, chat, pageCompiler, pageFixPrompt);
+        var stageIdx = task.enterStageAndAttempt(StageType.FRONTEND);
+        try {
+            var chat = agent.createChat();
+            var existingFiles = pageCompiler.getSourceFiles(task.sysAppId);
+            String prompt;
+            if (existingFiles.stream().noneMatch(f -> f.path().toString().equals(APP_TSX)))
+                prompt = buildFrontCreatePrompt(task.exchange.getPrompt(), apiSource);
+            else
+                prompt = buildFrontUpdatePrompt(task.exchange.getPrompt(), PatchReader.buildCode(existingFiles), apiSource);
+            log.info("Page generation prompt:\n{}", prompt);
+            var resp = generateCode(chat, prompt, task);
+            var files = new ArrayList<>(resp.addedFiles());
+            files.add(new SourceFile(Path.of(API_TS), apiSource));
+            var r = runCompiler(pageCompiler, task.sysAppId, files, resp.removedFiles());
+            if (!r.successful()) {
+                task.finishAttempt(false, r.output());
+                fix(task.sysAppId, r.output(), task, chat, pageCompiler, pageFixPrompt);
+            } else
+                task.finishAttempt(true, null);
+            log.info("Pages generated successfully");
+            pageCompiler.commit(task.sysAppId, generatePagesCommitMsg(task));
+            log.info("Page source code committed");
+        } catch (Exception e) {
+            task.failStage(stageIdx, e.getMessage());
+            throw e;
         }
-        else
-            task.finishAttempt(true, null);
-        log.info("Pages generated successfully");
-        pageCompiler.commit(task.sysAppId, generatePagesCommitMsg(task));
-        log.info("Page source code committed");
     }
 
     private String buildFrontUpdatePrompt(String userPrompt, String existingCode, String apiSource) {
         return Format.format(pageUpdatePrompt, userPrompt, existingCode, apiSource);
     }
-
-    private record Patch(
-            String fileName,
-            @Nullable String existingCode,
-            String agentResponse
-    ) {}
 
     private String buildFrontCreatePrompt(String userPrompt, String apiSource) {
         return Format.format(pageCreatePrompt, userPrompt, apiSource);
@@ -405,13 +420,15 @@ public class GenerationService {
             runningTasks.put(exchange.getId(), this);
         }
 
-        void enterStageAndAttempt(StageType type) {
+        int enterStageAndAttempt(StageType type) {
             if (exchange.getStatus() == ExchangeStatus.PLANNING)
                 exchange.setStatus(ExchangeStatus.GENERATING);
             var stage = Stage.create(type);
             stage.addAttempt(Attempt.create());
+            var stageIdx = exchange.getStages().size();
             exchange.addStage(stage);
             saveExchange();
+            return stageIdx;
         }
 
         void startAttempt() {
@@ -439,8 +456,7 @@ public class GenerationService {
 
         void abort(String errorMsg) {
             if (!cancelled) {
-                exchange.setStatus(ExchangeStatus.FAILED);
-                exchange.setErrorMessage(errorMsg);
+                exchange.fail(errorMsg);
                 saveExchange();
             }
         }
@@ -453,10 +469,33 @@ public class GenerationService {
             return exchange.getStages().getLast();
         }
 
+        void failStage(int stageIdx, String errMsg) {
+            exchange.getStages().get(stageIdx).fail(errMsg);
+            saveExchange();
+        }
+
         void saveExchange() {
             ensureNotCancelled();
+            exchange.setLastHeartBeatAt(System.currentTimeMillis());
             exchange = exchClient.get(exchClient.save(exchange));
             sendProgress();
+        }
+
+        private static final long SEND_HEART_BEAT_INTERVAL = 1000 * 10;
+
+        void sendHeartBeatIfRequired() {
+            if (exchange.isRunning() && System.currentTimeMillis() - exchange.getLastHeartBeatAt() >  SEND_HEART_BEAT_INTERVAL) {
+                try {
+                    exchClient.sendHeartBeat(new ExchangeHeartBeatRequest(exchange.getId()));
+                    reloadExchange();
+                } catch (Exception e) {
+                    log.warn("Failed to send heartbeat for exchange {}: {}", exchange.getId(), e.getMessage());
+                }
+            }
+        }
+
+        void reloadExchange() {
+            exchange = exchClient.get(exchange.getId());
         }
 
         void sendProgress() {

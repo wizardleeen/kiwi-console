@@ -19,7 +19,9 @@ public enum ErrorCode {
 
     DEPLOY_FAILED(4003, "{}"),
 
-    REQUIREMENT_REJECTED(4004, "{}")
+    REQUIREMENT_REJECTED(4004, "{}"),
+
+    GENERATION_ALREADY_RUNNING(4005, "Generation already running for this application")
 
     ;
     private final int code;

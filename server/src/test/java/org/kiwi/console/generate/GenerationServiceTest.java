@@ -22,7 +22,7 @@ import static org.kiwi.console.util.Constants.MAIN_KIWI;
 @Slf4j
 public class GenerationServiceTest extends TestCase {
 
-    public void testChat() {
+    public void testGeneration() {
         var kiwiCompiler = new MockCompiler();
         var pageCompiler = new MockCompiler();
         var appClient = new MockAppClient();
@@ -119,7 +119,6 @@ public class GenerationServiceTest extends TestCase {
         assertSame(ExchangeStatus.CANCELLED, exch1.getStatus());
     }
 
-
     public void testHideAttempts() {
         var kiwiCompiler = new MockCompiler();
         var pageCompiler = new MockCompiler();
@@ -199,6 +198,75 @@ public class GenerationServiceTest extends TestCase {
         generationService.retry(userId, new RetryRequest(exch.getId()), discardListener);
         var exch1 = exchClient.getFirst();
         assertSame(ExchangeStatus.SUCCESSFUL, exch1.getStatus());
+    }
+
+    public void testPreventingDuplicateGeneration() {
+        var kiwiCompiler = new MockCompiler();
+        var pageCompiler = new MockCompiler();
+        var appClient = new MockAppClient();
+        var exchangeClient = new MockExChangeClient();
+        var genService = new GenerationService(new MockAgent(), kiwiCompiler, pageCompiler,
+                exchangeClient,
+                appClient,
+                new MockUserClient(), "http://{}.metavm.test",
+                "http://localhost:8080",
+                t -> {}
+        );
+        var appId = genService.generate(null, "class Foo {}", "001", false, discardListener);
+        try {
+            genService.generate(appId, "class Foo {}", "001", false, discardListener);
+            fail("Should not allow duplicate generation");
+        } catch (BusinessException e) {
+            assertSame(ErrorCode.GENERATION_ALREADY_RUNNING, e.getErrorCode());
+        }
+    }
+
+    public void testFailExpiredExchanges() {
+        var kiwiCompiler = new MockCompiler();
+        var pageCompiler = new MockCompiler();
+        var appClient = new MockAppClient();
+        var exchangeClient = new MockExChangeClient();
+        var genService = new GenerationService(new MockAgent(), kiwiCompiler, pageCompiler,
+                exchangeClient,
+                appClient,
+                new MockUserClient(), "http://{}.metavm.test",
+                "http://localhost:8080",
+                t -> {}
+        );
+        genService.generate(null, "class Foo {}", "001", false, discardListener);
+        var exch = exchangeClient.getFirst();
+        assertTrue(exch.isRunning());
+        exch.setLastHeartBeatAt(System.currentTimeMillis() - 1000 * 60 * 10); // Set last heartbeat to 10 minutes ago
+        genService.failExpiredExchanges();
+        exch = exchangeClient.get(exch.getId());
+        assertSame(ExchangeStatus.FAILED, exch.getStatus());
+        assertEquals("Timeout", exch.getErrorMessage());
+    }
+
+    public void testReconnectToLostTask() {
+        var kiwiCompiler = new MockCompiler();
+        var pageCompiler = new MockCompiler();
+        var appClient = new MockAppClient();
+        var exchangeClient = new MockExChangeClient();
+        var genService = new GenerationService(new MockAgent(), kiwiCompiler, pageCompiler,
+                exchangeClient,
+                appClient,
+                new MockUserClient(), "http://{}.metavm.test",
+                "http://localhost:8080",
+                t -> {}
+        );
+        genService.generate(null, "class Foo {}", "001", false, discardListener);
+        var exch = exchangeClient.getFirst();
+        genService.discardTask(exch.getId());
+        assertTrue(exch.isRunning());
+        try {
+            genService.reconnect(exch.getId(), discardListener);
+            fail("Should not allow reconnecting to a lost task");
+        } catch (BusinessException e) {
+            assertSame(ErrorCode.TASK_NOT_RUNNING, e.getErrorCode());
+        }
+        genService.cancel(new CancelRequest(exch.getId()));
+        assertSame(ExchangeStatus.CANCELLED, exchangeClient.get(exch.getId()).getStatus());
     }
 
     private final GenerationListener discardListener = new GenerationListener() {

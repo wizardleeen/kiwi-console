@@ -55,10 +55,13 @@ import domain.Product
 import domain.Coupon
 import domain.Order
 import domain.OrderStatus
+import domain.OrderStatusAndTime
 
 @Bean
 @Label("订单服务")
 class OrderService {
+
+    static val PENDING_TIMEOUT = 15 * 60 * 1000
 
     @Label("下单")
     fn placeOrder(@Label("客户") customer: Customer, @Label("商品列表") products: Product[], @Label("优惠券") coupon: Coupon?) -> Order {
@@ -88,15 +91,21 @@ class OrderService {
         order.cancel()
     }
 
-    @Label("取消所有待处理订单")
-    fn cancelAllPendingOrders() {
-        val orders = Order.statusIdx.getAll(OrderStatus.PENDING)
+    @Label("取消超时待处理订单")
+    fn cancelExpiredPendingOrders() {
+        val orders = Order.statusAndCreatedAtIdx.query(
+            OrderStatusAndTime(OrderStatus.PENDING, 0),
+            OrderStatusAndTime(OrderStatus.PENDING, now() - PENDING_TIMEOUT)
+        )
         orders.forEach(o -> o.cancel())
     }
 
     @Label("删除所有已取消订单")
     fn deleteAllCancelledOrders() {
-        val orders = Order.statusIdx.getAll(OrderStatus.CANCELLED)
+        val orders = Order.statusAndCreatedAtIdx.query(
+            OrderStatusAndTime(OrderStatus.CANCELLED, 0),
+            OrderStatusAndTime(OrderStatus.CANCELLED, now())
+        )
         orders.forEach(o -> {
             delete o
         })
@@ -118,6 +127,10 @@ enum Category {
     ;
 }
 
+@@ src/domain/OrderStatusAndTime.kiwi @@
+package domain
+
+value class OrderStatusAndTime(val status: OrderStatus, val time: long)
 @@ src/domain/order.kiwi @@
 package domain
 
@@ -129,7 +142,7 @@ class Order(
     val price: Money
 ) {
 
-    static val statusIdx = Index<OrderStatus, Order>(false, o -> o.status)
+    static val statusAndCreatedAtIdx = Index<OrderStatusAndTime, Order>(false, o -> OrderStatusAndTime(o.status, o.createdAt))
 
     @Label("创建时间")
     val createdAt = now()
@@ -161,7 +174,6 @@ class Order(
     )
 
 }
-
 @@ src/domain/order_status.kiwi @@
 package domain
 

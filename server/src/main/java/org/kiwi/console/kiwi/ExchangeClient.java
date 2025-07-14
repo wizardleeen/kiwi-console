@@ -7,6 +7,8 @@ import org.kiwi.console.util.Constants;
 import org.kiwi.console.util.SearchResult;
 import org.kiwi.console.util.Utils;
 
+import java.util.List;
+
 public interface ExchangeClient {
 
     @RequestLine("POST /api/exchange/_search")
@@ -31,24 +33,39 @@ public interface ExchangeClient {
     @Headers("Content-Type: application/json")
     void retry(ExchangeRetryRequest request);
 
+    @RequestLine("POST /api/exchange-service/fail-expired-exchanges")
+    @Headers("Content-Type: application/json")
+    List<String> failExpiredExchanges();
+
+    @RequestLine("POST /api/exchange/send-heart-beat")
+    @Headers("Content-Type: application/json")
+    void sendHeartBeat(ExchangeHeartBeatRequest request);
+
+    @RequestLine("POST /api/exchange-service/is-generating")
+    @Headers("Content-Type: application/json")
+    boolean isGenerating(IsGeneratingRequest request);
+
     static void main(String[] args) {
         var client = Utils.createKiwiFeignClient(
                 "http://localhost:8080",
                 ExchangeClient.class,
                 Constants.CHAT_APP_ID
         );
+//
+//        var id = "0190fcdab90700";
+//        var exch = client.get(id);
+//
+//
+//        for (int i = 0; i < 1000; i++) {
+//            exch.setStatus(i % 2 == 0 ? ExchangeStatus.SUCCESSFUL : ExchangeStatus.FAILED);
+//            client.save(exch);
+//        }
+//
+//        System.out.println(id);
 
-        var id = "0190fcdab90700";
-        var exch = client.get(id);
+//        client.failExpiredExchanges();
 
-
-        for (int i = 0; i < 1000; i++) {
-            exch.setStatus(i % 2 == 0 ? ExchangeStatus.SUCCESSFUL : ExchangeStatus.FAILED);
-            client.save(exch);
-        }
-
-        System.out.println(id);
-
+        System.out.println(client.isGenerating(new IsGeneratingRequest("01fc87e1b90700")));
 
 //        var r = client.search(new ExchangeSearchRequest(
 //           null,

@@ -23,6 +23,7 @@ public class Exchange {
     private @Nullable String errorMessage;
     private boolean first;
     private boolean skipPageGeneration;
+    private long lastHeartBeatAt;
 
     public static Exchange create(String appId, String userId, String prompt, boolean first, boolean skipPageGeneration) {
         return new Exchange(null,
@@ -35,11 +36,17 @@ public class Exchange {
                 null,
                 null,
                 first,
-                skipPageGeneration);
+                skipPageGeneration,
+                0
+        );
     }
 
     public void addStage(Stage stage) {
         stages.add(stage);
+    }
+
+    public boolean isRunning() {
+        return status == ExchangeStatus.GENERATING || status == ExchangeStatus.PLANNING;
     }
 
     public String toString() {
@@ -59,6 +66,22 @@ public class Exchange {
         writer.deIndent();
     }
 
+    public void fail(String errorMessage) {
+        if (!isRunning())
+            throw new IllegalStateException("Exchange is not running");
+        this.status = ExchangeStatus.FAILED;
+        this.errorMessage = errorMessage;
+        for (Stage stage : stages) {
+            if(stage.isRunning()) {
+                stage.setStatus(StageStatus.FAILED);
+                for (Attempt attempt : stage.getAttempts()) {
+                    if (attempt.isRunning())
+                        attempt.setStatus(AttemptStatus.FAILED);
+                }
+            }
+        }
+    }
+
     public Exchange clearAttempts() {
         return new Exchange(
                 id,
@@ -71,7 +94,8 @@ public class Exchange {
                 managementURL,
                 errorMessage,
                 first,
-                skipPageGeneration
+                skipPageGeneration,
+                lastHeartBeatAt
         );
     }
 }
