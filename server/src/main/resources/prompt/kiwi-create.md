@@ -474,7 +474,8 @@ value class Money(
     ```
     order.Item(product, 1)
     ```
-19. Integration with external systems is not yet supported such as payments system or AI.
+19. Use `as` to perform type cast. for example: `var i = l as int`
+20. Integration with external systems is not yet supported such as payments system or AI.
 
 ### Output Format:
 
