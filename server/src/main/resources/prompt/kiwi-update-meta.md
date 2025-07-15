@@ -133,7 +133,32 @@ Kiwi is an infrastructure-free programming langauge that enables application to 
     order.Item(product, 1)
     ```
 19. Use `as` to perform type cast. for example: `var i = l as int`
-20. Integration with external systems is not yet supported such as payments system or AI.
+20. Avoid using the 'Id' suffix in field names and parameter names.
+    * Bad Code:
+    ```
+    class Employee(
+        var employeeId: string
+    ) {
+    
+        fn updateEmployeeId(employeeId: string) {
+            this.employeeId = employeeId
+        }
+
+    }
+    ```
+    * Recommended Code:
+    ```
+    class Employee(
+        var employeeNumber: string
+    ) {
+    
+        fn updateEmployeeNumber(employeeNumber: string) {
+            this.employeeNumber = employeeNumber
+        }
+
+    }
+    ```
+21. Integration with external systems is not yet supported such as payments system or AI.
 
 
 ### Data Migration
