@@ -5,6 +5,8 @@ import com.google.genai.types.GenerateContentConfig;
 import com.google.genai.types.Part;
 import com.google.genai.types.ThinkingConfig;
 import lombok.extern.slf4j.Slf4j;
+import org.kiwi.console.util.BusinessException;
+import org.kiwi.console.util.ErrorCode;
 
 public class GeminiAgent implements Agent {
 
@@ -48,7 +50,7 @@ public class GeminiAgent implements Agent {
             try (var stream = chat.sendMessageStream(text)) {
                 for (var resp : stream) {
                     if (ctrl.isAborted())
-                        throw new AgentException("Generation aborted by user");
+                        throw new BusinessException(ErrorCode.TASK_CANCELLED);
                     var content = resp.candidates().orElseThrow().getFirst().content().orElseThrow();
                     if (content.parts().isEmpty())
                         continue;
@@ -62,7 +64,7 @@ public class GeminiAgent implements Agent {
                         }
                     }
                 }
-            } catch (AgentException e) {
+            } catch (BusinessException e) {
                 throw e;
             } catch (Exception e) {
                 throw new AgentException("Gemini internal error", e);

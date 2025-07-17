@@ -63,6 +63,8 @@ public abstract class AbstractCompiler implements Compiler {
         if (!workDir.root().toFile().exists()) {
             initWorkDir(workDir, appId);
             Utils.executeCommand(workDir.root(), "git", "init");
+            Utils.executeCommand(workDir.root(), "git", "add", ".");
+            Utils.executeCommand(workDir.root(), "git", "commit", "-m", "First commit");
         }
         return workDir;
     }
