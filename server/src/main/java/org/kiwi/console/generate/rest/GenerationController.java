@@ -82,7 +82,7 @@ public class GenerationController {
             return r;
         else {
             return new SearchResult<>(
-                    Utils.map(r.items(), Exchange::clearAttempts),
+                    Utils.map(r.items(), Exchange::clearDetails),
                     r.total()
             );
         }

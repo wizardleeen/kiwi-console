@@ -82,7 +82,7 @@ public class Exchange {
         }
     }
 
-    public Exchange clearAttempts() {
+    public Exchange clearDetails() {
         return new Exchange(
                 id,
                 appId,
@@ -92,7 +92,7 @@ public class Exchange {
                 Utils.map(stages, Stage::clearAttempts),
                 productURL,
                 managementURL,
-                errorMessage,
+                null,
                 first,
                 skipPageGeneration,
                 lastHeartBeatAt

@@ -248,13 +248,17 @@ public class GenerationService {
             return Format.format(updateAnalyzePrompt, exch.getPrompt(), kiwiCode, pageCode);
     }
 
+    @SneakyThrows
     private void executeGen(Runnable run) {
-        for (var i = 0; i < 3; i++) {
+        var wait = 20;
+        for (var i = 0; i < 5; i++) {
             try {
                 run.run();
                 return;
             } catch (AgentException e) {
                 log.error("Agent internal error", e);
+                Thread.sleep(wait);
+                wait *= 2;
             }
         }
         throw new BusinessException(ErrorCode.CODE_GENERATION_FAILED);
@@ -499,7 +503,7 @@ public class GenerationService {
         }
 
         void sendProgress() {
-            listener.onProgress(showAttempts ? exchange : exchange.clearAttempts());
+            listener.onProgress(showAttempts ? exchange : exchange.clearDetails());
         }
 
         boolean isBackendSuccessful() {
