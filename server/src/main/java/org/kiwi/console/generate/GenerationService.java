@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 import static org.kiwi.console.util.Constants.*;
 
@@ -126,7 +127,7 @@ public class GenerationService {
             var sysAppId = task.sysAppId;
             kiwiCompiler.reset(sysAppId);
             pageCompiler.reset(sysAppId);
-            var plan = plan(task);
+            var plan = executeGen(() -> plan(task));
             if (task.exchange.isFirst() && plan.appName != null) {
                 updateAppName(task.exchange.getAppId(), plan.appName);
             }
@@ -248,13 +249,19 @@ public class GenerationService {
             return Format.format(updateAnalyzePrompt, exch.getPrompt(), kiwiCode, pageCode);
     }
 
-    @SneakyThrows
     private void executeGen(Runnable run) {
+        executeGen(() -> {
+            run.run();
+            return null;
+        });
+    }
+
+    @SneakyThrows
+    private <R> R executeGen(Supplier<R> run) {
         var wait = 20;
         for (var i = 0; i < 5; i++) {
             try {
-                run.run();
-                return;
+                return run.get();
             } catch (AgentException e) {
                 log.error("Agent internal error", e);
                 Thread.sleep(wait);

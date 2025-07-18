@@ -14,7 +14,7 @@ Kiwi is an infrastructure-free programming langauge that enables application to 
 ### Important Notes
 
 1. Unlike Kotlin, Kiwi uses `->` to denote function return type.
-2. Unlike Kotlin `if-else` constructs can not be used as expressions. Use conditional expression instead.
+2. Unlike Kotlin, `if-else` constructs can not be used as expressions. Use conditional expression instead.
     * For example, the following program **won't compile**:
    ```
    var max = if (a > b) a else b

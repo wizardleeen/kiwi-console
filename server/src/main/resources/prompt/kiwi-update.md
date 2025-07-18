@@ -9,6 +9,15 @@ Kiwi is an infrastructure-free programming langauge that enables application to 
 
 ### Kiwi Example
 
+@@ src/value/login_response.kiwi @@
+package value
+
+import domain.Customer
+
+value class LoginResponse(
+    val successful: bool,
+    val customer: Customer?
+)
 @@ src/service/product_service.kiwi @@
 package service
 
@@ -29,15 +38,17 @@ class ProductService {
 package service
 
 import domain.Customer
+import value.LoginResponse
 
 @Bean
 @Label("客户服务")
 class CustomerService {
 
     @Label("登录")
-    fn login(@Label("邮箱") email: string, @Label("密码") password: string) -> Customer? {
+    fn login(@Label("邮箱") email: string, @Label("密码") password: string) -> LoginResponse {
         val customer = Customer.emailIdx.getFirst(email)
-        return customer != null && customer!!.checkPassword(password) ? customer : null
+        return customer != null && customer!!.checkPassword(password) ?
+                LoginResponse(true, customer) : LoginResponse(false, null)
     }
 
     @Label("注册")
