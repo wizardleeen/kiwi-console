@@ -10,6 +10,8 @@ class Order(
 
     static val statusAndCreatedAtIdx = Index<OrderStatusAndTime, Order>(false, o -> OrderStatusAndTime(o.status, o.createdAt))
 
+    static val customerIdx = Index<Customer, Order>(false, o -> o.customer)
+
     @Label("创建时间")
     val createdAt = now()
     @Label("状态")

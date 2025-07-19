@@ -49,13 +49,14 @@ public abstract class AbstractCompiler implements Compiler {
     @Override
     public void commit(long appId, String message) {
         var workDir = getWorkDir(appId);
-        Utils.executeCommand(workDir.root(), "git", "add", "src");
+        Utils.executeCommand(workDir.root(), "git", "add", ".");
         Utils.executeCommand(workDir.root(), "git", "commit", "-m", "\"" + message + "\"");
     }
 
     @Override
     public void reset(long appId) {
         Utils.executeCommand(getWorkDir(appId).root(), "git", "reset", "--hard", "HEAD");
+        Utils.executeCommand(getWorkDir(appId).root(), "git", "clean", "-fdx");
     }
 
     protected WorkDir getWorkDir(long appId) {
@@ -64,7 +65,7 @@ public abstract class AbstractCompiler implements Compiler {
             initWorkDir(workDir, appId);
             Utils.executeCommand(workDir.root(), "git", "init");
             Utils.executeCommand(workDir.root(), "git", "add", ".");
-            Utils.executeCommand(workDir.root(), "git", "commit", "-m", "First commit");
+            Utils.executeCommand(workDir.root(), "git", "commit", "-m", "first commit");
         }
         return workDir;
     }
