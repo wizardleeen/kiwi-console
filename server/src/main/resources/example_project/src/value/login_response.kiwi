@@ -1,0 +1,8 @@
+package value
+
+import domain.Customer
+
+value class LoginResponse(
+    val successful: bool,
+    val customer: Customer?
+)
