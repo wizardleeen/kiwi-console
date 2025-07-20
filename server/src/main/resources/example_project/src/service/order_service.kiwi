@@ -61,4 +61,11 @@ class OrderService {
         })
     }
 
+    fn deleteAllCustomerOrders(customer: Customer) {
+        val orders = Order.customerIdx.getAll(customer)
+        orders.forEach(o -> {
+            delete o
+        })
+    }
+
 }

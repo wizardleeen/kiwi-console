@@ -122,6 +122,13 @@ class OrderService {
         })
     }
 
+    fn deleteAllCustomerOrders(customer: Customer) {
+        val orders = Order.customerIdx.getAll(customer)
+        orders.forEach(o -> {
+            delete o
+        })
+    }
+
 }
 
 @@ src/domain/category.kiwi @@
@@ -154,6 +161,8 @@ class Order(
 ) {
 
     static val statusAndCreatedAtIdx = Index<OrderStatusAndTime, Order>(false, o -> OrderStatusAndTime(o.status, o.createdAt))
+
+    static val customerIdx = Index<Customer, Order>(false, o -> o.customer)
 
     @Label("创建时间")
     val createdAt = now()
@@ -366,7 +375,7 @@ value class Money(
 ### Important Notes
 
 1. Unlike Kotlin, Kiwi uses `->` to denote function return type.
-2. Unlike Kotlin `if-else` constructs can not be used as expressions. Use conditional expression instead.
+2. Unlike Kotlin, `if-else` constructs can not be used as expressions. Use conditional expression instead.
     * For example, the following program **won't compile**:
    ```
    var max = if (a > b) a else b
