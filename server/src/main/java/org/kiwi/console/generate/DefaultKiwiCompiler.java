@@ -32,7 +32,11 @@ public class DefaultKiwiCompiler extends AbstractCompiler implements KiwiCompile
     @SneakyThrows
     public String generateApi(long appId) {
         var wd = WorkDir.from(baseDir, appId);
-        var r = Utils.executeCommand(wd.root(), "kiwi", "gen-api");
+        var versionPath = wd.root().resolve(".version");
+        var version = Files.exists(versionPath) ? Integer.parseInt(Files.readString(versionPath)) : 0;
+        var r = version > 0 ?
+            Utils.executeCommand(wd.root(), "kiwi", "gen-api", "--return-full-object"):
+            Utils.executeCommand(wd.root(), "kiwi", "gen-api");
         if (r.exitCode() != 0)
             throw new RuntimeException("Failed to generate API: " + r.output());
         return Files.readString(wd.root().resolve("apigen").resolve("api.ts"));
@@ -61,6 +65,7 @@ public class DefaultKiwiCompiler extends AbstractCompiler implements KiwiCompile
         super.initWorkDir(workDir, appId);
         Utils.executeCommand(workDir.root(), "touch", "src/.gitkeep");
         Files.writeString(workDir.root().resolve(".gitignore"), "target");
+        Files.writeString(workDir.root().resolve(".version"), "1");
     }
 
     public static void main(String[] args) {

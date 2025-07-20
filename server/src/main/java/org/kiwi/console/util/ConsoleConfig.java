@@ -2,6 +2,7 @@ package org.kiwi.console.util;
 
 import org.kiwi.console.generate.*;
 import org.kiwi.console.kiwi.*;
+import org.kiwi.console.upload.UploadService;
 import org.springframework.beans.factory.annotation.Configurable;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.web.server.ConfigurableWebServerFactory;
@@ -27,6 +28,8 @@ public class ConsoleConfig {
     private final ServerConfig serverConfig;
     private final PageConfig pageConfig;
     private final UrlTemplates urlTemplates;
+    private final UploadConfig uploadConfig;
+
 
     public ConsoleConfig() {
         var config = getConfig();
@@ -35,7 +38,12 @@ public class ConsoleConfig {
         kiwiConfig = buildKiwiConfig(config);
         pageConfig = buildPageConfig(config);
         urlTemplates = buildUrlTemplates(config);
+        uploadConfig = buildUploadConfig(config);
         configProxy(config);
+    }
+
+    private UploadConfig buildUploadConfig(YmlConfig config) {
+        return new UploadConfig(config.getString("upload", "dir"));
     }
 
     private PageConfig buildPageConfig(YmlConfig config) {
@@ -105,6 +113,11 @@ public class ConsoleConfig {
     }
 
     @Bean
+    public UploadService uploadService() {
+        return new UploadService(Path.of(uploadConfig.dir));
+    }
+
+    @Bean
     public KiwiCompiler kiwiCompiler(DeployService deployService) {
         return new DefaultKiwiCompiler(Path.of(kiwiConfig.worksDir), deployService);
     }
@@ -167,6 +180,10 @@ public class ConsoleConfig {
     private record UrlTemplates(
             String product,
             String management
+    ) {}
+
+    private record UploadConfig(
+        String dir
     ) {}
 
 }

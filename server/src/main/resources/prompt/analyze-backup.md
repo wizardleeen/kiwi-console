@@ -18,7 +18,6 @@ Here is a list of Kiwi's key features:
 ### Limitations
 
 * The generated application cannot communicate with external systems, such as payments system, google search or AI chatbot. 
-* Image uploading is not yet supported.
 * The frontend is only allowed to uses the following libraries: Vite, React and Ant Design.
 * Specifying programming language or other implementation detail is not supported.
 * The generated application is a WEB application.
