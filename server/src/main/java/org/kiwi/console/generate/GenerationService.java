@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Supplier;
 
 import static org.kiwi.console.util.Constants.*;
@@ -168,7 +169,7 @@ public class GenerationService {
         var task = runningTasks.get(exchangeId);
         if (task == null)
             throw new BusinessException(ErrorCode.TASK_NOT_RUNNING);
-        task.changeListener(listener);
+        task.addListener(listener);
         task.sendProgress();
     }
 
@@ -417,14 +418,14 @@ public class GenerationService {
     }
 
     private class Task implements ChatStreamListener {
-        private volatile GenerationListener listener;
+        private final List<GenerationListener> listeners = new CopyOnWriteArrayList<>();
         private Exchange exchange;
         private final long sysAppId;
         private boolean cancelled;
         private final boolean showAttempts;
 
         public Task(Exchange exchange, long sysAppId, boolean showAttempts, @Nonnull GenerationListener listener) {
-            this.listener = listener;
+            listeners.add(listener);
             this.sysAppId = sysAppId;
             this.exchange = exchange;
             this.showAttempts = showAttempts;
@@ -510,7 +511,17 @@ public class GenerationService {
         }
 
         void sendProgress() {
-            listener.onProgress(showAttempts ? exchange : exchange.clearDetails());
+            var it = listeners.iterator();
+            while (it.hasNext()) {
+                var listener = it.next();
+                try {
+                    listener.onProgress(showAttempts ? exchange : exchange.clearDetails());
+                }
+                catch (Exception e) {
+                    log.error("Failed to send progress", e);
+                    it.remove();
+                }
+            }
         }
 
         boolean isBackendSuccessful() {
@@ -532,17 +543,20 @@ public class GenerationService {
 
         @Override
         public void onThought(String thoughtChunk) {
-            listener.onThought(thoughtChunk);
+            for (var listener : listeners) {
+                listener.onThought(thoughtChunk);
+            }
         }
 
         @Override
         public void onContent(String contentChunk) {
-            listener.onContent(contentChunk);
+            for (var listener : listeners) {
+                listener.onContent(contentChunk);
+            }
         }
 
-        public void changeListener(GenerationListener listener) {
-            this.listener.close();
-            this.listener = listener;
+        public void addListener(GenerationListener listener) {
+            listeners.add(listener);
         }
 
         private void ensureNotCancelled() {

@@ -31,7 +31,9 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth.requestMatchers("/auth/login", "/auth/register", "/aigc/**").permitAll()
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/auth/login", "/auth/register", "/aigc/**", "/files/", "/files")
+                        .permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(authenticateFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
