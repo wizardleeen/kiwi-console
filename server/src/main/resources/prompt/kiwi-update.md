@@ -519,7 +519,18 @@ value class Money(
 
     }
     ```
-21. Integration with external systems is not yet supported such as payments system or AI.
+21. Only direct fields are allowed for computing index keys.
+    * The following example is invalid because it uses an indirect field `name` in index key computation:
+    ```
+    class Product(var name: string)
+    
+    class Order(val product: Product) {
+        
+        static productNameIdx = Index<name, Order>(false, o.product.name)
+    
+    }
+    ```
+22. Integration with external systems is not yet supported such as payments system or AI.
 
 
 ### Data Migration
