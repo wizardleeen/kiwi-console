@@ -177,3 +177,4 @@ box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 *   All changes must be contained within the `src/App.tsx` file.
 *   Do not use `useCallback` hook.
 *   The web page must adapt to both computer and mobile phone screens. 
+*.  `useNavigate` **MUST** be used inside the context of a <Router> component.

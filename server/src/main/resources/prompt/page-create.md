@@ -273,3 +273,4 @@ You are only allowed to use libraries declared in the following package.json and
 4. The application must be fully functional.
 5. Do not use `useCallback` hook. 
 6. The web page must adapt to both computer and mobile phone screens. 
+7. `useNavigate` **MUST** be used inside the context of a <Router> component.
