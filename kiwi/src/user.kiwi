@@ -1,4 +1,5 @@
 class User(
+    @Summary
     var name: string,
     password: string,
     val sysUserId: string,
