@@ -36,7 +36,7 @@ public class MockPromptParser {
                 return new Prompt(PromptKind.PAGE_CREATE, parts[1], null, parts[2]);
             }
             case "page_update" -> {
-                if (parts.length < 4)
+                if (parts.length < 5)
                     throw invalidPrompt(text);
                 return new Prompt(PromptKind.PAGE_UPDATE, parts[1], parts[2], parts[3]);
             }

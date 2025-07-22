@@ -19,7 +19,7 @@ import feign.gson.GsonEncoder;
 import jakarta.annotation.Nullable;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import org.kiwi.console.generate.SourceFile;
+import org.kiwi.console.generate.GenerationService;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -29,6 +29,7 @@ import java.lang.reflect.Type;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -230,6 +231,14 @@ public class Utils {
     @SneakyThrows
     public static <T> T readJsonBytes(InputStream input, Class<T> cls) {
         return OBJECT_MAPPER.readValue(input, cls);
+    }
+
+    public static String loadResource(String file) {
+        try (var input = GenerationService.class.getResourceAsStream(file)) {
+            return new String(Objects.requireNonNull(input).readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public record CommandResult(int exitCode, String output) {}

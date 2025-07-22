@@ -10,7 +10,13 @@ import java.util.Objects;
 
 public class MockUserClient implements UserClient {
 
+    private final MockGenerationConfigClient genConfigClient;
+
     private final Map<String, User> userMap = new HashMap<>();
+
+    public MockUserClient(MockGenerationConfigClient genConfigClient) {
+        this.genConfigClient = genConfigClient;
+    }
 
     @Override
     public User get(String id) {
@@ -34,7 +40,7 @@ public class MockUserClient implements UserClient {
 
     @Override
     public String register(RegisterRequest request) {
-        var user = new User(System.currentTimeMillis() + "", request.userName(), request.sysUserId(), List.of());
+        var user = new User(System.currentTimeMillis() + "", request.userName(), request.sysUserId(), List.of(), genConfigClient.getPresetId());
         userMap.put(user.getId(), user);
         return user.getId();
     }
@@ -44,8 +50,4 @@ public class MockUserClient implements UserClient {
         throw new UnsupportedOperationException();
     }
 
-    @Override
-    public boolean shouldShowAttempts(UserIdRequest request) {
-        return true;
-    }
 }

@@ -22,22 +22,37 @@ import static org.kiwi.console.util.Constants.MAIN_KIWI;
 @Slf4j
 public class GenerationServiceTest extends TestCase {
 
+    private MockCompiler kiwiCompiler;
+    private MockPageCompiler pageCompiler;
+    private AppClient appClient;
+    private MockExchangeClient exchangeClient;
+    private UserClient userClient;
+    private MockGenerationConfigClient genConfigClient;
+    private String userId;
+
+    @Override
+    protected void setUp() {
+        kiwiCompiler = new MockCompiler();
+        pageCompiler = new MockPageCompiler();
+        appClient = new MockAppClient();
+        exchangeClient = new MockExchangeClient();
+        genConfigClient = new MockGenerationConfigClient();
+        userClient = new MockUserClient(genConfigClient);
+        userId = userClient.register(new RegisterRequest("kiwi", "123456"));
+    }
+
     public void testGeneration() {
-        var kiwiCompiler = new MockCompiler();
-        var pageCompiler = new MockCompiler();
-        var appClient = new MockAppClient();
-        var exchangeClient = new MockExChangeClient();
         var genService = new GenerationService(new MockAgent(), kiwiCompiler, pageCompiler,
                 exchangeClient,
                 appClient,
-                new MockUserClient(), "http://{}.metavm.test",
+                userClient, "http://{}.metavm.test",
                 "http://localhost:8080",
-                new SyncTaskExecutor()
-        );
+                genConfigClient,
+                new SyncTaskExecutor());
         var prompt = """
                 class Foo {}
                 """;
-        genService.generate(null, prompt, "tk", false, discardListener);
+        genService.generate(null, prompt, userId, false, discardListener);
         var appId = exchangeClient.getLast().getAppId();
         var app = appClient.get(appId);
         var sysAppId = app.getSystemAppId();
@@ -57,7 +72,7 @@ public class GenerationServiceTest extends TestCase {
                 exchangeClient.getLast().toString()
         );
 
-        genService.generate(appId, "class Bar{}", "tk", false, discardListener);
+        genService.generate(appId, "class Bar{}", userId, false, discardListener);
         assertEquals("class Bar{}\n", kiwiCompiler.getCode(sysAppId, MAIN_KIWI));
         assertEquals("class Bar{}\n", pageCompiler.getCode(sysAppId, APP_TSX));
         assertEquals(
@@ -73,7 +88,7 @@ public class GenerationServiceTest extends TestCase {
         );
 
 
-        genService.generate(appId, "class Error{}", "tk", false, discardListener);
+        genService.generate(appId, "class Error{}", userId, false, discardListener);
         assertEquals("class Fixed{}\n", kiwiCompiler.getCode(sysAppId, MAIN_KIWI));
         assertEquals("class Fixed{}\n", pageCompiler.getCode(sysAppId, APP_TSX));
         assertEquals(
@@ -95,19 +110,16 @@ public class GenerationServiceTest extends TestCase {
     }
 
     public void testCancel() {
-        var kiwiCompiler = new MockCompiler();
-        var pageCompiler = new MockCompiler();
         var taskExecutor = new DelayedTaskExecutor();
-        var exchClient = new MockExChangeClient();
         var generationService = new GenerationService(new MockAgent(), kiwiCompiler, pageCompiler,
-                exchClient,
-                new MockAppClient(),
-                new MockUserClient(), "http://{}.metavm.test",
+                exchangeClient,
+                appClient,
+                userClient, "http://{}.metavm.test",
                 "http://localhost:8080",
-                taskExecutor
-        );
-        generationService.generate(null, "class Foo{}", "001", false, discardListener);
-        var exch = exchClient.getFirst();
+                genConfigClient,
+                taskExecutor);
+        generationService.generate(null, "class Foo{}", userId, false, discardListener);
+        var exch = exchangeClient.getFirst();
         generationService.cancel(new CancelRequest(exch.getId()));
         try {
             taskExecutor.flush();
@@ -115,33 +127,21 @@ public class GenerationServiceTest extends TestCase {
         } catch (BusinessException e) {
             assertSame(ErrorCode.TASK_CANCELLED, e.getErrorCode());
         }
-        var exch1 = exchClient.getFirst();
+        var exch1 = exchangeClient.getFirst();
         assertSame(ExchangeStatus.CANCELLED, exch1.getStatus());
     }
 
     public void testHideAttempts() {
-        var kiwiCompiler = new MockCompiler();
-        var pageCompiler = new MockCompiler();
-        var appClient = new MockAppClient();
-        var exchangeClient = new MockExChangeClient();
-        var userService = new MockUserClient() {
-
-            @Override
-            public boolean shouldShowAttempts(UserIdRequest request) {
-                return false;
-            }
-        };
-
         var genService = new GenerationService(new MockAgent(), kiwiCompiler, pageCompiler,
                 exchangeClient,
                 appClient,
-                userService,
+                userClient,
                 "http://{}.metavm.test",
                 "http://localhost:8080",
-                new SyncTaskExecutor()
-        );
+                genConfigClient,
+                new SyncTaskExecutor());
         var exchanges = new ArrayList<Exchange>();
-        genService.generate(null, "class Foo {}", "", false, new GenerationListener() {
+        genService.generate(null, "class Foo {}", userId, false, new GenerationListener() {
             @Override
             public void onThought(String thoughtChunk) {
 
@@ -176,45 +176,37 @@ public class GenerationServiceTest extends TestCase {
                 return super.run(appId, sourceFiles, removedFiles);
             }
         };
-        var pageCompiler = new MockCompiler();
-        var exchClient = new MockExChangeClient();
-        var userClient = new MockUserClient();
-        var userId = userClient.register(new RegisterRequest("leen", "123456"));
         var generationService = new GenerationService(new MockAgent(), kiwiCompiler, pageCompiler,
-                exchClient,
+                exchangeClient,
                 new MockAppClient(),
                 userClient, "http://{}.metavm.test",
                 "http://localhost:8080",
-                new SyncTaskExecutor()
-        );
+                genConfigClient,
+                new SyncTaskExecutor());
         try {
-            generationService.generate(null, "class Foo{}", "001", false, discardListener);
+            generationService.generate(null, "class Foo{}", userId, false, discardListener);
             fail();
         }
         catch (Exception ignored) {}
-        var exch = exchClient.getFirst();
+        var exch = exchangeClient.getFirst();
         assertSame(ExchangeStatus.FAILED, exch.getStatus());
         kiwiCompiler.failing = false;
         generationService.retry(userId, new RetryRequest(exch.getId()), discardListener);
-        var exch1 = exchClient.getFirst();
+        var exch1 = exchangeClient.getFirst();
         assertSame(ExchangeStatus.SUCCESSFUL, exch1.getStatus());
     }
 
     public void testPreventingDuplicateGeneration() {
-        var kiwiCompiler = new MockCompiler();
-        var pageCompiler = new MockCompiler();
-        var appClient = new MockAppClient();
-        var exchangeClient = new MockExChangeClient();
         var genService = new GenerationService(new MockAgent(), kiwiCompiler, pageCompiler,
                 exchangeClient,
                 appClient,
-                new MockUserClient(), "http://{}.metavm.test",
+                userClient, "http://{}.metavm.test",
                 "http://localhost:8080",
-                t -> {}
-        );
-        var appId = genService.generate(null, "class Foo {}", "001", false, discardListener);
+                genConfigClient,
+                t -> {});
+        var appId = genService.generate(null, "class Foo {}", userId, false, discardListener);
         try {
-            genService.generate(appId, "class Foo {}", "001", false, discardListener);
+            genService.generate(appId, "class Foo {}", userId, false, discardListener);
             fail("Should not allow duplicate generation");
         } catch (BusinessException e) {
             assertSame(ErrorCode.GENERATION_ALREADY_RUNNING, e.getErrorCode());
@@ -222,18 +214,14 @@ public class GenerationServiceTest extends TestCase {
     }
 
     public void testFailExpiredExchanges() {
-        var kiwiCompiler = new MockCompiler();
-        var pageCompiler = new MockCompiler();
-        var appClient = new MockAppClient();
-        var exchangeClient = new MockExChangeClient();
         var genService = new GenerationService(new MockAgent(), kiwiCompiler, pageCompiler,
                 exchangeClient,
                 appClient,
-                new MockUserClient(), "http://{}.metavm.test",
+                userClient, "http://{}.metavm.test",
                 "http://localhost:8080",
-                t -> {}
-        );
-        genService.generate(null, "class Foo {}", "001", false, discardListener);
+                genConfigClient,
+                t -> {});
+        genService.generate(null, "class Foo {}", userId, false, discardListener);
         var exch = exchangeClient.getFirst();
         assertTrue(exch.isRunning());
         exch.setLastHeartBeatAt(System.currentTimeMillis() - 1000 * 60 * 10); // Set last heartbeat to 10 minutes ago
@@ -244,18 +232,14 @@ public class GenerationServiceTest extends TestCase {
     }
 
     public void testReconnectToLostTask() {
-        var kiwiCompiler = new MockCompiler();
-        var pageCompiler = new MockCompiler();
-        var appClient = new MockAppClient();
-        var exchangeClient = new MockExChangeClient();
         var genService = new GenerationService(new MockAgent(), kiwiCompiler, pageCompiler,
                 exchangeClient,
                 appClient,
-                new MockUserClient(), "http://{}.metavm.test",
+                userClient, "http://{}.metavm.test",
                 "http://localhost:8080",
-                t -> {}
-        );
-        genService.generate(null, "class Foo {}", "001", false, discardListener);
+                genConfigClient,
+                t -> {});
+        genService.generate(null, "class Foo {}", userId, false, discardListener);
         var exch = exchangeClient.getFirst();
         genService.discardTask(exch.getId());
         assertTrue(exch.isRunning());

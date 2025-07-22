@@ -18,4 +18,5 @@ public class Constants {
     public static final String USER_ID = "01e6f0ddb90700";
     public static final String KIWI_WORKDIR = "/Users/leen/develop/kiwi-works";
     public static final String PAGE_WORKDIR = "/Users/leen/develop/page-works";
+    public static final String KIWI_TEMPLATE_REPO = "git@github.com:wizardleeen/kiwi-template.git";
 }

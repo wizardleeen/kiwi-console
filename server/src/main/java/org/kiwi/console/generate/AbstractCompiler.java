@@ -54,24 +54,22 @@ public abstract class AbstractCompiler implements Compiler {
     }
 
     @Override
-    public void reset(long appId) {
-        Utils.executeCommand(getWorkDir(appId).root(), "git", "reset", "--hard", "HEAD");
-        Utils.executeCommand(getWorkDir(appId).root(), "git", "clean", "-fdx");
+    public void reset(long appId, String templateRepo) {
+        var dir = baseDir.resolve(Long.toString(appId));
+        if (dir.toFile().exists()) {
+            Utils.executeCommand(getWorkDir(appId).root(), "git", "reset", "--hard", "HEAD");
+            Utils.executeCommand(getWorkDir(appId).root(), "git", "clean", "-fdx", "--exclude=node_modules");
+        } else {
+            Utils.executeCommand(baseDir, "git", "clone", templateRepo, Long.toString(appId));
+            initWorkDir(getWorkDir(appId), appId);
+        }
     }
 
     protected WorkDir getWorkDir(long appId) {
-        var workDir = WorkDir.from(baseDir, appId);
-        if (!workDir.root().toFile().exists()) {
-            initWorkDir(workDir, appId);
-            Utils.executeCommand(workDir.root(), "git", "init");
-            Utils.executeCommand(workDir.root(), "git", "add", ".");
-            Utils.executeCommand(workDir.root(), "git", "commit", "-m", "first commit");
-        }
-        return workDir;
+        return WorkDir.from(baseDir, appId);
     }
 
     protected void initWorkDir(WorkDir workDir, long appId) {
-        workDir.init();
     }
 
     @SneakyThrows

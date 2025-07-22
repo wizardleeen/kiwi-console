@@ -59,15 +59,6 @@ public class DefaultKiwiCompiler extends AbstractCompiler implements KiwiCompile
         }
     }
 
-    @SneakyThrows
-    @Override
-    protected void initWorkDir(WorkDir workDir, long appId) {
-        super.initWorkDir(workDir, appId);
-        Utils.executeCommand(workDir.root(), "touch", "src/.gitkeep");
-        Files.writeString(workDir.root().resolve(".gitignore"), "target");
-        Files.writeString(workDir.root().resolve(".version"), "1");
-    }
-
     public static void main(String[] args) {
         var compiler = new DefaultKiwiCompiler(Path.of("/tmp/kiwi-works"), new MockDeployService());
         var code = "class Foo(var name: string)";
