@@ -13,7 +13,7 @@ public interface Compiler {
 
     void commit(long appId, String message);
 
-    void reset(long appId);
+    void reset(long appId, String templateRepo);
 
     void delete(long appId);
 }

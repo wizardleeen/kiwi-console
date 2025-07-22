@@ -51,11 +51,6 @@ public class UserService implements UserClient {
         return userClient.getBySysUserId(request);
     }
 
-    @Override
-    public boolean shouldShowAttempts(UserIdRequest request) {
-        return userClient.shouldShowAttempts(request);
-    }
-
     public static void main(String[] args) {
         var client = new UserService(
                 "http://localhost:8080",

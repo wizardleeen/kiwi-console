@@ -22,32 +22,19 @@ public class DefaultPageCompiler extends AbstractCompiler implements PageCompile
         return new DeployResult(true, null);
     }
 
-    @Override
-    public void reset(long appId) {
-        Utils.executeCommand(getWorkDir(appId).root(), "git", "reset", "--hard", "HEAD");
-        Utils.executeCommand(getWorkDir(appId).root(), "git", "clean", "-fdx", "--exclude=node_modules");
-    }
-
     @SneakyThrows
     @Override
     protected void initWorkDir(WorkDir workDir, long appId) {
-        if(!workDir.root().toFile().exists()) {
-            var r = Utils.executeCommand(workDir.root().getParent(), "cp", "-r", "template",
-                    workDir.root().getFileName().toString());
-            if (r.exitCode() != 0)
-                throw new RuntimeException("Failed to initialized frontend workspace");
-            var r1 = Utils.executeCommand(workDir.root(), "npm", "install");
-            if (r1.exitCode() != 0)
-                throw new RuntimeException("Failed to run `npm install`: " + r1.output());
-            var envFilePath = workDir.getSrcPath().resolve("env.ts");
-            Files.writeString(envFilePath, "export const APP_ID = " + appId);
-            Files.writeString(workDir.root().resolve(".gitignore"), "node_modules");
-        }
+        var r1 = Utils.executeCommand(workDir.root(), "pnpm", "install");
+        if (r1.exitCode() != 0)
+            throw new RuntimeException("Failed to run `pnpm install`: " + r1.output());
+        var envFilePath = workDir.getSrcPath().resolve("env.ts");
+        Files.writeString(envFilePath, "export const APP_ID = " + appId);
     }
 
     protected BuildResult build(WorkDir workDir) {
         Utils.CommandResult r;
-        r = Utils.executeCommand(workDir.root(), "npm", "run", "build");
+        r = Utils.executeCommand(workDir.root(), "pnpm", "run", "build");
         if (r.exitCode() == 0)
             return new BuildResult(true, null);
         log.info("Build failed: {}", r.output());

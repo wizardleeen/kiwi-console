@@ -76,16 +76,11 @@ public class GenerationController {
                 request.page() > 0 ? request.page() : 1,
                 request.pageSize() > 0 ? request.pageSize() : 20
         );
-        var showAttempts = userClient.shouldShowAttempts(new UserIdRequest(userId));
         var r = exchangeClient.search(innerReq);
-        if (showAttempts)
-            return r;
-        else {
-            return new SearchResult<>(
-                    Utils.map(r.items(), Exchange::clearDetails),
-                    r.total()
-            );
-        }
+        return new SearchResult<>(
+                Utils.map(r.items(), Exchange::clearDetails),
+                r.total()
+        );
     }
 
 

@@ -6,24 +6,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
 
 public record WorkDir(Path root) {
 
     public static WorkDir from(Path baseDir, long appId) {
         return new WorkDir(baseDir.resolve(Long.toString(appId)));
-    }
-
-    public void init() {
-        try {
-            if (!root.toFile().exists()) {
-                Files.createDirectory(root);
-                Files.createDirectory(getSrcPath());
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
     }
 
     Path getSrcPath() {

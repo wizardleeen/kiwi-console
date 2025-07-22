@@ -5,7 +5,7 @@ import org.kiwi.console.util.Utils;
 
 import java.util.*;
 
-public class MockExChangeClient implements ExchangeClient {
+public class MockExchangeClient implements ExchangeClient {
 
     public static final long TIMEOUT = 60 * 1000;
 

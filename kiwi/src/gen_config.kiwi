@@ -1,0 +1,45 @@
+class GenerationConfig(
+    @Summary
+    var name: string,
+    var pageCreatePrompt: string,
+    var pageUpdatePrompt: string,
+    var pageFixPrompt: string,
+    var templateRepo: string?
+) {
+
+    fn __name__() -> string {
+        return "v1"
+    }
+
+
+    fn __pageCreatePrompt__() -> string {
+        return ""
+    }
+
+    fn __pageUpdatePrompt__() -> string {
+        return ""
+    }
+
+    fn __pageFixPrompt__() -> string {
+        return ""
+    }
+
+}
+
+@Bean
+class GenerationConfigService {
+
+    var preset: GenerationConfig?
+
+    fn getPreset() -> GenerationConfig {
+        if (preset != null)
+            return preset!!
+        else
+            throw Exception("No preset generation config found")
+    }
+
+    fn setPreset(config: GenerationConfig) {
+        preset = config
+    }
+
+}

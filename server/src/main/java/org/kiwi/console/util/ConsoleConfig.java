@@ -92,12 +92,18 @@ public class ConsoleConfig {
     }
 
     @Bean
+    public GenerationConfigClient generationConfigClient() {
+        return Utils.createKiwiFeignClient(kiwiConfig.host, GenerationConfigClient.class, kiwiConfig.chatAppId);
+    }
+
+    @Bean
     public GenerationService generationService(GeminiAgent geminiAgent,
                                                KiwiCompiler kiwiCompiler,
                                                PageCompiler pageCompiler,
                                                AppClient appClient,
                                                UserClient userClient,
                                                ExchangeClient exchangeClient,
+                                               GenerationConfigClient generationConfigClient,
                                                @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor) {
         return new GenerationService(
                 geminiAgent,
@@ -108,8 +114,8 @@ public class ConsoleConfig {
                 userClient,
                 urlTemplates.product,
                 urlTemplates.management,
-                taskExecutor
-        );
+                generationConfigClient,
+                taskExecutor);
     }
 
     @Bean

@@ -31,8 +31,4 @@ public interface UserClient {
     @Headers("Content-Type: application/json")
     String getBySysUserId(GetBySysUserIdRequest request);
 
-    @RequestLine("POST /api/user-service/should-show-attempts")
-    @Headers("Content-Type: application/json")
-    boolean shouldShowAttempts(UserIdRequest request);
-
 }

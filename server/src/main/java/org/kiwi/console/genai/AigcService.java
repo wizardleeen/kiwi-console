@@ -5,6 +5,7 @@ import org.kiwi.console.genai.rest.dto.GenerateRequest;
 import org.kiwi.console.generate.*;
 import org.kiwi.console.patch.PatchReader;
 import org.kiwi.console.util.BusinessException;
+import org.kiwi.console.util.Constants;
 import org.kiwi.console.util.ErrorCode;
 import org.kiwi.console.util.Utils;
 import org.springframework.stereotype.Component;
@@ -44,7 +45,7 @@ public class AigcService {
     }
 
     public void generate(GenerateRequest request) {
-        compiler.reset(request.appId());
+        compiler.reset(request.appId(), Constants.KIWI_TEMPLATE_REPO);
         var chat = agent.createChat();
         var existingCode = compiler.getSourceFiles(request.appId());
         String text;

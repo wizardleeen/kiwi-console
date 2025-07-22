@@ -12,4 +12,5 @@ public class User {
     private String name;
     private String sysUserId;
     private List<App> apps;
+    private String genConfigId;
 }

@@ -14,21 +14,33 @@ class MockCompiler implements KiwiCompiler, PageCompiler {
 
     @Override
     public DeployResult run(long appId, List<SourceFile> sourceFiles, List<Path> removedFiles) {
-        var files = new HashMap<>(working.getOrDefault(appId, Map.of()));
+        var files = getWorkdir(appId);
         sourceFiles.forEach(f -> files.put(f.path().toString(), f.content()));
         for (Path removedFile : removedFiles) {
             files.remove(removedFile.toString());
         }
-        working.put(appId, files);
         if (sourceFiles.stream().anyMatch(f -> f.content().contains("Error")))
             return new DeployResult(false, "Compilation failed.");
         else
             return new DeployResult(true, null);
     }
 
+    private Map<String, String> getWorkdir(long appId) {
+        var wd = working.get(appId);
+        if (wd == null) {
+            wd = new HashMap<>();
+            working.put(appId, wd);
+            initWorkdir(wd);
+        }
+        return wd;
+    }
+
+    protected void initWorkdir(Map<String, String> workdir) {
+    }
+
     @Override
     public List<SourceFile> getSourceFiles(long appId) {
-        var files = working.getOrDefault(appId, Map.of());
+        var files = getWorkdir(appId);
         var sourceFiles = new ArrayList<SourceFile>();
         files.forEach((path, content) -> sourceFiles.add(new SourceFile(Path.of(path), content)));
         return sourceFiles;
@@ -50,7 +62,7 @@ class MockCompiler implements KiwiCompiler, PageCompiler {
     }
 
     @Override
-    public void reset(long appId) {
+    public void reset(long appId, String templateRepo) {
         if (commits.isEmpty())
             working = new HashMap<>();
         else
@@ -74,7 +86,7 @@ class MockCompiler implements KiwiCompiler, PageCompiler {
     }
 
     public String getCode(long appId, String path) {
-        return working.getOrDefault(appId, Map.of()).get(path);
+        return getWorkdir(appId).get(path);
     }
 
     private record Commit(Map<Long, Map<String, String>> map, String message) {}

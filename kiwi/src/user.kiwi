@@ -1,8 +1,11 @@
 class User(
     var name: string,
     password: string,
-    val sysUserId: string
+    val sysUserId: string,
+    var genConfig: GenerationConfig
 ) {
+
+    var role = Role.USER
 
     priv var passwordHash = secureHash(password, null)
 
@@ -10,11 +13,6 @@ class User(
     static val sysUserIdIdx = Index<string, User>(true, u -> u.sysUserId)
 
     val applications = new Application[]
-    val genConfig = GenerationConfig(false)
-
-    fn __genConfig__() -> GenerationConfig {
-        return GenerationConfig(true)
-    }
 
     fn checkPassword(password: string) -> bool {
         return passwordHash == secureHash(password, null)
@@ -24,19 +22,38 @@ class User(
         return "01e0ffd8b90700"
     }
 
+    fn __role__() -> Role {
+        return Role.USER
+    }
+
+    fn __genConfig__(old: GenerationConfig?) -> GenerationConfig {
+        return old!!
+    }
+
+    fn setGenerationConfig(genConfig: GenerationConfig) {
+        this.genConfig = genConfig
+    }
+
 }
 
-class GenerationConfig(
-    var showAttempts: bool
-)
+enum Role {
+    USER,
+    ADMIN
+;
+}
+
+
 
 @Bean
-class UserService {
+class UserService(
+    val genConfigService: GenerationConfigService
+) {
 
     fn register(userName: string, password: string, sysUserId: string) -> User {
         if (User.nameIdx.getFirst(userName) != null)
             throw Exception("User already exists")
-        return User(userName, password, sysUserId)
+        val genConfig = genConfigService.getPreset()
+        return User(userName, password, sysUserId, genConfig)
     }
 
     fn login(userName: string, password: string) -> LoginResponse {
@@ -75,10 +92,6 @@ class UserService {
         if (user != null)
             return user as User
         throw Exception("Login required")
-    }
-
-    fn shouldShowAttempts(user: User) -> bool {
-        return user.genConfig.showAttempts
     }
 
 }

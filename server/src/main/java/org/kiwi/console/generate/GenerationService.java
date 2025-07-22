@@ -25,28 +25,24 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.StringReader;
 import java.net.http.HttpClient;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Supplier;
 
 import static org.kiwi.console.util.Constants.*;
+import static org.kiwi.console.util.Utils.loadResource;
 
 @Slf4j
 public class GenerationService {
 
     public static final String NEW_APP_NAME = "New Application";
-    private static final String pageCreatePrompt = loadResource("/prompt/page-create.md");
-    private static final String pageUpdatePrompt = loadResource("/prompt/page-update.md");
     private static final String kiwiCreatePrompt = loadResource("/prompt/kiwi-create.md");
     private static final String kiwiUpdatePrompt = loadResource("/prompt/kiwi-update.md");
-    private static final String pageFixPrompt = loadResource("/prompt/page-fix.md");
     private static final String kiwiFixPrompt = loadResource("/prompt/kiwi-fix.md");
     private static final String createAnalyzePrompt = loadResource("/prompt/create-analyze.md");
     private static final String updateAnalyzePrompt = loadResource("/prompt/update-analyze.md");
@@ -58,6 +54,7 @@ public class GenerationService {
     private final String productUrlTempl;
     private final String mgmtUrlTempl;
     private final ExchangeClient exchClient;
+    private final GenerationConfigClient generationConfigClient;
     private final UserClient userClient;
     private final Map<String, Task> runningTasks = new ConcurrentHashMap<>();
     private final TaskExecutor taskExecutor;
@@ -70,6 +67,7 @@ public class GenerationService {
             AppClient appClient,
             UserClient userClient, String productUrlTempl,
             String mgmtUrlTempl,
+            GenerationConfigClient generationConfigClient,
             TaskExecutor taskExecutor
     ) {
         this.agent = agent;
@@ -80,15 +78,8 @@ public class GenerationService {
         this.mgmtUrlTempl = mgmtUrlTempl;
         this.exchClient = exchClient;
         this.userClient = userClient;
+        this.generationConfigClient = generationConfigClient;
         this.taskExecutor = taskExecutor;
-    }
-
-    public static String loadResource(String file) {
-        try (var input = GenerationService.class.getResourceAsStream(file)) {
-            return new String(Objects.requireNonNull(input).readAllBytes(), StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
     }
 
     public String generate(String appId,
@@ -106,9 +97,11 @@ public class GenerationService {
         }
         var sysAppId = getApp(appId).getSystemAppId();
         var exchange = Exchange.create(appId, userId, prompt, creating, skipPageGeneration);
+        var user = userClient.get(userId);
         exchange.setId(exchClient.save(exchange));
-        var showAttempt = userClient.shouldShowAttempts(new UserIdRequest(userId));
-        var task = new Task(exchange, sysAppId, showAttempt, listener);
+        var task = new Task(exchange, sysAppId, false,
+                generationConfigClient.get(user.getGenConfigId()),
+                listener);
         task.sendProgress();
         taskExecutor.execute(() -> runTask(task));
         return appId;
@@ -126,8 +119,8 @@ public class GenerationService {
     private void runTask(Task task) {
         try {
             var sysAppId = task.sysAppId;
-            kiwiCompiler.reset(sysAppId);
-            pageCompiler.reset(sysAppId);
+            kiwiCompiler.reset(sysAppId, KIWI_TEMPLATE_REPO);
+            pageCompiler.reset(sysAppId, task.genConfig.templateRepo());
             var plan = executeGen(() -> plan(task));
             if (task.exchange.isFirst() && plan.appName != null) {
                 updateAppName(task.exchange.getAppId(), plan.appName);
@@ -186,8 +179,10 @@ public class GenerationService {
         ensureNotGenerating(app.getId());
         exchClient.retry(new ExchangeRetryRequest(request.exchangeId()));
         exch = exchClient.get(request.exchangeId());  // Reload
-        var showAttempts = userClient.shouldShowAttempts(new UserIdRequest(userId));
-        var task = new Task(exch, app.getSystemAppId(), showAttempts, listener);
+        var user = userClient.get(userId);
+        var task = new Task(exch, app.getSystemAppId(), false,
+                generationConfigClient.get(user.getGenConfigId()),
+                listener);
         task.sendProgress();
         taskExecutor.execute(() -> runTask(task));
     }
@@ -379,9 +374,9 @@ public class GenerationService {
             var existingFiles = pageCompiler.getSourceFiles(task.sysAppId);
             String prompt;
             if (existingFiles.stream().noneMatch(f -> f.path().toString().equals(APP_TSX)))
-                prompt = buildFrontCreatePrompt(task.exchange.getPrompt(), apiSource);
+                prompt = buildFrontCreatePrompt(task, apiSource);
             else
-                prompt = buildFrontUpdatePrompt(task.exchange.getPrompt(), PatchReader.buildCode(existingFiles), apiSource);
+                prompt = buildFrontUpdatePrompt(task, PatchReader.buildCode(existingFiles), apiSource);
             log.info("Page generation prompt:\n{}", prompt);
             var resp = generateCode(chat, prompt, task);
             var files = new ArrayList<>(resp.addedFiles());
@@ -389,7 +384,7 @@ public class GenerationService {
             var r = runCompiler(pageCompiler, task.sysAppId, files, resp.removedFiles());
             if (!r.successful()) {
                 task.finishAttempt(false, r.output());
-                fix(task.sysAppId, r.output(), task, chat, pageCompiler, pageFixPrompt);
+                fix(task.sysAppId, r.output(), task, chat, pageCompiler, task.genConfig.pageFixPrompt());
             } else
                 task.finishAttempt(true, null);
             log.info("Pages generated successfully");
@@ -401,12 +396,12 @@ public class GenerationService {
         }
     }
 
-    private String buildFrontUpdatePrompt(String userPrompt, String existingCode, String apiSource) {
-        return Format.format(pageUpdatePrompt, userPrompt, existingCode, apiSource);
+    private String buildFrontUpdatePrompt(Task task, String existingCode, String apiSource) {
+        return Format.format(task.genConfig.pageUpdatePrompt(), task.exchange.getPrompt(), existingCode, apiSource);
     }
 
-    private String buildFrontCreatePrompt(String userPrompt, String apiSource) {
-        return Format.format(pageCreatePrompt, userPrompt, apiSource);
+    private String buildFrontCreatePrompt(Task task, String apiSource) {
+        return Format.format(task.genConfig.pageCreatePrompt(), task.exchange.getPrompt(), apiSource);
     }
 
     private String buildCreatePrompt(String prompt) {
@@ -422,9 +417,11 @@ public class GenerationService {
         private Exchange exchange;
         private final long sysAppId;
         private boolean cancelled;
+        private final GenerationConfig genConfig;
         private final boolean showAttempts;
 
-        public Task(Exchange exchange, long sysAppId, boolean showAttempts, @Nonnull GenerationListener listener) {
+        public Task(Exchange exchange, long sysAppId, boolean showAttempts, GenerationConfig genConfig, @Nonnull GenerationListener listener) {
+            this.genConfig = genConfig;
             listeners.add(listener);
             this.sysAppId = sysAppId;
             this.exchange = exchange;
@@ -591,8 +588,8 @@ public class GenerationService {
                 )),
                 Utils.createKiwiFeignClient(host, UserClient.class, CHAT_APP_ID), "http://{}.metavm.test",
                 "http://localhost:5173/app/{}",
-                new SyncTaskExecutor()
-        );
+                Utils.createKiwiFeignClient(host, GenerationConfigClient.class, CHAT_APP_ID),
+                new SyncTaskExecutor());
 //        System.out.println(kiwiCompiler.generateApi(TEST_APP_ID));
         testNewApp(service);
 //        testUpdateApp(service);

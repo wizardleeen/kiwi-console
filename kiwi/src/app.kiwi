@@ -1,4 +1,5 @@
 class Application(
+    @Summary
     var name: string,
     val owner: User,
     val systemAppId: long
