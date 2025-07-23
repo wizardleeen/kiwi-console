@@ -21,7 +21,10 @@ public record SourceFile(Path path, String content) {
             Path.of("target"),
             Path.of("dist"),
             Path.of("src/components/ui"),
-            Path.of("package-lock.json")
+            Path.of("package-lock.json"),
+            Path.of("pnpm-lock.yaml"),
+            Path.of("public"),
+            Path.of("src/assets")
     );
 
     @SneakyThrows
@@ -37,7 +40,6 @@ public record SourceFile(Path path, String content) {
             @SneakyThrows
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-                log.info("Visiting file {}", file);
                 var path = root.relativize(file);
                 if (!isIgnored(path))
                     files.add(new SourceFile(path, Files.readString(file)));

@@ -130,23 +130,24 @@ stop_server() {
   echo "Stopping $APP_NAME (PID: $PID)..."
 
   # Send SIGTERM (15) first, allowing graceful shutdown
-  kill -15 "$PID"
+  kill -9 "$PID"
+  sleep 1
 
-  # Wait for the process to terminate
-  WAIT_SECONDS=30 # Max time to wait for graceful shutdown
-  COUNT=0
-  while ps -p "$PID" > /dev/null 2>&1; do
-    if [ $COUNT -lt $WAIT_SECONDS ]; then
-      printf "."
-      sleep 1
-      ((COUNT++))
-    else
-      echo "\n$APP_NAME (PID: $PID) did not stop gracefully after $WAIT_SECONDS seconds. Sending SIGKILL (9)."
-      kill -9 "$PID" # Force kill
-      sleep 1 # Give OS time to process kill
-      break
-    fi
-  done
+#  # Wait for the process to terminate
+#  WAIT_SECONDS=30 # Max time to wait for graceful shutdown
+#  COUNT=0
+#  while ps -p "$PID" > /dev/null 2>&1; do
+#    if [ $COUNT -lt $WAIT_SECONDS ]; then
+#      printf "."
+#      sleep 1
+#      ((COUNT++))
+#    else
+#      echo "\n$APP_NAME (PID: $PID) did not stop gracefully after $WAIT_SECONDS seconds. Sending SIGKILL (9)."
+#      kill -9 "$PID" # Force kill
+#      sleep 1 # Give OS time to process kill
+#      break
+#    fi
+#  done
 
   # Check if it finally stopped
   if ps -p "$PID" > /dev/null 2>&1; then

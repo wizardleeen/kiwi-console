@@ -4,23 +4,44 @@ class GenerationConfig(
     var pageCreatePrompt: string,
     var pageUpdatePrompt: string,
     var pageFixPrompt: string,
-    var templateRepo: string?
+    var kiwiCreatePrompt: string,
+    var kiwiUpdatePrompt: string,
+    var kiwiFixPrompt: string,
+    var createAnalyzePrompt: string,
+    var updateAnalyzePrompt: string,
+    var pageTemplateRepo: string,
+    var kiwiTemplateRepo: string
 ) {
 
-    fn __name__() -> string {
-        return "v1"
-    }
+    static val nameIdx = Index<string, GenerationConfig>(false, g -> g.name)
 
+    deleted var templateRepo: string?
 
-    fn __pageCreatePrompt__() -> string {
+    fn __pageTemplateRepo__() -> string {
         return ""
     }
 
-    fn __pageUpdatePrompt__() -> string {
+    fn __kiwiCreatePrompt__() -> string {
         return ""
     }
 
-    fn __pageFixPrompt__() -> string {
+    fn __kiwiUpdatePrompt__() -> string {
+        return ""
+    }
+
+    fn __kiwiFixPrompt__() -> string {
+        return ""
+    }
+
+    fn __kiwiTemplateRepo__() -> string {
+        return "git@github.com:wizardleeen/kiwi-template.git"
+    }
+
+    fn __createAnalyzePrompt__() -> string {
+        return ""
+    }
+
+    fn __updateAnalyzePrompt__() -> string {
         return ""
     }
 
@@ -40,6 +61,22 @@ class GenerationConfigService {
 
     fn setPreset(config: GenerationConfig) {
         preset = config
+    }
+
+    fn copy(config: GenerationConfig) -> GenerationConfig {
+        return GenerationConfig(
+            config.name + "Copy",
+            config.pageCreatePrompt,
+            config.pageUpdatePrompt,
+            config.pageFixPrompt,
+            config.kiwiCreatePrompt,
+            config.kiwiUpdatePrompt,
+            config.kiwiFixPrompt,
+            config.createAnalyzePrompt,
+            config.updateAnalyzePrompt,
+            config.pageTemplateRepo,
+            config.kiwiTemplateRepo
+        )
     }
 
 }

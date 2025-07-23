@@ -170,6 +170,7 @@ Kiwi is an infrastructure-free programming langauge that enables application to 
     }
     ```
 22. Integration with external systems is not yet supported such as payments system or AI.
+23. Be very careful with the `!!` operator, you have to be absolutely sure that the value is not null.
 
 
 ### Data Migration

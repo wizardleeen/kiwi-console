@@ -17,8 +17,14 @@ public class MockGenerationConfigClient implements GenerationConfigClient {
                 Utils.loadResource("/prompt/page-create.md"),
                 Utils.loadResource("/prompt/page-update.md"),
                 Utils.loadResource("/prompt/page-fix.md"),
-                null
-        );
+                Utils.loadResource("/prompt/kiwi-create.md"),
+                Utils.loadResource("/prompt/kiwi-update.md"),
+                Utils.loadResource("/prompt/kiwi-fix.md"),
+                Utils.loadResource("/prompt/create-analyze.md"),
+                Utils.loadResource("/prompt/update-analyze.md"),
+                "",
+                ""
+                );
         configs.put(preset.id(), preset);
     }
 
@@ -47,7 +53,13 @@ public class MockGenerationConfigClient implements GenerationConfigClient {
                 config.pageCreatePrompt(),
                 config.pageUpdatePrompt(),
                 config.pageFixPrompt(),
-                config.templateRepo()
+                config.kiwiCreatePrompt(),
+                config.kiwiUpdatePrompt(),
+                config.kiwiFixPrompt(),
+                config.createAnalyzePrompt(),
+                config.updateAnalyzePrompt(),
+                config.pageTemplateRepo(),
+                config.kiwiTemplateRepo()
         );
     }
 

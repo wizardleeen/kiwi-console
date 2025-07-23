@@ -10,6 +10,11 @@ public class MockAppClient implements AppClient {
 
     private final Map<String, App> apps = new LinkedHashMap<>();
     private final Random random = new Random();
+    private final UserClient userClient;
+
+    public MockAppClient(UserClient userClient) {
+        this.userClient = userClient;
+    }
 
     @Override
     public SearchResult<App> search(AppSearchRequest request) {
@@ -41,6 +46,7 @@ public class MockAppClient implements AppClient {
     public String save(App app) {
         app = copy(app);
         if (app.getId() == null) {
+            app.setGenConfigId(userClient.get(app.getOwnerId()).getGenConfigId());
             app.setId(Long.toString(System.currentTimeMillis()));
             app.setSystemAppId(random.nextInt(10000));
         }
@@ -50,7 +56,7 @@ public class MockAppClient implements AppClient {
 
     private App copy(App app) {
         return new App(app.getId(), app.getName(), app.getOwnerId(),
-                app.getSystemAppId(), app.getMemberIds());
+                app.getSystemAppId(), app.getMemberIds(), app.getGenConfigId());
     }
 
     @Override
