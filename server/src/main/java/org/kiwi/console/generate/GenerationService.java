@@ -35,17 +35,11 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Supplier;
 
 import static org.kiwi.console.util.Constants.*;
-import static org.kiwi.console.util.Utils.loadResource;
 
 @Slf4j
 public class GenerationService {
 
     public static final String NEW_APP_NAME = "New Application";
-    private static final String kiwiCreatePrompt = loadResource("/prompt/kiwi-create.md");
-    private static final String kiwiUpdatePrompt = loadResource("/prompt/kiwi-update.md");
-    private static final String kiwiFixPrompt = loadResource("/prompt/kiwi-fix.md");
-    private static final String createAnalyzePrompt = loadResource("/prompt/create-analyze.md");
-    private static final String updateAnalyzePrompt = loadResource("/prompt/update-analyze.md");
 
     private final Agent agent;
     private final KiwiCompiler kiwiCompiler;
@@ -97,10 +91,10 @@ public class GenerationService {
         }
         var sysAppId = getApp(appId).getSystemAppId();
         var exchange = Exchange.create(appId, userId, prompt, creating, skipPageGeneration);
-        var user = userClient.get(userId);
+        var app = appClient.get(appId);
         exchange.setId(exchClient.save(exchange));
         var task = new Task(exchange, sysAppId, false,
-                generationConfigClient.get(user.getGenConfigId()),
+                generationConfigClient.get(app.getGenConfigId()),
                 listener);
         task.sendProgress();
         taskExecutor.execute(() -> runTask(task));
@@ -119,8 +113,8 @@ public class GenerationService {
     private void runTask(Task task) {
         try {
             var sysAppId = task.sysAppId;
-            kiwiCompiler.reset(sysAppId, KIWI_TEMPLATE_REPO);
-            pageCompiler.reset(sysAppId, task.genConfig.templateRepo());
+            kiwiCompiler.reset(sysAppId, task.genConfig.kiwiTemplateRepo());
+            pageCompiler.reset(sysAppId, task.genConfig.pageTemplateRepo());
             var plan = executeGen(() -> plan(task));
             if (task.exchange.isFirst() && plan.appName != null) {
                 updateAppName(task.exchange.getAppId(), plan.appName);
@@ -179,9 +173,8 @@ public class GenerationService {
         ensureNotGenerating(app.getId());
         exchClient.retry(new ExchangeRetryRequest(request.exchangeId()));
         exch = exchClient.get(request.exchangeId());  // Reload
-        var user = userClient.get(userId);
         var task = new Task(exch, app.getSystemAppId(), false,
-                generationConfigClient.get(user.getGenConfigId()),
+                generationConfigClient.get(app.getGenConfigId()),
                 listener);
         task.sendProgress();
         taskExecutor.execute(() -> runTask(task));
@@ -214,7 +207,7 @@ public class GenerationService {
         var kiwiCode = PatchReader.buildCode(kiwiCompiler.getSourceFiles(task.sysAppId));
         var pageCode = PatchReader.buildCode(pageCompiler.getSourceFiles(task.sysAppId));
         var chat = agent.createChat();
-        var planPrompt = createPlanPrompt(exch, kiwiCode, pageCode);
+        var planPrompt = createPlanPrompt(exch, kiwiCode, pageCode, task);
         log.info("Plan prompt:\n{}", planPrompt);
         var text = generateContent(chat, planPrompt, task);
         var reader = new BufferedReader(new StringReader(text));
@@ -238,11 +231,11 @@ public class GenerationService {
         };
     }
 
-    private String createPlanPrompt(Exchange exch, String kiwiCode, String pageCode) {
+    private String createPlanPrompt(Exchange exch, String kiwiCode, String pageCode, Task task) {
         if (exch.isFirst())
-            return Format.format(createAnalyzePrompt, exch.getPrompt());
+            return Format.format(task.genConfig.createAnalyzePrompt(), exch.getPrompt());
         else
-            return Format.format(updateAnalyzePrompt, exch.getPrompt(), kiwiCode, pageCode);
+            return Format.format(task.genConfig.updateAnalyzePrompt(), exch.getPrompt(), kiwiCode, pageCode);
     }
 
     private void executeGen(Runnable run) {
@@ -276,9 +269,9 @@ public class GenerationService {
             String prompt;
             var existingFiles = kiwiCompiler.getSourceFiles(sysAppId);
             if (!existingFiles.isEmpty())
-                prompt = buildUpdatePrompt(userPrompt, PatchReader.buildCode(existingFiles));
+                prompt = buildUpdatePrompt(userPrompt, PatchReader.buildCode(existingFiles), task);
             else
-                prompt = buildCreatePrompt(userPrompt);
+                prompt = buildCreatePrompt(userPrompt, task);
             log.info("Kiwi generation prompt: \n{}", prompt);
             var resp = generateCode(chat, prompt, task);
 //        if (existingFiles == null) {
@@ -289,7 +282,7 @@ public class GenerationService {
             var r = runCompiler(kiwiCompiler, sysAppId, resp.addedFiles(), resp.removedFiles());
             if (!r.successful()) {
                 task.finishAttempt(false, r.output());
-                fix(sysAppId, r.output(), task, chat, kiwiCompiler, kiwiFixPrompt);
+                fix(sysAppId, r.output(), task, chat, kiwiCompiler, task.genConfig.kiwiFixPrompt());
             } else
                 task.finishAttempt(true, null);
             log.info("Kiwi deployed successfully");
@@ -404,12 +397,12 @@ public class GenerationService {
         return Format.format(task.genConfig.pageCreatePrompt(), task.exchange.getPrompt(), apiSource);
     }
 
-    private String buildCreatePrompt(String prompt) {
-        return Format.format(kiwiCreatePrompt, prompt);
+    private String buildCreatePrompt(String prompt, Task task) {
+        return Format.format(task.genConfig.kiwiCreatePrompt(), prompt);
     }
 
-    private String buildUpdatePrompt(String prompt, String code) {
-        return Format.format(kiwiUpdatePrompt, prompt, code);
+    private String buildUpdatePrompt(String prompt, String code, Task task) {
+        return Format.format(task.genConfig.kiwiUpdatePrompt(), prompt, code);
     }
 
     private class Task implements ChatStreamListener {

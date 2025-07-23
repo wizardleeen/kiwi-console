@@ -40,7 +40,8 @@ public class AppService implements AppClient {
                 app.getName(),
                 app.getOwnerId(),
                 sysAppId,
-                app.getMemberIds()
+                app.getMemberIds(),
+                app.getGenConfigId()
         ));
     }
 

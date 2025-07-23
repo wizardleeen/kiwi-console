@@ -5,10 +5,16 @@ class Application(
     val systemAppId: long
 ) {
 
+    val genConfig = owner.genConfig
+
     val members = new User[]
 
     {
         addMember(owner)
+    }
+
+    fn __genConfig__() -> GenerationConfig {
+        return owner.genConfig
     }
 
     fn addMember(user: User) {

@@ -38,7 +38,7 @@ public interface AppClient {
         );
         var id = "0192fbdab90700";
         for (int i = 0; i < 10; i++) {
-            var id1 = client.save(new App(id, "test" + i, Constants.USER_ID, 0, List.of()));
+            var id1 = client.save(new App(id, "test" + i, Constants.USER_ID, 0, List.of(), ""));
             System.out.println("Saved successfully. ID: " + id1);
 
         }

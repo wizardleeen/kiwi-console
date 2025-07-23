@@ -19,18 +19,6 @@ class User(
         return passwordHash == secureHash(password, null)
     }
 
-    fn __sysUserId__() -> string {
-        return "01e0ffd8b90700"
-    }
-
-    fn __role__() -> Role {
-        return Role.USER
-    }
-
-    fn __genConfig__(old: GenerationConfig?) -> GenerationConfig {
-        return old!!
-    }
-
     fn setGenerationConfig(genConfig: GenerationConfig) {
         this.genConfig = genConfig
     }

@@ -34,10 +34,10 @@ public class GenerationServiceTest extends TestCase {
     protected void setUp() {
         kiwiCompiler = new MockCompiler();
         pageCompiler = new MockPageCompiler();
-        appClient = new MockAppClient();
         exchangeClient = new MockExchangeClient();
         genConfigClient = new MockGenerationConfigClient();
         userClient = new MockUserClient(genConfigClient);
+        appClient = new MockAppClient(userClient);
         userId = userClient.register(new RegisterRequest("kiwi", "123456"));
     }
 
@@ -178,7 +178,7 @@ public class GenerationServiceTest extends TestCase {
         };
         var generationService = new GenerationService(new MockAgent(), kiwiCompiler, pageCompiler,
                 exchangeClient,
-                new MockAppClient(),
+                appClient,
                 userClient, "http://{}.metavm.test",
                 "http://localhost:8080",
                 genConfigClient,
