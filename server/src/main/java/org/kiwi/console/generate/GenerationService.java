@@ -366,10 +366,11 @@ public class GenerationService {
             var chat = agent.createChat();
             var existingFiles = pageCompiler.getSourceFiles(task.sysAppId);
             String prompt;
-            if (existingFiles.stream().noneMatch(f -> f.path().toString().equals(APP_TSX)))
-                prompt = buildFrontCreatePrompt(task, apiSource);
+            var existingSource = PatchReader.buildCode(existingFiles);
+            if (existingFiles.stream().noneMatch(f -> f.path().toString().equals(API_TS)))
+                prompt = buildFrontCreatePrompt(task, existingSource, apiSource);
             else
-                prompt = buildFrontUpdatePrompt(task, PatchReader.buildCode(existingFiles), apiSource);
+                prompt = buildFrontUpdatePrompt(task,existingSource , apiSource);
             log.info("Page generation prompt:\n{}", prompt);
             var resp = generateCode(chat, prompt, task);
             var files = new ArrayList<>(resp.addedFiles());
@@ -393,8 +394,8 @@ public class GenerationService {
         return Format.format(task.genConfig.pageUpdatePrompt(), task.exchange.getPrompt(), existingCode, apiSource);
     }
 
-    private String buildFrontCreatePrompt(Task task, String apiSource) {
-        return Format.format(task.genConfig.pageCreatePrompt(), task.exchange.getPrompt(), apiSource);
+    private String buildFrontCreatePrompt(Task task, String existingSource, String apiSource) {
+        return Format.format(task.genConfig.pageCreatePrompt(), task.exchange.getPrompt(), existingSource, apiSource);
     }
 
     private String buildCreatePrompt(String prompt, Task task) {
