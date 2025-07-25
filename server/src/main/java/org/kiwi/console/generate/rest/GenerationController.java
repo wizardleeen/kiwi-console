@@ -100,12 +100,10 @@ public class GenerationController {
 
         @Override
         public void onThought(String thoughtChunk) {
-            System.out.print(thoughtChunk);
         }
 
         @Override
         public void onContent(String contentChunk) {
-            System.out.print(contentChunk);
         }
 
         @SneakyThrows
