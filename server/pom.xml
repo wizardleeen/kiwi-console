@@ -97,7 +97,7 @@
         <dependency>
             <groupId>com.google.genai</groupId>
             <artifactId>google-genai</artifactId>
-            <version>1.5.0</version>
+            <version>1.10.0</version>
         </dependency>
 
         <dependency>
