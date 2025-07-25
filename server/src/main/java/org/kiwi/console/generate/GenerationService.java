@@ -534,6 +534,7 @@ public class GenerationService {
 
         @Override
         public void onThought(String thoughtChunk) {
+            System.out.print(thoughtChunk);
             for (var listener : listeners) {
                 listener.onThought(thoughtChunk);
             }
@@ -541,6 +542,7 @@ public class GenerationService {
 
         @Override
         public void onContent(String contentChunk) {
+            System.out.print(contentChunk);
             for (var listener : listeners) {
                 listener.onContent(contentChunk);
             }
@@ -630,12 +632,10 @@ public class GenerationService {
     public static final GenerationListener printListener = new GenerationListener() {
         @Override
         public void onThought(String thoughtChunk) {
-            System.out.print(thoughtChunk);
         }
 
         @Override
         public void onContent(String contentChunk) {
-            System.out.print(contentChunk);
         }
 
         @Override
