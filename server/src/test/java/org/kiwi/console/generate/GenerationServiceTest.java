@@ -59,7 +59,7 @@ public class GenerationServiceTest extends TestCase {
 //        assertEquals("Test App", app.getName());
 
         assertEquals("class Foo {}\n", kiwiCompiler.getCode(sysAppId, MAIN_KIWI));
-        assertEquals("class Foo {}\n", pageCompiler.getCode(sysAppId, APP_TSX));
+        assertEquals("// Test App\nclass Foo {}\n", pageCompiler.getCode(sysAppId, APP_TSX));
         assertEquals(
         String.format("""
                 Status: SUCCESSFUL
