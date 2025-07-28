@@ -7,6 +7,8 @@ import org.kiwi.console.util.*;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
 @Slf4j
 public class DefaultKiwiCompiler extends AbstractCompiler implements KiwiCompiler {
@@ -32,23 +34,33 @@ public class DefaultKiwiCompiler extends AbstractCompiler implements KiwiCompile
     @SneakyThrows
     public String generateApi(long appId) {
         var wd = WorkDir.from(baseDir, appId);
-        var versionPath = wd.root().resolve(".version");
-        var version = Files.exists(versionPath) ? Integer.parseInt(Files.readString(versionPath)) : 0;
-        var r = version > 0 ?
-            Utils.executeCommand(wd.root(), "kiwi", "gen-api", "--return-full-object"):
-            Utils.executeCommand(wd.root(), "kiwi", "gen-api");
+        var version = getVersion(wd);
+        var command = new ArrayList<>(List.of("kiwi", "gen-api"));
+        if (version > 0)
+            command.add("--return-full-object");
+        var r = Utils.executeCommand(wd.root(), command);
         if (r.exitCode() != 0)
             throw new RuntimeException("Failed to generate API: " + r.output());
         return Files.readString(wd.root().resolve("apigen").resolve("api.ts"));
     }
 
+    @SneakyThrows
     protected BuildResult build(WorkDir workDir) {
-        Utils.CommandResult r;
-        r = Utils.executeCommand(workDir.root(), "kiwi", "build");
+        var version = getVersion(workDir);
+        var command = new ArrayList<>(List.of("kiwi", "build"));
+        if (version > 1)
+            command.add("--sense-lint");
+        var r = Utils.executeCommand(workDir.root(), command);
         if (r.output().isEmpty())
             return new BuildResult(true, null);
         log.info("Build failed: {}", r.output());
         return new BuildResult(false, r.output());
+    }
+
+    @SneakyThrows
+    private long getVersion(WorkDir workDir) {
+        var versionPath = workDir.root().resolve(".version");
+        return Files.exists(versionPath) ? Integer.parseInt(Files.readAllLines(versionPath).getFirst()) : 0;
     }
 
     private void deploy(long appId, WorkDir workDir) {

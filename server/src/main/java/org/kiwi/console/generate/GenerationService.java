@@ -89,11 +89,10 @@ public class GenerationService {
             appId = createApp(NEW_APP_NAME, userId);
             creating = true;
         }
-        var sysAppId = getApp(appId).getSystemAppId();
         var exchange = Exchange.create(appId, userId, prompt, creating, skipPageGeneration);
         var app = appClient.get(appId);
         exchange.setId(exchClient.save(exchange));
-        var task = new Task(exchange, sysAppId, false,
+        var task = new Task(exchange, app, false,
                 generationConfigClient.get(app.getGenConfigId()),
                 listener);
         task.sendProgress();
@@ -112,12 +111,12 @@ public class GenerationService {
 
     private void runTask(Task task) {
         try {
-            var sysAppId = task.sysAppId;
+            var sysAppId = task.app.getSystemAppId();
             kiwiCompiler.reset(sysAppId, task.genConfig.kiwiTemplateRepo());
             pageCompiler.reset(sysAppId, task.genConfig.pageTemplateRepo());
             var plan = executeGen(() -> plan(task));
             if (task.exchange.isFirst() && plan.appName != null) {
-                updateAppName(task.exchange.getAppId(), plan.appName);
+                updateAppName(task.app, plan.appName);
             }
             log.info("{}", plan);
             if (plan.generateKiwi) {
@@ -173,7 +172,7 @@ public class GenerationService {
         ensureNotGenerating(app.getId());
         exchClient.retry(new ExchangeRetryRequest(request.exchangeId()));
         exch = exchClient.get(request.exchangeId());  // Reload
-        var task = new Task(exch, app.getSystemAppId(), false,
+        var task = new Task(exch, app, false,
                 generationConfigClient.get(app.getGenConfigId()),
                 listener);
         task.sendProgress();
@@ -204,8 +203,8 @@ public class GenerationService {
         var exch = task.exchange;
         if (exch.isSkipPageGeneration())
             return task.isStageSuccessful(StageType.BACKEND) ? Plan.none : Plan.kiwiOnly;
-        var kiwiCode = PatchReader.buildCode(kiwiCompiler.getSourceFiles(task.sysAppId));
-        var pageCode = PatchReader.buildCode(pageCompiler.getSourceFiles(task.sysAppId));
+        var kiwiCode = PatchReader.buildCode(kiwiCompiler.getSourceFiles(task.app.getSystemAppId()));
+        var pageCode = PatchReader.buildCode(pageCompiler.getSourceFiles(task.app.getSystemAppId()));
         var chat = agent.createChat();
         var planPrompt = createPlanPrompt(exch, kiwiCode, pageCode, task);
         log.info("Plan prompt:\n{}", planPrompt);
@@ -261,7 +260,7 @@ public class GenerationService {
     }
 
     private void generateKiwi(Task task) {
-        var sysAppId = task.sysAppId;
+        var sysAppId = task.app.getSystemAppId();
         var userPrompt = task.exchange.getPrompt();
         var stageIdx = task.enterStageAndAttempt(StageType.BACKEND);
         try {
@@ -326,8 +325,9 @@ public class GenerationService {
         return appClient.save(App.create(name, userId));
     }
 
-    public void updateAppName(String appId, String name) {
-        appClient.updateName(new UpdateNameRequest(appId, name));
+    public void updateAppName(App app, String name) {
+        appClient.updateName(new UpdateNameRequest(app.getId(), name));
+        app.setName(name);
     }
 
     public App getApp(String id) {
@@ -364,25 +364,25 @@ public class GenerationService {
         var stageIdx = task.enterStageAndAttempt(StageType.FRONTEND);
         try {
             var chat = agent.createChat();
-            var existingFiles = pageCompiler.getSourceFiles(task.sysAppId);
+            var existingFiles = pageCompiler.getSourceFiles(task.app.getSystemAppId());
             String prompt;
             var existingSource = PatchReader.buildCode(existingFiles);
             if (existingFiles.stream().noneMatch(f -> f.path().toString().equals(API_TS)))
-                prompt = buildFrontCreatePrompt(task, existingSource, apiSource);
+                prompt = buildPageCreatePrompt(task, existingSource, apiSource);
             else
-                prompt = buildFrontUpdatePrompt(task,existingSource , apiSource);
+                prompt = buildPageUpdatePrompt(task,existingSource , apiSource);
             log.info("Page generation prompt:\n{}", prompt);
             var resp = generateCode(chat, prompt, task);
             var files = new ArrayList<>(resp.addedFiles());
             files.add(new SourceFile(Path.of(API_TS), apiSource));
-            var r = runCompiler(pageCompiler, task.sysAppId, files, resp.removedFiles());
+            var r = runCompiler(pageCompiler, task.app.getSystemAppId(), files, resp.removedFiles());
             if (!r.successful()) {
                 task.finishAttempt(false, r.output());
-                fix(task.sysAppId, r.output(), task, chat, pageCompiler, task.genConfig.pageFixPrompt());
+                fix(task.app.getSystemAppId(), r.output(), task, chat, pageCompiler, task.genConfig.pageFixPrompt());
             } else
                 task.finishAttempt(true, null);
             log.info("Pages generated successfully");
-            pageCompiler.commit(task.sysAppId, generatePagesCommitMsg(task));
+            pageCompiler.commit(task.app.getSystemAppId(), generatePagesCommitMsg(task));
             log.info("Page source code committed");
         } catch (Exception e) {
             task.failStage(stageIdx, e.getMessage());
@@ -390,12 +390,12 @@ public class GenerationService {
         }
     }
 
-    private String buildFrontUpdatePrompt(Task task, String existingCode, String apiSource) {
+    private String buildPageUpdatePrompt(Task task, String existingCode, String apiSource) {
         return Format.format(task.genConfig.pageUpdatePrompt(), task.exchange.getPrompt(), existingCode, apiSource);
     }
 
-    private String buildFrontCreatePrompt(Task task, String existingSource, String apiSource) {
-        return Format.format(task.genConfig.pageCreatePrompt(), task.exchange.getPrompt(), existingSource, apiSource);
+    private String buildPageCreatePrompt(Task task, String existingSource, String apiSource) {
+        return Format.format(task.genConfig.pageCreatePrompt(), task.app.getName(), task.exchange.getPrompt(), existingSource, apiSource);
     }
 
     private String buildCreatePrompt(String prompt, Task task) {
@@ -409,15 +409,15 @@ public class GenerationService {
     private class Task implements ChatStreamListener {
         private final List<GenerationListener> listeners = new CopyOnWriteArrayList<>();
         private Exchange exchange;
-        private final long sysAppId;
+        private final App app;
         private boolean cancelled;
         private final GenerationConfig genConfig;
         private final boolean showAttempts;
 
-        public Task(Exchange exchange, long sysAppId, boolean showAttempts, GenerationConfig genConfig, @Nonnull GenerationListener listener) {
+        public Task(Exchange exchange, App app, boolean showAttempts, GenerationConfig genConfig, @Nonnull GenerationListener listener) {
             this.genConfig = genConfig;
             listeners.add(listener);
-            this.sysAppId = sysAppId;
+            this.app = app;
             this.exchange = exchange;
             this.showAttempts = showAttempts;
             runningTasks.put(exchange.getId(), this);

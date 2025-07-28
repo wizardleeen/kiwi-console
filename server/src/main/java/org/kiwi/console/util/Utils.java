@@ -35,10 +35,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.regex.Pattern;
@@ -163,9 +160,13 @@ public class Utils {
     }
 
     public static CommandResult executeCommand(Path directory, String... command) {
+        return executeCommand(directory, Arrays.asList(command));
+    }
+
+    public static CommandResult executeCommand(Path directory, List<String> commands) {
         log.info("Executing command {} in working dir {}",
-                String.join(" ", command), directory.toString());
-        ProcessBuilder processBuilder = new ProcessBuilder(command);
+                String.join(" ", commands), directory.toString());
+        ProcessBuilder processBuilder = new ProcessBuilder(commands);
 
         // Set the working directory for the command
         processBuilder.directory(directory.toFile());

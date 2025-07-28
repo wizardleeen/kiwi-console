@@ -92,6 +92,13 @@ class OrderService {
         return order
     }
 
+    fn getCustomerOrders(customer: Customer) -> Order[] {
+        val orders = Order.customerIdx.getAll(customer)
+        // Recent orders come first
+        orders.sort((o1, o2) -> o1.createdAt < o2.createdAt ? 1 : o1.createdAt == o2.createdAt ? 0 : -1)
+        return orders
+    }
+
     @Label("确认订单")
     fn confirmOrder(@Label("订单") order: Order) {
         order.confirm()

@@ -3,6 +3,10 @@ spring:
     allow-circular-references: true
   jackson:
     default-property-inclusion: non_null
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
 
 server:
   compression:
