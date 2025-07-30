@@ -13,11 +13,12 @@ Initiates an AI generation process. This endpoint establishes a long-lived conne
 *   `POST /generate`
 *   **Request Body:**
 
-| Field                | Type      | Description                                                                                |
-|:---------------------|:----------|:-------------------------------------------------------------------------------------------|
-| `appId`              | `string`  | (Optional) ID of the application to modify. If omitted, a new application will be created. |
-| `prompt`             | `string`  | A prompt describing the program to create or the changes to make.                          |
-| `skipPageGeneration` | `boolean` | When `true`, the AI will not generate a web page for the application.                      |
+| Field                | Type       | Description                                                                                             |
+|:---------------------|:-----------|:--------------------------------------------------------------------------------------------------------|
+| `appId`              | `string`   | (Optional) ID of the application to modify. If omitted, a new application will be created.              |
+| `prompt`             | `string`   | A prompt describing the program to create or the changes to make.                                       |
+| `attachmentUrls`     | `string[]` | (Optional) A list of URLs for attachments (e.g., screenshots) to provide context to the AI.            |
+| `skipPageGeneration` | `boolean`  | When `true`, the AI will not generate a web page for the application.                                   |
 
 *   **SSE Event Stream:**
     The stream sends events named generation. The data payload for each event is a JSON-serialized Exchange object, reflecting the current state of the process.
@@ -30,7 +31,8 @@ Initiates an AI generation process. This endpoint establishes a long-lived conne
     Authorization: Bearer {token}
     
     {
-        "prompt": "Create a simple application with a user login page"
+        "prompt": "Create a simple application with a user login page",
+        "attachmentUrls": [ "/uploads/uuid1-screenshot1.png" ]
     }
     ```
     * **Response (SSE Stream):** The server will send a series of events. Below is an example of the data payload for each event in a successful generation flow. Since this is a new application, `first` is `true`.
@@ -139,26 +141,62 @@ Initiates an AI generation process. This endpoint establishes a long-lived conne
     ```
     > **Note on Failures:** If an attempt fails, its status will change to `FAILED` and an `errorMessage` will be provided. The AI may create a new attempt to retry the stage. If the entire process cannot be completed, the final event will have `status: "FAILED"`.
 
-### 2. Reconnect
+### 2. Upload Attachments
+
+Uploads one or more files to be used as attachments in a generation request. Returns a list of URLs for the uploaded files.
+
+*   `POST /generate/attachments`
+*   **Supported File Types:** JPEG, PNG, GIF, PDF, MP4, TXT, HTML, JSON.
+*   **Request:** `multipart/form-data`. The form field for the files must be named `files`.
+*   **Response Body:** `MultiUploadResult`
+*   **Example:**
+    *   **Request:**
+    ```http
+    POST /generate/attachments
+    Authorization: Bearer {token}
+    Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+    ------WebKitFormBoundary7MA4YWxkTrZu0gW
+    Content-Disposition: form-data; name="files"; filename="screenshot1.png"
+    Content-Type: image/png
+
+    (binary data)
+    ------WebKitFormBoundary7MA4YWxkTrZu0gW
+    Content-Disposition: form-data; name="files"; filename="screenshot2.png"
+    Content-Type: image/png
+
+    (binary data)
+    ------WebKitFormBoundary7MA4YWxkTrZu0gW--
+    ```
+    * **Response:**
+    ```json
+    {
+      "urls": [
+        "/uploads/uuid1-screenshot1.png",
+        "/uploads/uuid2-screenshot2.png"
+      ]
+    }
+    ```
+
+### 3. Reconnect
 
 Reconnects to an existing SSE stream for an in-progress generation `Exchange`. This is useful if the client disconnects for any reason.
 
 *  `GET /generate/reconnect?exchange-id={exchange-id}`
 *  **Response:** SSE stream. See #[Generate](#1-generate) for details on the event stream.
 
-### 3. History
+### 4. History
 
-Retrieves a paginated list of past `Exchange` interactions for a specific application. 
+Retrieves a paginated list of past `Exchange` interactions for a specific application.
 
 *   `POST /generate/history`
 *   **Request Body:**
 
-| Parameter  | Type     | Required | Description                                                            |
-|:-----------|:---------|:---------|:-----------------------------------------------------------------------|
-| `appId`    | `string` | Yes      | The ID of the application to search within.                            |
-| `prompt`   | `string` | No       | Filter exchanges by text contained in the prompt.                      |
-| `page`     | `int`    | No       | Page number for pagination. Defaults to `1`.                           |
-| `pageSize` | `int`    | No       | Number of items per page. Defaults to `20`.                            |
+| Parameter  | Type     | Required | Description                                  |
+|:-----------|:---------|:---------|:---------------------------------------------|
+| `appId`    | `string` | Yes      | The ID of the application to search within.  |
+| `page`     | `int`    | No       | Page number for pagination. Defaults to `1`. |
+| `pageSize` | `int`    | No       | Number of items per page. Defaults to `20`.  |
 
 *   **Response Body:** `SearchResult<Exchange>`.
 *   **Example:**
@@ -198,9 +236,9 @@ Retrieves a paginated list of past `Exchange` interactions for a specific applic
     }
     ```
 
-### 4. Cancel Generation
+### 5. Cancel Generation
 
-Cancels an in-progress generation `Exchange`. 
+Cancels an in-progress generation `Exchange`.
 
 *   `POST /generate/cancel`
 *   **Request Body:**
@@ -222,9 +260,9 @@ Cancels an in-progress generation `Exchange`.
     }
     ```
 
-### 5. Retry Generation
+### 6. Retry Generation
 
-Retries a failed `Exchange`. 
+Retries a failed `Exchange`.
 
 *   `POST /generate/retry`
 *   **Request Body:**
@@ -246,7 +284,7 @@ Retries a failed `Exchange`.
     }
     ```
 
-### 6. Revert Generation
+### 7. Revert Generation
 
 Revert an `Exchange`. The exchange **must** be the last one for the application and it **must not** be running.
 
@@ -278,6 +316,13 @@ Represents an error response from the API.
 |:-----------|:---------|:----------------|
 | `code`     | `int`    | Error code      |
 | `message`  | `string` | Error message   |
+
+### `MultiUploadResult`
+Represents the result of a file upload operation.
+
+| Field   | Type      | Description                          |
+|:--------|:----------|:-------------------------------------|
+| `urls`  | `string[]`| A list of URLs for the uploaded files|
 
 ### `SearchResult<T>`
 Represents a paginated list of items.

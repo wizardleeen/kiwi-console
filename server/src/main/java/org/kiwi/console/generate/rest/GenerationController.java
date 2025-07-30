@@ -3,6 +3,7 @@ package org.kiwi.console.generate.rest;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.kiwi.console.generate.GenerationService;
+import org.kiwi.console.generate.AttachmentServiceImpl;
 import org.kiwi.console.generate.event.GenerationListener;
 import org.kiwi.console.kiwi.*;
 import org.kiwi.console.util.BusinessException;
@@ -11,7 +12,10 @@ import org.kiwi.console.util.SearchResult;
 import org.kiwi.console.util.Utils;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+import java.util.ArrayList;
 
 @RestController
 @RequestMapping("/generate")
@@ -22,12 +26,14 @@ public class GenerationController {
     private final AppClient appClient;
     private final ExchangeClient exchangeClient;
     private final UserClient userClient;
+    private final AttachmentServiceImpl screenshotService;
 
-    public GenerationController(GenerationService generationService, AppClient appClient, ExchangeClient exchangeClient, UserClient userClient) {
+    public GenerationController(GenerationService generationService, AppClient appClient, ExchangeClient exchangeClient, UserClient userClient, AttachmentServiceImpl screenshotService) {
         this.generationService = generationService;
         this.appClient = appClient;
         this.exchangeClient = exchangeClient;
         this.userClient = userClient;
+        this.screenshotService = screenshotService;
     }
 
     @PostMapping
@@ -35,8 +41,18 @@ public class GenerationController {
         if (request.appId() != null)
             ensureApplicationAuthorized(userId, request.appId());
         var sseEmitter = new SseEmitter(Long.MAX_VALUE);
-        generationService.generate(request.appId(), request.prompt(), userId, request.skipPageGeneration(), new Emitter(sseEmitter));
+        generationService.generate(request, userId, new Emitter(sseEmitter));
         return sseEmitter;
+    }
+
+    @SneakyThrows
+    @PostMapping("/attachments")
+    public MultiUploadResult uploadAttachments(@RequestParam("files") MultipartFile[] files) {
+        var urls = new ArrayList<String>();
+        for (MultipartFile file : files) {
+            urls.add(screenshotService.upload(file.getOriginalFilename(), file.getInputStream()));
+        }
+        return new MultiUploadResult(urls);
     }
 
     @GetMapping("/reconnect")

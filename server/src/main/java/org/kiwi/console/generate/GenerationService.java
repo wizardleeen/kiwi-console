@@ -8,6 +8,7 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.kiwi.console.generate.event.GenerationListener;
 import org.kiwi.console.generate.rest.CancelRequest;
+import org.kiwi.console.generate.rest.GenerationRequest;
 import org.kiwi.console.generate.rest.RetryRequest;
 import org.kiwi.console.kiwi.*;
 import org.kiwi.console.patch.PatchReader;
@@ -29,6 +30,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Supplier;
@@ -39,6 +42,16 @@ import static org.kiwi.console.util.Constants.*;
 public class GenerationService {
 
     public static final String NEW_APP_NAME = "New Application";
+    private static final Set<String> allowedMimeTypes = Set.of(
+            "application/pdf",
+            "application/json",
+            "image/png",
+            "image/jpeg",
+            "image/gif",
+            "text/plain",
+            "text/html",
+            "video/mp4"
+    );
 
     private final Agent agent;
     private final KiwiCompiler kiwiCompiler;
@@ -49,6 +62,7 @@ public class GenerationService {
     private final ExchangeClient exchClient;
     private final GenerationConfigClient generationConfigClient;
     private final UserClient userClient;
+    private final AttachmentService attachmentService;
     private final Map<String, Task> runningTasks = new ConcurrentHashMap<>();
     private final TaskExecutor taskExecutor;
 
@@ -60,7 +74,7 @@ public class GenerationService {
             AppClient appClient,
             UserClient userClient, String productUrlTempl,
             String mgmtUrlTempl,
-            GenerationConfigClient generationConfigClient,
+            GenerationConfigClient generationConfigClient, AttachmentService attachmentService,
             TaskExecutor taskExecutor
     ) {
         this.agent = agent;
@@ -72,23 +86,24 @@ public class GenerationService {
         this.exchClient = exchClient;
         this.userClient = userClient;
         this.generationConfigClient = generationConfigClient;
+        this.attachmentService = attachmentService;
         this.taskExecutor = taskExecutor;
     }
 
-    public String generate(String appId,
-                         String prompt,
-                         String userId,
-                         boolean skipPageGeneration,
-                         GenerationListener listener) {
+    public String generate(GenerationRequest request, String userId, GenerationListener listener) {
         boolean creating;
-        if (appId != null) {
+        String appId;
+        if (request.appId() != null) {
+            appId = request.appId();
             creating = false;
-            ensureNotGenerating(appId);
+            ensureNotGenerating(request.appId());
         } else {
-            appId = createApp(NEW_APP_NAME, userId);
+             appId = createApp(NEW_APP_NAME, userId);
             creating = true;
         }
-        var exchange = Exchange.create(appId, userId, prompt, creating, skipPageGeneration);
+        List<String> attachmentUrls = Objects.requireNonNullElse(request.attachmentUrls(), List.of());
+        attachmentUrls.forEach(this::checkAttachmentUrl);
+        var exchange = Exchange.create(appId, userId, request.prompt(), attachmentUrls, creating, request.skipPageGeneration());
         var app = appClient.get(appId);
         exchange.setId(exchClient.save(exchange));
         var task = new Task(exchange, app, false,
@@ -97,6 +112,14 @@ public class GenerationService {
         task.sendProgress();
         taskExecutor.execute(() -> runTask(task));
         return appId;
+    }
+
+    private void checkAttachmentUrl(String url) {
+        if (!attachmentService.exists(url))
+            throw new BusinessException(ErrorCode.ATTACHMENT_NOT_FOUND, "Attachment not found: " + url);
+        var mimeType = attachmentService.getMimeType(url);
+        if (!allowedMimeTypes.contains(mimeType))
+            throw new BusinessException(ErrorCode.INVALID_ATTACHMENT_TYPE, "Invalid attachment type: " + mimeType);
     }
 
     void discardTask(String exchangeId) {
@@ -219,7 +242,12 @@ public class GenerationService {
         log.info("Plan prompt:\n{}", planPrompt);
         var text = generateContent(chat, planPrompt, task);
         var reader = new BufferedReader(new StringReader(text));
-        var r = Integer.parseInt(reader.readLine());
+        int r;
+        try {
+            r = Integer.parseInt(reader.readLine());
+        } catch (NumberFormatException e) {
+            throw new AgentException("Invalid plan result: " + text);
+        }
         return switch (r) {
             case 0 -> Plan.none;
             case 1 -> task.isBackendSuccessful() ?
@@ -317,7 +345,8 @@ public class GenerationService {
 
     private String generateContent(Chat chat, String prompt, Task task) {
         var buf = new StringBuilder();
-        chat.send(prompt, new ChatStreamListener() {
+        var attachments = Utils.map(task.exchange.getAttachmentUrls(), attachmentService::read);
+        chat.send(prompt, attachments, new ChatStreamListener() {
             @Override
             public void onThought(String thoughtChunk) {
                 task.onThought(thoughtChunk);
@@ -401,7 +430,8 @@ public class GenerationService {
     }
 
     private String buildPageUpdatePrompt(Task task, String existingCode, String apiSource) {
-        return Format.format(task.genConfig.pageUpdatePrompt(), task.exchange.getPrompt(), existingCode, apiSource);
+        var exch = task.exchange;
+        return Format.format(task.genConfig.pageUpdatePrompt(), exch.getPrompt(), existingCode, apiSource);
     }
 
     private String buildPageCreatePrompt(Task task, String existingSource, String apiSource) {
@@ -502,7 +532,7 @@ public class GenerationService {
                     exchClient.sendHeartBeat(new ExchangeHeartBeatRequest(exchange.getId()));
                     reloadExchange();
                 } catch (Exception e) {
-                    log.warn("Failed to send heartbeat for exchange {}: {}", exchange.getId(), e.getMessage());
+                    log.warn("Failed to send heartbeat for exchange {}", exchange.getId(), e);
                 }
             }
         }
@@ -595,6 +625,7 @@ public class GenerationService {
                 Utils.createKiwiFeignClient(host, UserClient.class, CHAT_APP_ID), "http://{}.metavm.test",
                 "http://localhost:5173/app/{}",
                 Utils.createKiwiFeignClient(host, GenerationConfigClient.class, CHAT_APP_ID),
+                new MockAttachmentService(),
                 new SyncTaskExecutor());
 //        System.out.println(kiwiCompiler.generateApi(TEST_APP_ID));
         testNewApp(service);
@@ -618,10 +649,8 @@ public class GenerationService {
     @SneakyThrows
     private static void testNewApp(GenerationService service) {
         service.generate(
-                null,
-                "Create a stock trading system",
+                GenerationRequest.create(null, "Create a stock trading system"),
                 USER_ID,
-                false,
                 printListener
         );
     }
@@ -629,12 +658,8 @@ public class GenerationService {
     @SuppressWarnings("unused")
     private static void testUpdateApp(GenerationService service) {
         service.generate(
-                APP_ID,
-                """
-                       Remove the workstation feature
-                        """,
+                GenerationRequest.create(APP_ID, "Remove the workstation feature"),
                 USER_ID,
-                false,
                 printListener
         );
     }

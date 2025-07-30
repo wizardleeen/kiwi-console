@@ -1,12 +1,17 @@
 package org.kiwi.console.generate;
 
 import com.google.genai.Client;
+import com.google.genai.types.Content;
 import com.google.genai.types.GenerateContentConfig;
 import com.google.genai.types.Part;
 import com.google.genai.types.ThinkingConfig;
 import lombok.extern.slf4j.Slf4j;
+import org.kiwi.console.file.File;
 import org.kiwi.console.util.BusinessException;
 import org.kiwi.console.util.ErrorCode;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class GeminiAgent implements Agent {
 
@@ -46,8 +51,13 @@ public class GeminiAgent implements Agent {
         }
 
         @Override
-        public void send(String text, ChatStreamListener listener, ChatController ctrl) {
-            try (var stream = chat.sendMessageStream(text)) {
+        public void send(String text, List<File> attachments, ChatStreamListener listener, ChatController ctrl) {
+            var contents = new ArrayList<Content>();
+            contents.add(Content.fromParts(Part.fromText(text)));
+            for (File file : attachments) {
+                contents.add(Content.fromParts(Part.fromBytes(file.bytes(), file.mimeType())));
+            }
+            try (var stream = chat.sendMessageStream(contents)) {
                 for (var resp : stream) {
                     if (ctrl.isAborted())
                         throw new BusinessException(ErrorCode.TASK_CANCELLED);

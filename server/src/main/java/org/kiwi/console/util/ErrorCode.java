@@ -21,9 +21,17 @@ public enum ErrorCode {
 
     REQUIREMENT_REJECTED(4004, "{}"),
 
-    GENERATION_ALREADY_RUNNING(4005, "Generation already running for this application")
+    GENERATION_ALREADY_RUNNING(4005, "Generation already running for this application"),
+
+    ATTACHMENT_NOT_FOUND(4006, "Attachment not found: {}"),
+
+
+    INVALID_ATTACHMENT_TYPE(4007, "Invalid attachment type: {}"),
 
     ;
+
+
+
     private final int code;
     private final String message;
 

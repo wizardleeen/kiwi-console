@@ -2,7 +2,7 @@ package org.kiwi.console.util;
 
 import org.kiwi.console.generate.*;
 import org.kiwi.console.kiwi.*;
-import org.kiwi.console.upload.UploadService;
+import org.kiwi.console.file.FileService;
 import org.springframework.beans.factory.annotation.Configurable;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.web.server.ConfigurableWebServerFactory;
@@ -104,6 +104,7 @@ public class ConsoleConfig {
                                                UserClient userClient,
                                                ExchangeClient exchangeClient,
                                                GenerationConfigClient generationConfigClient,
+                                               AttachmentService attachmentService,
                                                @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor) {
         return new GenerationService(
                 geminiAgent,
@@ -115,12 +116,13 @@ public class ConsoleConfig {
                 urlTemplates.product,
                 urlTemplates.management,
                 generationConfigClient,
+                attachmentService,
                 taskExecutor);
     }
 
     @Bean
-    public UploadService uploadService() {
-        return new UploadService(Path.of(uploadConfig.dir));
+    public FileService uploadService() {
+        return new FileService(Path.of(uploadConfig.dir));
     }
 
     @Bean
@@ -146,6 +148,11 @@ public class ConsoleConfig {
     @Bean
     public ExchangeClient exchangeClient() {
         return Utils.createKiwiFeignClient(kiwiConfig.host, ExchangeClient.class, kiwiConfig.chatAppId);
+    }
+
+    @Bean
+    public AttachmentService generationUploadService(FileService fileService) {
+        return new AttachmentServiceImpl(kiwiConfig.chatAppId, fileService);
     }
 
     @Bean
