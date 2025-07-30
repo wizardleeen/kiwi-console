@@ -66,8 +66,10 @@ public class PatchReader {
 
     private Header parseHeader(String line) {
         line = line.trim();
-        if (line.length() <= 4 || !line.startsWith("@@") || !line.endsWith("@@"))
+        if (line.length() <= 4 || !line.startsWith("@@"))
             throw new MalformedHunkException(line, 0);
+        if (!line.endsWith("@@"))
+            throw new MalformedHunkException(line, 0, "Missing ending '@@'");
         var text = line.substring(2, line.length() - 2).trim();
         if(text.startsWith("--"))
             return new Header(Path.of(text.substring(2).trim()), true);
