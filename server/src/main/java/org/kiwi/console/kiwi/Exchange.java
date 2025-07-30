@@ -98,4 +98,17 @@ public class Exchange {
                 lastHeartBeatAt
         );
     }
+
+    public boolean isStageSuccessful(StageType stageType) {
+        for (Stage stage : stages) {
+            if (stage.getType() == stageType && stage.getStatus() == StageStatus.SUCCESSFUL)
+                return true;
+        }
+        return false;
+    }
+
+    public boolean hasSuccessfulStages() {
+        return stages.stream().anyMatch(s -> s.getStatus() == StageStatus.SUCCESSFUL);
+    }
+
 }

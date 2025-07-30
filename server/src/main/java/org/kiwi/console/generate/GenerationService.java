@@ -27,7 +27,6 @@ import java.io.StringReader;
 import java.net.http.HttpClient;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -170,13 +169,23 @@ public class GenerationService {
         var exch = exchClient.get(request.exchangeId());
         var app = appClient.get(exch.getAppId());
         ensureNotGenerating(app.getId());
-        exchClient.retry(new ExchangeRetryRequest(request.exchangeId()));
+        exchClient.retry(new ExchangeIdRequest(request.exchangeId()));
         exch = exchClient.get(request.exchangeId());  // Reload
         var task = new Task(exch, app, false,
                 generationConfigClient.get(app.getGenConfigId()),
                 listener);
         task.sendProgress();
         taskExecutor.execute(() -> runTask(task));
+    }
+
+    public void revert(String exchangeId) {
+        exchClient.revert(new ExchangeIdRequest(exchangeId));
+        var exch = exchClient.get(exchangeId);
+        var app = appClient.get(exch.getAppId());
+        if (exch.isStageSuccessful(StageType.BACKEND))
+            kiwiCompiler.revert(app.getSystemAppId());
+        if (exch.isStageSuccessful(StageType.FRONTEND))
+            pageCompiler.revert(app.getSystemAppId());
     }
 
     private record Plan(boolean generateKiwi, boolean generatePage, @Nullable String appName) {
@@ -272,13 +281,12 @@ public class GenerationService {
             else
                 prompt = buildCreatePrompt(userPrompt, task);
             log.info("Kiwi generation prompt: \n{}", prompt);
-            var resp = generateCode(chat, prompt, task);
+            var r = generateCode(chat, prompt, task, kiwiCompiler);
 //        if (existingFiles == null) {
 //            var appName = extractAppName(resp);
 //            if (appName != null)
 //                updateAppName(task.exchange.getAppId(), appName);
 //        }
-            var r = runCompiler(kiwiCompiler, sysAppId, resp.addedFiles(), resp.removedFiles());
             if (!r.successful()) {
                 task.finishAttempt(false, r.output());
                 fix(sysAppId, r.output(), task, chat, kiwiCompiler, task.genConfig.kiwiFixPrompt());
@@ -298,8 +306,13 @@ public class GenerationService {
         return compiler.run(appId, files, removedFiles);
     }
 
-    private org.kiwi.console.patch.Patch generateCode(Chat chat, String prompt, Task task) {
-        return new PatchReader(generateContent(chat, prompt, task)).read();
+    private DeployResult generateCode(Chat chat, String prompt, Task task, Compiler compiler) {
+        try {
+            var patch = new PatchReader(generateContent(chat, prompt, task)).read();
+            return runCompiler(compiler, task.app.getSystemAppId(), patch.addedFiles(), patch.removedFiles());
+        } catch (MalformedHunkException e) {
+            return new DeployResult(false, e.getMessage());
+        }
     }
 
     private String generateContent(Chat chat, String prompt, Task task) {
@@ -347,9 +360,7 @@ public class GenerationService {
             task.startAttempt();
             var fixPrompt = Format.format(promptTemplate, error);
             log.info("Fix prompt:\n{}", fixPrompt);
-            var resp = generateCode(chat, fixPrompt, task);
-            log.info("Generated code (Retry #{}):\n{}", i + 1, resp);
-            var r = runCompiler(compiler, sysAppId, resp.addedFiles(), resp.removedFiles());
+            var r = generateCode(chat, fixPrompt, task, compiler);
             if (r.successful()) {
                 task.finishAttempt(true, null);
                 return;
@@ -363,8 +374,9 @@ public class GenerationService {
     private void generatePages(String apiSource, Task task) {
         var stageIdx = task.enterStageAndAttempt(StageType.FRONTEND);
         try {
+            var appId = task.app.getSystemAppId();
             var chat = agent.createChat();
-            var existingFiles = pageCompiler.getSourceFiles(task.app.getSystemAppId());
+            var existingFiles = pageCompiler.getSourceFiles(appId);
             String prompt;
             var existingSource = PatchReader.buildCode(existingFiles);
             if (existingFiles.stream().noneMatch(f -> f.path().toString().equals(API_TS)))
@@ -372,17 +384,15 @@ public class GenerationService {
             else
                 prompt = buildPageUpdatePrompt(task,existingSource , apiSource);
             log.info("Page generation prompt:\n{}", prompt);
-            var resp = generateCode(chat, prompt, task);
-            var files = new ArrayList<>(resp.addedFiles());
-            files.add(new SourceFile(Path.of(API_TS), apiSource));
-            var r = runCompiler(pageCompiler, task.app.getSystemAppId(), files, resp.removedFiles());
+            pageCompiler.addFile(appId, new SourceFile(Path.of(API_TS), apiSource));
+            var r = generateCode(chat, prompt, task, pageCompiler);
             if (!r.successful()) {
                 task.finishAttempt(false, r.output());
-                fix(task.app.getSystemAppId(), r.output(), task, chat, pageCompiler, task.genConfig.pageFixPrompt());
+                fix(appId, r.output(), task, chat, pageCompiler, task.genConfig.pageFixPrompt());
             } else
                 task.finishAttempt(true, null);
             log.info("Pages generated successfully");
-            pageCompiler.commit(task.app.getSystemAppId(), generatePagesCommitMsg(task));
+            pageCompiler.commit(appId, generatePagesCommitMsg(task));
             log.info("Page source code committed");
         } catch (Exception e) {
             task.failStage(stageIdx, e.getMessage());

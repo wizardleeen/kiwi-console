@@ -4,4 +4,7 @@ import java.io.InputStream;
 
 public interface DeployService {
     void deploy(long appId, InputStream input);
+
+    void revert(long appId);
+
 }

@@ -33,6 +33,11 @@ public abstract class AbstractCompiler implements Compiler {
             return new DeployResult(false, r.message());
     }
 
+    @Override
+    public void addFile(long appId, SourceFile file) {
+        writeSourceFile(getWorkDir(appId), file);
+    }
+
     @SneakyThrows
     private void writeSourceFile(WorkDir workDir, SourceFile sourceFile) {
         workDir.writeSource(sourceFile.path(), sourceFile.content());
@@ -51,6 +56,11 @@ public abstract class AbstractCompiler implements Compiler {
         var workDir = getWorkDir(appId);
         Utils.executeCommand(workDir.root(), "git", "add", ".");
         Utils.executeCommand(workDir.root(), "git", "commit", "-m", "\"" + message + "\"");
+    }
+
+    public void revert(long appId) {
+        var workDir = getWorkDir(appId);
+        Utils.executeCommand(workDir.root(), "git", "revert", "HEAD");
     }
 
     @Override

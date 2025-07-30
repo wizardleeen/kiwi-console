@@ -253,6 +253,25 @@ public class GenerationServiceTest extends TestCase {
         assertSame(ExchangeStatus.CANCELLED, exchangeClient.get(exch.getId()).getStatus());
     }
 
+    public void testRevert() {
+        var generationService = new GenerationService(new MockAgent(), kiwiCompiler, pageCompiler,
+                exchangeClient,
+                appClient,
+                userClient, "http://{}.metavm.test",
+                "http://localhost:8080",
+                genConfigClient,
+                new SyncTaskExecutor());
+        var appId = generationService.generate(null, "class Foo{}", userId, false, discardListener);
+        var exch = exchangeClient.getFirst();
+        var app = appClient.get(appId);
+        assertSame(ExchangeStatus.SUCCESSFUL, exch.getStatus());
+        generationService.revert(exch.getId());
+        var exch1 = exchangeClient.getFirst();
+        assertSame(ExchangeStatus.REVERTED, exch1.getStatus());
+        assertEquals(0, kiwiCompiler.getSourceFiles(app.getSystemAppId()).size());
+        assertEquals(1, pageCompiler.getSourceFiles(app.getSystemAppId()).size());
+    }
+
     private final GenerationListener discardListener = new GenerationListener() {
         @Override
         public void onThought(String thoughtChunk) {

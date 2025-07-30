@@ -1,28 +1,21 @@
 package domain
 
-@Label("商品")
 class Product(
     @Summary
-    @Label("名称")
     var name: string,
-    @Label("价格")
     var price: Money,
-    @Label("库存")
     var stock: int,
-    @Label("类目")
     var category: Category
 ) {
 
     static val nameIdx = Index<string, Product>(true, p -> p.name)
 
-    @Label("扣减库存")
-    fn reduceStock(@Label("数量") quantity: int) {
+    fn reduceStock(quantity: int) {
         require(stock >= quantity, "库存不足")
         stock -= quantity
     }
 
-    @Label("补充库存")
-    fn restock(@Label("数量") quantity: int) {
+    fn restock(quantity: int) {
         require(quantity > 0, "补充数量必须大于0")
         stock += quantity
     }

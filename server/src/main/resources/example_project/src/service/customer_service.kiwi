@@ -4,18 +4,15 @@ import domain.Customer
 import value.LoginResponse
 
 @Bean
-@Label("客户服务")
 class CustomerService {
 
-    @Label("登录")
-    fn login(@Label("邮箱") email: string, @Label("密码") password: string) -> LoginResponse {
+        fn login(email: string, password: string) -> LoginResponse {
         val customer = Customer.emailIdx.getFirst(email)
         return customer != null && customer!!.checkPassword(password) ?
                 LoginResponse(true, customer) : LoginResponse(false, null)
     }
 
-    @Label("注册")
-    fn register(@Label("用户名") name: string, @Label("邮箱") email: string, @Label("密码") password: string) -> Customer {
+        fn register(name: string, email: string, password: string) -> Customer {
         return Customer(name, email, password)
     }
 

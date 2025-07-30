@@ -1,33 +1,26 @@
 package domain
 
-@Label("金额")
 value class Money(
-    @Label("数额")
-    val amount: double,
-    @Label("币种")
-    val currency: Currency
+        val amount: double,
+        val currency: Currency
 ) {
 
     @Summary
     priv val summary = amount + " " + currency.label()
 
-    @Label("加")
-    fn add(@Label("待加金额") that: Money) -> Money {
+        fn add(that: Money) -> Money {
         return Money(amount + that.getAmount(currency), currency)
     }
 
-    @Label("减")
-    fn sub(@Label("待减金额") that: Money) -> Money {
+        fn sub(that: Money) -> Money {
         return Money(amount - that.getAmount(currency), currency)
     }
 
-    @Label("汇率转化")
-    fn getAmount(@Label("目标币种") currency: Currency) -> double {
+        fn getAmount(currency: Currency) -> double {
         return currency.rate / this.currency.rate * amount
     }
 
-    @Label("乘")
-    fn times(@Label("倍数") n: int) -> Money {
+        fn times(n: int) -> Money {
         return Money(amount * n, currency)
     }
 

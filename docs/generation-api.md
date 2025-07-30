@@ -246,6 +246,29 @@ Retries a failed `Exchange`.
     }
     ```
 
+### 6. Revert Generation
+
+Revert an `Exchange`. The exchange **must** be the last one for the application and it **must not** be running.
+
+*   `POST /generate/revert`
+*   **Request Body:**
+
+| Field        | Type     | Description                         |
+|:-------------|:---------|:------------------------------------|
+| `exchangeId` | `string` | The ID of the `Exchange` to revert. |
+
+*   **Example:**
+    *   **Request:**
+    ```http
+    POST /generate/revert
+    Authorization: Bearer {token}
+    Content-Type: application/json
+
+    {
+      "exchangeId": "e9z8y7x6"
+    }
+    ```
+
 ## Data Structures
 
 ### `ErrorResponse`
@@ -267,18 +290,18 @@ Represents a paginated list of items.
 ### `Exchange`
 Represents a single interaction with the generation AI.
 
-| Field          | Type       | Description                                                                                                         |
-|:---------------|:-----------|:--------------------------------------------------------------------------------------------------------------------|
-| `id`           | `string`   | The unique identifier for the exchange.                                                                             |
-| `appId`        | `string`   | The ID of the application this exchange is associated with.                                                         |
-| `userId`       | `string`   | The ID of the user who initiated the exchange.                                                                      |
-| `first`        | `boolean`  | Indicates if this is the first exchange for the application (i.e., the one that created it).                        |
-| `prompt`       | `string`   | The initial user prompt that started the generation process.                                                        |
-| `status`       | `string`   | The overall status of the exchange. Possible values: `PLANNING`, `GENERATING`, `SUCCESSFUL`, `FAILED`, `CANCELLED`. |
-| `stages`       | `Stage[]`  | An ordered list of processing stages the AI undertakes to fulfill the request.                                      |
-| `errorMessage` | `string`   | An error message if the exchange failed. Will be `null` if successful.                                              |
-| `productURL`   | `string`   | The URL where the generated product can be accessed if the exchange was successful. Will be `null` otherwise.       |
-| `managementURL`| `string`   | The URL for managing the application. This is populated after the BACKEND stage completes successfully.             |
+| Field          | Type       | Description                                                                                                                      |
+|:---------------|:-----------|:---------------------------------------------------------------------------------------------------------------------------------|
+| `id`           | `string`   | The unique identifier for the exchange.                                                                                          |
+| `appId`        | `string`   | The ID of the application this exchange is associated with.                                                                      |
+| `userId`       | `string`   | The ID of the user who initiated the exchange.                                                                                   |
+| `first`        | `boolean`  | Indicates if this is the first exchange for the application (i.e., the one that created it).                                     |
+| `prompt`       | `string`   | The initial user prompt that started the generation process.                                                                     |
+| `status`       | `string`   | The overall status of the exchange. Possible values: `PLANNING`, `GENERATING`, `SUCCESSFUL`, `FAILED`, `CANCELLED`, `REVERTED`.  |
+| `stages`       | `Stage[]`  | An ordered list of processing stages the AI undertakes to fulfill the request.                                                   |
+| `errorMessage` | `string`   | An error message if the exchange failed. Will be `null` if successful.                                                           |
+| `productURL`   | `string`   | The URL where the generated product can be accessed if the exchange was successful. Will be `null` otherwise.                    |
+| `managementURL`| `string`   | The URL for managing the application. This is populated after the BACKEND stage completes successfully.                          |
 
 ### `Stage`
 Represents a major step within an `Exchange`.

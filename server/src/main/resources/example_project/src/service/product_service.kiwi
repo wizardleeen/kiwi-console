@@ -3,11 +3,9 @@ package service
 import domain.Product
 
 @Bean
-@Label("商品服务")
 class ProductService {
 
-    @Label("按名称查找商品")
-    fn findProductByName(@Label("名称") name: string) -> Product? {
+    fn findProductByName(name: string) -> Product? {
         return Product.nameIdx.getFirst(name)
     }
 

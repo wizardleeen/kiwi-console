@@ -9,6 +9,8 @@ public interface Compiler {
 
     List<SourceFile> getSourceFiles(long appId);
 
+    void addFile(long appId, SourceFile file);
+
     DeployResult deploy(long appId);
 
     void commit(long appId, String message);
@@ -16,4 +18,7 @@ public interface Compiler {
     void reset(long appId, String templateRepo);
 
     void delete(long appId);
+
+    void revert(long appId);
+
 }

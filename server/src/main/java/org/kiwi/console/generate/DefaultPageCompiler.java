@@ -32,6 +32,13 @@ public class DefaultPageCompiler extends AbstractCompiler implements PageCompile
         Files.writeString(envFilePath, "export const APP_ID = " + appId);
     }
 
+    @Override
+    public void revert(long appId) {
+        super.revert(appId);
+        build(getWorkDir(appId));
+        deploy(appId);
+    }
+
     protected BuildResult build(WorkDir workDir) {
         Utils.CommandResult r;
         r = Utils.executeCommand(workDir.root(), "pnpm", "run", "build");
