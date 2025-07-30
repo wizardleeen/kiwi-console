@@ -31,6 +31,12 @@ public class DefaultKiwiCompiler extends AbstractCompiler implements KiwiCompile
         }
     }
 
+    @Override
+    public void revert(long appId) {
+        super.revert(appId);
+        deployService.revert(appId);
+    }
+
     @SneakyThrows
     public String generateApi(long appId) {
         var wd = WorkDir.from(baseDir, appId);

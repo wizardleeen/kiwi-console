@@ -1,12 +1,8 @@
 package domain
 
-@Label("订单状态")
 enum OrderStatus {
-    @Label("待确认")
-    PENDING,
-    @Label("已确认")
-    CONFIRMED,
-    @Label("已取消")
-    CANCELLED,
+        PENDING,
+        CONFIRMED,
+        CANCELLED,
     ;
 }

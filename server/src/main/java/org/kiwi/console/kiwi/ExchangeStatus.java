@@ -4,5 +4,7 @@ public enum ExchangeStatus {
     PLANNING,
     GENERATING,
     SUCCESSFUL,
-    CANCELLED, FAILED
+    CANCELLED,
+    FAILED,
+    REVERTED,
 }

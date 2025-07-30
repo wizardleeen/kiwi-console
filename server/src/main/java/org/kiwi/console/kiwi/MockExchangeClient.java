@@ -82,11 +82,30 @@ public class MockExchangeClient implements ExchangeClient {
     }
 
     @Override
-    public void retry(ExchangeRetryRequest request) {
+    public void retry(ExchangeIdRequest request) {
         var exch = exchanges.get(request.exchangeId());
         if (exch.getStatus() != ExchangeStatus.FAILED)
             throw new IllegalStateException("Exchange is not in FAILED state");
         exch.setStatus(ExchangeStatus.PLANNING);
+    }
+
+    @Override
+    public void revert(ExchangeIdRequest request) {
+        var exch = exchanges.get(request.exchangeId());
+        if (!exch.hasSuccessfulStages()) {
+            throw new RuntimeException("Cannot revert an exchange with no successful stages");
+        }
+        var appExchanges = exchanges.values().stream()
+                .filter(e -> e.getAppId().equals(exch.getAppId()))
+                .toList()
+                .reversed();
+        for (Exchange appExchange : appExchanges) {
+            if (appExchange == exch)
+                break;
+            if (appExchange.hasSuccessfulStages())
+                throw new RuntimeException("Reversion is only applicable to the last exchange with successful stages");
+        }
+        exch.setStatus(ExchangeStatus.REVERTED);
     }
 
     @Override

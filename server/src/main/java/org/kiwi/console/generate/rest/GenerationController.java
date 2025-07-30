@@ -61,6 +61,12 @@ public class GenerationController {
         return sseEmitter;
     }
 
+    @PostMapping("/revert")
+    public void revert(@AuthenticationPrincipal String userId, @RequestBody RevertRequest request) {
+        ensureExchangeAuthorized(userId, request.exchangeId());
+        generationService.revert(request.exchangeId());
+    }
+
     @PostMapping("/history")
     public SearchResult<Exchange> search(@AuthenticationPrincipal String userId, @RequestBody HistoryRequest request) {
         if (request.appId() == null)

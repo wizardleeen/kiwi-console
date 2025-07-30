@@ -31,7 +31,11 @@ public interface ExchangeClient {
 
     @RequestLine("POST /api/exchange/retry")
     @Headers("Content-Type: application/json")
-    void retry(ExchangeRetryRequest request);
+    void retry(ExchangeIdRequest request);
+
+    @RequestLine("POST /api/exchange-service/revert-exchange")
+    @Headers("Content-Type: application/json")
+    void revert(ExchangeIdRequest request);
 
     @RequestLine("POST /api/exchange-service/fail-expired-exchanges")
     @Headers("Content-Type: application/json")

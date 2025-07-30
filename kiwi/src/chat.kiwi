@@ -54,6 +54,15 @@ class Exchange(
         if (status != ExchangeStatus.FAILED)
             throw Exception("Cannot retry a non-failed exchange")
         status = ExchangeStatus.PLANNING
+        lastHeartBeatAt = now()
+    }
+
+    fn revert() {
+        if (status == ExchangeStatus.REVERTED)
+            throw Exception("Cannot revert an already reverted exchange")
+        if (isRunning())
+            throw Exception("Cannot revert a running exchange")
+        status = ExchangeStatus.REVERTED
     }
 
     fn fail(errMsg: string) {
@@ -69,6 +78,14 @@ class Exchange(
                 }
             }
         }
+    }
+
+    fn hasSuccessfulStages() -> bool {
+        for (c in children) {
+            if (c is Stage stage && stage.status == StageStatus.SUCCESSFUL)
+                return true
+        }
+        return false
     }
 
 }
@@ -91,6 +108,12 @@ class ExchangeService {
         return expired
     }
 
+    fn revertExchange(exchange: Exchange) {
+        if (exchange != Exchange.appIdx.getLast(exchange.app))
+            throw Exception("Cannot revert an exchange that is not the last one for the application")
+        exchange.revert()
+    }
+
     fn isGenerating(app: Application) -> bool {
         val exch = Exchange.appIdx.getLast(app)
         return exch != null && exch!!.isRunning()
@@ -104,7 +127,8 @@ enum ExchangeStatus {
     GENERATING,
     SUCCESSFUL,
     FAILED,
-    CANCELLED
+    CANCELLED,
+    REVERTED,
 ;
 }
 

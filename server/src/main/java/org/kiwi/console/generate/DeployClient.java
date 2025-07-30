@@ -39,4 +39,19 @@ public class DeployClient implements DeployService {
         }
     }
 
+    @SneakyThrows
+    @Override
+    public void revert(long appId) {
+        var uri = new URI(host + "/internal-api/deploy/revert/" + appId);
+        HttpRequest httpRequest = HttpRequest.newBuilder()
+                .uri(uri)
+                .POST(HttpRequest.BodyPublishers.noBody())
+                .build();
+        var resp = client.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+        if (resp.statusCode() != 200) {
+            var errorResp = Utils.readJSONString(resp.body(), ErrorResponse.class);
+            throw new BusinessException(ErrorCode.DEPLOY_FAILED, errorResp.message());
+        }
+    }
+
 }

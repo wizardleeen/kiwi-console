@@ -47,13 +47,18 @@ class MockCompiler implements KiwiCompiler, PageCompiler {
     }
 
     @Override
+    public void addFile(long appId, SourceFile file) {
+        getWorkdir(appId).put(file.path().toString(), file.content());
+    }
+
+    @Override
     public DeployResult deploy(long appId) {
         return new DeployResult(true, "");
     }
 
     @Override
     public void commit(long appId, String message) {
-        commits.add(new Commit(copyMap(working), message));
+        commits.add(new Commit(copyMap(working.get(appId)), message));
     }
 
     @Nullable
@@ -66,18 +71,26 @@ class MockCompiler implements KiwiCompiler, PageCompiler {
         if (commits.isEmpty())
             working = new HashMap<>();
         else
-            working = copyMap(commits.getLast().map());
+            working.put(appId, copyMap(commits.getLast().map()));
     }
 
-    private Map<Long, Map<String, String>> copyMap(Map<Long, Map<String, String>> map) {
-        var copy = new HashMap<Long, Map<String, String>>();
-        map.forEach((k, v) -> copy.put(k, new HashMap<>(v)));
-        return copy;
+    private Map<String, String> copyMap(Map<String, String> map) {
+        return new HashMap<>(map);
     }
 
     @Override
     public void delete(long appId) {
         working.remove(appId);
+    }
+
+    @Override
+    public void revert(long appId) {
+        if (commits.isEmpty())
+            throw new IllegalStateException("No commits to revert to.");
+        if (commits.size() == 1)
+            working.remove(appId);
+        else
+            working.put(appId, copyMap(commits.get(commits.size() - 2).map()));
     }
 
     @Override
@@ -89,6 +102,6 @@ class MockCompiler implements KiwiCompiler, PageCompiler {
         return getWorkdir(appId).get(path);
     }
 
-    private record Commit(Map<Long, Map<String, String>> map, String message) {}
+    private record Commit(Map<String, String> map, String message) {}
 
 }

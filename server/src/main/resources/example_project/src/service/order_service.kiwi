@@ -8,13 +8,11 @@ import domain.OrderStatus
 import domain.OrderStatusAndTime
 
 @Bean
-@Label("订单服务")
 class OrderService {
 
     static val PENDING_TIMEOUT = 15 * 60 * 1000
 
-    @Label("下单")
-    fn placeOrder(@Label("客户") customer: Customer, @Label("商品列表") products: Product[], @Label("优惠券") coupon: Coupon?) -> Order {
+        fn placeOrder(customer: Customer, products: Product[], coupon: Coupon?) -> Order {
         require(products.length > 0, "Missing products")
         var price = products[0].price
         for (i in 1...products.length) {
@@ -38,18 +36,15 @@ class OrderService {
         return orders
     }
 
-    @Label("确认订单")
-    fn confirmOrder(@Label("订单") order: Order) {
+        fn confirmOrder(order: Order) {
         order.confirm()
     }
 
-    @Label("取消订单")
-    fn confirmOrder(@Label("订单") order: Order) {
+        fn confirmOrder(order: Order) {
         order.cancel()
     }
 
-    @Label("取消超时待处理订单")
-    fn cancelExpiredPendingOrders() {
+        fn cancelExpiredPendingOrders() {
         val orders = Order.statusAndCreatedAtIdx.query(
             OrderStatusAndTime(OrderStatus.PENDING, 0),
             OrderStatusAndTime(OrderStatus.PENDING, now() - PENDING_TIMEOUT)
@@ -57,8 +52,7 @@ class OrderService {
         orders.forEach(o -> o.cancel())
     }
 
-    @Label("删除所有已取消订单")
-    fn deleteAllCancelledOrders() {
+        fn deleteAllCancelledOrders() {
         val orders = Order.statusAndCreatedAtIdx.query(
             OrderStatusAndTime(OrderStatus.CANCELLED, 0),
             OrderStatusAndTime(OrderStatus.CANCELLED, now())
