@@ -1,4 +1,4 @@
-package org.kiwi.console.upload;
+package org.kiwi.console.file;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.SneakyThrows;
@@ -12,10 +12,10 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping("/files")
 public class FilesController {
 
-    private final UploadService uploadService;
+    private final FileService fileService;
 
-    public FilesController(UploadService uploadService) {
-        this.uploadService = uploadService;
+    public FilesController(FileService fileService) {
+        this.fileService = fileService;
     }
 
     @SneakyThrows
@@ -27,7 +27,7 @@ public class FilesController {
         var appId = Long.parseLong(appIdHeader);
         var fileName = file.getOriginalFilename();
         var input = file.getInputStream();
-        return new UploadResult(uploadService.upload(appId, fileName, input));
+        return new UploadResult(fileService.upload(appId, fileName, input));
     }
 
 }

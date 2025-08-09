@@ -4,6 +4,7 @@ import junit.framework.TestCase;
 import lombok.extern.slf4j.Slf4j;
 import org.kiwi.console.generate.event.GenerationListener;
 import org.kiwi.console.generate.rest.CancelRequest;
+import org.kiwi.console.generate.rest.GenerationRequest;
 import org.kiwi.console.generate.rest.RetryRequest;
 import org.kiwi.console.kiwi.*;
 import org.kiwi.console.util.BusinessException;
@@ -28,6 +29,7 @@ public class GenerationServiceTest extends TestCase {
     private MockExchangeClient exchangeClient;
     private UserClient userClient;
     private MockGenerationConfigClient genConfigClient;
+    private AttachmentService attachmentService;
     private String userId;
 
     @Override
@@ -38,6 +40,7 @@ public class GenerationServiceTest extends TestCase {
         genConfigClient = new MockGenerationConfigClient();
         userClient = new MockUserClient(genConfigClient);
         appClient = new MockAppClient(userClient);
+        attachmentService = new MockAttachmentService();
         userId = userClient.register(new RegisterRequest("kiwi", "123456"));
     }
 
@@ -48,11 +51,12 @@ public class GenerationServiceTest extends TestCase {
                 userClient, "http://{}.metavm.test",
                 "http://localhost:8080",
                 genConfigClient,
+                attachmentService,
                 new SyncTaskExecutor());
         var prompt = """
                 class Foo {}
                 """;
-        genService.generate(null, prompt, userId, false, discardListener);
+        genService.generate(GenerationRequest.create(null, prompt),userId, discardListener);
         var appId = exchangeClient.getLast().getAppId();
         var app = appClient.get(appId);
         var sysAppId = app.getSystemAppId();
@@ -72,7 +76,7 @@ public class GenerationServiceTest extends TestCase {
                 exchangeClient.getLast().toString()
         );
 
-        genService.generate(appId, "class Bar{}", userId, false, discardListener);
+        genService.generate(GenerationRequest.create(appId, "class Bar{}"), userId, discardListener);
         assertEquals("class Bar{}\n", kiwiCompiler.getCode(sysAppId, MAIN_KIWI));
         assertEquals("class Bar{}\n", pageCompiler.getCode(sysAppId, APP_TSX));
         assertEquals(
@@ -88,7 +92,7 @@ public class GenerationServiceTest extends TestCase {
         );
 
 
-        genService.generate(appId, "class Error{}", userId, false, discardListener);
+        genService.generate(GenerationRequest.create(appId, "class Error{}"), userId, discardListener);
         assertEquals("class Fixed{}\n", kiwiCompiler.getCode(sysAppId, MAIN_KIWI));
         assertEquals("class Fixed{}\n", pageCompiler.getCode(sysAppId, APP_TSX));
         assertEquals(
@@ -117,8 +121,9 @@ public class GenerationServiceTest extends TestCase {
                 userClient, "http://{}.metavm.test",
                 "http://localhost:8080",
                 genConfigClient,
+                attachmentService,
                 taskExecutor);
-        generationService.generate(null, "class Foo{}", userId, false, discardListener);
+        generationService.generate(GenerationRequest.create(null, "class Foo{}"), userId, discardListener);
         var exch = exchangeClient.getFirst();
         generationService.cancel(new CancelRequest(exch.getId()));
         try {
@@ -139,9 +144,10 @@ public class GenerationServiceTest extends TestCase {
                 "http://{}.metavm.test",
                 "http://localhost:8080",
                 genConfigClient,
+                attachmentService,
                 new SyncTaskExecutor());
         var exchanges = new ArrayList<Exchange>();
-        genService.generate(null, "class Foo {}", userId, false, new GenerationListener() {
+        genService.generate(GenerationRequest.create(null, "class Foo {}"), userId, new GenerationListener() {
             @Override
             public void onThought(String thoughtChunk) {
 
@@ -182,9 +188,10 @@ public class GenerationServiceTest extends TestCase {
                 userClient, "http://{}.metavm.test",
                 "http://localhost:8080",
                 genConfigClient,
+                attachmentService,
                 new SyncTaskExecutor());
         try {
-            generationService.generate(null, "class Foo{}", userId, false, discardListener);
+            generationService.generate(GenerationRequest.create(null, "class Foo{}"), userId, discardListener);
             fail();
         }
         catch (Exception ignored) {}
@@ -203,10 +210,11 @@ public class GenerationServiceTest extends TestCase {
                 userClient, "http://{}.metavm.test",
                 "http://localhost:8080",
                 genConfigClient,
+                attachmentService,
                 t -> {});
-        var appId = genService.generate(null, "class Foo {}", userId, false, discardListener);
+        var appId = genService.generate(GenerationRequest.create(null, "class Foo {}"), userId, discardListener);
         try {
-            genService.generate(appId, "class Foo {}", userId, false, discardListener);
+            genService.generate(GenerationRequest.create(appId, "class Foo {}"), userId, discardListener);
             fail("Should not allow duplicate generation");
         } catch (BusinessException e) {
             assertSame(ErrorCode.GENERATION_ALREADY_RUNNING, e.getErrorCode());
@@ -220,8 +228,9 @@ public class GenerationServiceTest extends TestCase {
                 userClient, "http://{}.metavm.test",
                 "http://localhost:8080",
                 genConfigClient,
+                attachmentService,
                 t -> {});
-        genService.generate(null, "class Foo {}", userId, false, discardListener);
+        genService.generate(GenerationRequest.create(null, "class Foo {}"), userId, discardListener);
         var exch = exchangeClient.getFirst();
         assertTrue(exch.isRunning());
         exch.setLastHeartBeatAt(System.currentTimeMillis() - 1000 * 60 * 10); // Set last heartbeat to 10 minutes ago
@@ -238,8 +247,9 @@ public class GenerationServiceTest extends TestCase {
                 userClient, "http://{}.metavm.test",
                 "http://localhost:8080",
                 genConfigClient,
+                attachmentService,
                 t -> {});
-        genService.generate(null, "class Foo {}", userId, false, discardListener);
+        genService.generate(GenerationRequest.create(null, "class Foo {}"), userId, discardListener);
         var exch = exchangeClient.getFirst();
         genService.discardTask(exch.getId());
         assertTrue(exch.isRunning());
@@ -260,8 +270,9 @@ public class GenerationServiceTest extends TestCase {
                 userClient, "http://{}.metavm.test",
                 "http://localhost:8080",
                 genConfigClient,
+                attachmentService,
                 new SyncTaskExecutor());
-        var appId = generationService.generate(null, "class Foo{}", userId, false, discardListener);
+        var appId = generationService.generate(GenerationRequest.create(null, "class Foo{}"), userId, discardListener);
         var exch = exchangeClient.getFirst();
         var app = appClient.get(appId);
         assertSame(ExchangeStatus.SUCCESSFUL, exch.getStatus());

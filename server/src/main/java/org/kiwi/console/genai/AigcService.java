@@ -84,7 +84,7 @@ public class AigcService {
 
     private String generateContent(Chat chat, String prompt) {
         var buf = new StringBuilder();
-        chat.send(prompt, new ChatStreamListener() {
+        chat.send(prompt, List.of(), new ChatStreamListener() {
             @Override
             public void onThought(String thoughtChunk) {
                 log.info(thoughtChunk);

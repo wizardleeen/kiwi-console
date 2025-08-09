@@ -30,6 +30,8 @@ public class DefaultPageCompiler extends AbstractCompiler implements PageCompile
             throw new RuntimeException("Failed to run `pnpm install`: " + r1.output());
         var envFilePath = workDir.getSrcPath().resolve("env.ts");
         Files.writeString(envFilePath, "export const APP_ID = " + appId);
+        Utils.executeCommand(workDir.root(), "git", "add", "src/env.ts");
+        Utils.executeCommand(workDir.root(), "git", "commit", "-m", "\"Add env.ts\"");
     }
 
     @Override

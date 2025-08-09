@@ -16,6 +16,7 @@ public class Exchange {
     private String appId;
     private String userId;
     private String prompt;
+    private List<String> attachmentUrls;
     private ExchangeStatus status;
     private List<Stage> stages;
     private @Nullable String productURL;
@@ -25,11 +26,17 @@ public class Exchange {
     private boolean skipPageGeneration;
     private long lastHeartBeatAt;
 
-    public static Exchange create(String appId, String userId, String prompt, boolean first, boolean skipPageGeneration) {
+    public static Exchange create(String appId,
+                                  String userId,
+                                  String prompt,
+                                  List<String> attachmentUrls,
+                                  boolean first,
+                                  boolean skipPageGeneration) {
         return new Exchange(null,
                 appId,
                 userId,
                 prompt,
+                attachmentUrls,
                 ExchangeStatus.PLANNING,
                 new ArrayList<>(),
                 null,
@@ -88,6 +95,7 @@ public class Exchange {
                 appId,
                 userId,
                 prompt,
+                attachmentUrls,
                 status,
                 Utils.map(stages, Stage::clearAttempts),
                 productURL,
