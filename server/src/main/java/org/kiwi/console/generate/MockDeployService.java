@@ -4,7 +4,13 @@ import java.io.InputStream;
 
 public class MockDeployService implements DeployService {
     @Override
-    public void deploy(long appId, InputStream input) {
+    public String deploy(long appId, InputStream input) {
+        return null;
+    }
+
+    @Override
+    public String getDeployStatus(long appId, String deployId) {
+        return null;
     }
 
     @Override

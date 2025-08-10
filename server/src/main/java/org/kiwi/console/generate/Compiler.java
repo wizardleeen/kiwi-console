@@ -15,7 +15,7 @@ public interface Compiler {
 
     void commit(long appId, String message);
 
-    void reset(long appId, String templateRepo);
+    void reset(long appId, String templateRepo, String branch);
 
     void delete(long appId);
 

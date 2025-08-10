@@ -12,6 +12,8 @@ public record GenerationConfig(
         String createAnalyzePrompt,
         String updateAnalyzePrompt,
         String pageTemplateRepo,
-        String kiwiTemplateRepo
+        String pageTemplateBranch,
+        String kiwiTemplateRepo,
+        String kiwiTemplateBranch
 ) {
 }

@@ -6,7 +6,7 @@ This API manages user authentication and application lifecycle.
 
 ## Endpoints
 
-All endpoints except `/auth/login` and `/auth/register` require an `Authorization: Bearer {token}` header. Error responses use the [ErrorResponse](#errorresponse) schema.
+All endpoints except `/auth/login`, `/auth/register`, and `/auth/login-with-sso-code` require an `Authorization: Bearer {token}` header. Error responses use the [ErrorResponse](#errorresponse) schema.
 
 ### 1. Login
 
@@ -79,7 +79,64 @@ Creates a new user account.
     }
     ```
 
-### 4. Search Applications
+### 4. Generate SSO Code
+
+Generates a single-use code for SSO login. Requires authentication.
+
+*   `POST /auth/generate-sso-code`
+*   **Request Body:** No content
+*   **Response Body:**
+
+| Field | Type     | Description             |
+|:------|:---------|:------------------------|
+| `code`  | `string` | The generated SSO code. |
+
+*   **Example:**
+    ```http
+    POST /auth/generate-sso-code
+    Authorization: Bearer {token}
+    ```
+    * Response:
+    ```json
+    {
+      "code": "{sso-code}"
+    }
+    ```
+
+### 5. Login with SSO Code
+
+Authenticates a user using a previously generated SSO code.
+
+*   `POST /auth/login-with-sso-code`
+*   **Request Body:**
+
+| Field | Type     | Description                         |
+|:------|:---------|:------------------------------------|
+| `code`  | `string` | The SSO code from the generate step. |
+
+*   **Response Body:**
+
+| Field | Type     | Description              |
+|:------|:---------|:-------------------------|
+| `token` | `string` | token for authentication |
+
+*   **Example:**
+    ```http
+    POST /auth/login-with-sso-code
+    Content-Type: application/json
+
+    {
+      "code": "{sso-code}"
+    }
+    ```
+    * Response:
+    ```json
+    {
+      "token": "{token}"
+    }
+    ```
+
+### 6. Search Applications
 
 Retrieves a paginated list of applications.
 
@@ -118,7 +175,7 @@ Retrieves a paginated list of applications.
     }
     ```
 
-### 5. Save Application
+### 7. Save Application
 
 Creates a new application or updates an existing one.
 
@@ -143,7 +200,7 @@ Creates a new application or updates an existing one.
     "{id}"
     ```
 
-### 6. Retrieve Application
+### 8. Retrieve Application
 
 Retrieves an Application.
 
@@ -164,7 +221,7 @@ Retrieves an Application.
     }
     ```
 
-### 7. Delete Application
+### 9. Delete Application
 
 Deletes an application.
 

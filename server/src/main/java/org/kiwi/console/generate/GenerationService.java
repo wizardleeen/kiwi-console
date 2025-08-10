@@ -6,6 +6,8 @@ import feign.gson.GsonDecoder;
 import feign.gson.GsonEncoder;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.kiwi.console.file.File;
+import org.kiwi.console.file.UrlFetcher;
 import org.kiwi.console.generate.event.GenerationListener;
 import org.kiwi.console.generate.rest.CancelRequest;
 import org.kiwi.console.generate.rest.GenerationRequest;
@@ -48,6 +50,7 @@ public class GenerationService {
             "image/png",
             "image/jpeg",
             "image/gif",
+            "image/webp",
             "text/plain",
             "text/html",
             "video/mp4"
@@ -62,7 +65,7 @@ public class GenerationService {
     private final ExchangeClient exchClient;
     private final GenerationConfigClient generationConfigClient;
     private final UserClient userClient;
-    private final AttachmentService attachmentService;
+    private final UrlFetcher urlFetcher;
     private final Map<String, Task> runningTasks = new ConcurrentHashMap<>();
     private final TaskExecutor taskExecutor;
 
@@ -74,7 +77,8 @@ public class GenerationService {
             AppClient appClient,
             UserClient userClient, String productUrlTempl,
             String mgmtUrlTempl,
-            GenerationConfigClient generationConfigClient, AttachmentService attachmentService,
+            GenerationConfigClient generationConfigClient,
+            UrlFetcher urlFetcher,
             TaskExecutor taskExecutor
     ) {
         this.agent = agent;
@@ -86,7 +90,7 @@ public class GenerationService {
         this.exchClient = exchClient;
         this.userClient = userClient;
         this.generationConfigClient = generationConfigClient;
-        this.attachmentService = attachmentService;
+        this.urlFetcher = urlFetcher;
         this.taskExecutor = taskExecutor;
     }
 
@@ -102,24 +106,24 @@ public class GenerationService {
             creating = true;
         }
         List<String> attachmentUrls = Objects.requireNonNullElse(request.attachmentUrls(), List.of());
-        attachmentUrls.forEach(this::checkAttachmentUrl);
+        var attachments = Utils.map(attachmentUrls, this::readAttachment);
         var exchange = Exchange.create(appId, userId, request.prompt(), attachmentUrls, creating, request.skipPageGeneration());
         var app = appClient.get(appId);
         exchange.setId(exchClient.save(exchange));
         var task = new Task(exchange, app, false,
                 generationConfigClient.get(app.getGenConfigId()),
-                listener);
+                attachments, listener);
         task.sendProgress();
         taskExecutor.execute(() -> runTask(task));
         return appId;
     }
 
-    private void checkAttachmentUrl(String url) {
-        if (!attachmentService.exists(url))
-            throw new BusinessException(ErrorCode.ATTACHMENT_NOT_FOUND, "Attachment not found: " + url);
-        var mimeType = attachmentService.getMimeType(url);
+    private File readAttachment(String url) {
+        var r = urlFetcher.fetch(url);
+        var mimeType = r.mimeType();
         if (!allowedMimeTypes.contains(mimeType))
             throw new BusinessException(ErrorCode.INVALID_ATTACHMENT_TYPE, "Invalid attachment type: " + mimeType);
+        return new File(r.content(), r.mimeType());
     }
 
     void discardTask(String exchangeId) {
@@ -134,8 +138,8 @@ public class GenerationService {
     private void runTask(Task task) {
         try {
             var sysAppId = task.app.getSystemAppId();
-            kiwiCompiler.reset(sysAppId, task.genConfig.kiwiTemplateRepo());
-            pageCompiler.reset(sysAppId, task.genConfig.pageTemplateRepo());
+            kiwiCompiler.reset(sysAppId, task.genConfig.kiwiTemplateRepo(), task.genConfig.kiwiTemplateBranch());
+            pageCompiler.reset(sysAppId, task.genConfig.pageTemplateRepo(), task.genConfig.pageTemplateBranch());
             var plan = executeGen(() -> plan(task));
             if (task.exchange.isFirst() && plan.appName != null) {
                 updateAppName(task.app, plan.appName);
@@ -193,10 +197,11 @@ public class GenerationService {
         var app = appClient.get(exch.getAppId());
         ensureNotGenerating(app.getId());
         exchClient.retry(new ExchangeIdRequest(request.exchangeId()));
+        var attachments = Utils.map(exch.getAttachmentUrls(), this::readAttachment);
         exch = exchClient.get(request.exchangeId());  // Reload
         var task = new Task(exch, app, false,
                 generationConfigClient.get(app.getGenConfigId()),
-                listener);
+                attachments, listener);
         task.sendProgress();
         taskExecutor.execute(() -> runTask(task));
     }
@@ -345,8 +350,7 @@ public class GenerationService {
 
     private String generateContent(Chat chat, String prompt, Task task) {
         var buf = new StringBuilder();
-        var attachments = Utils.map(task.exchange.getAttachmentUrls(), attachmentService::read);
-        chat.send(prompt, attachments, new ChatStreamListener() {
+        chat.send(prompt, task.attachments, new ChatStreamListener() {
             @Override
             public void onThought(String thoughtChunk) {
                 task.onThought(thoughtChunk);
@@ -453,9 +457,11 @@ public class GenerationService {
         private boolean cancelled;
         private final GenerationConfig genConfig;
         private final boolean showAttempts;
+        private final List<File> attachments;
 
-        public Task(Exchange exchange, App app, boolean showAttempts, GenerationConfig genConfig, @Nonnull GenerationListener listener) {
+        public Task(Exchange exchange, App app, boolean showAttempts, GenerationConfig genConfig, List<File> attachments, @Nonnull GenerationListener listener) {
             this.genConfig = genConfig;
+            this.attachments = attachments;
             listeners.add(listener);
             this.app = app;
             this.exchange = exchange;
@@ -625,7 +631,8 @@ public class GenerationService {
                 Utils.createKiwiFeignClient(host, UserClient.class, CHAT_APP_ID), "http://{}.metavm.test",
                 "http://localhost:5173/app/{}",
                 Utils.createKiwiFeignClient(host, GenerationConfigClient.class, CHAT_APP_ID),
-                new MockAttachmentService(),
+                new UrlFetcher("https://1000061024.metavm.test")
+                ,
                 new SyncTaskExecutor());
 //        System.out.println(kiwiCompiler.generateApi(TEST_APP_ID));
         testNewApp(service);

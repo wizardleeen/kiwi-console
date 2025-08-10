@@ -51,6 +51,16 @@ public class UserService implements UserClient {
         return userClient.getBySysUserId(request);
     }
 
+    @Override
+    public String generateSsoCode(UserIdRequest request) {
+        return userClient.generateSsoCode(request);
+    }
+
+    @Override
+    public String loginWithSsoCode(LoginWithSsoCodeRequest request) {
+        return userClient.loginWithSsoCode(request);
+    }
+
     public static void main(String[] args) {
         var client = new UserService(
                 "http://localhost:8080",

@@ -14,6 +14,13 @@ import java.util.List;
 public class DefaultKiwiCompiler extends AbstractCompiler implements KiwiCompiler {
 
     private final DeployService deployService;
+    private static final String ABORT_ERROR_MSG = """
+                    Deploy failed. Possible causes:
+                    1. Error occurred while running migration functions.
+                    2. Trying to remove an enum constant that is being referenced by other objects.
+                    3. Trying to remove a class whose instances are being referenced by other objects.
+                    """;
+
 
     public DefaultKiwiCompiler(Path baseDir, DeployService deployService) {
         super(baseDir);
@@ -23,11 +30,24 @@ public class DefaultKiwiCompiler extends AbstractCompiler implements KiwiCompile
     @Override
     public DeployResult deploy(long appId) {
         try {
-            deploy(appId, getWorkDir(appId));
+            var deployId = deploy(appId, getWorkDir(appId));
+            waitForDeployFinish(appId, deployId);
             return new DeployResult(true, null);
         }
         catch (BusinessException e) {
             return new DeployResult(false, e.getMessage());
+        }
+    }
+
+    @SneakyThrows
+    private void waitForDeployFinish(long appId, String deployId) {
+        for(;;) {
+            var status = deployService.getDeployStatus(appId, deployId);
+            if (status.equals("ABORTED"))
+                throw new BusinessException(ErrorCode.DEPLOY_FAILED, ABORT_ERROR_MSG);
+            if (status.equals("COMPLETED"))
+                return;
+            Thread.sleep(1000L);
         }
     }
 
@@ -69,9 +89,9 @@ public class DefaultKiwiCompiler extends AbstractCompiler implements KiwiCompile
         return Files.exists(versionPath) ? Integer.parseInt(Files.readAllLines(versionPath).getFirst()) : 0;
     }
 
-    private void deploy(long appId, WorkDir workDir) {
+    private String deploy(long appId, WorkDir workDir) {
         try (var pkgInput = workDir.openTargetInput()) {
-            deployService.deploy(appId, pkgInput);
+            return deployService.deploy(appId, pkgInput);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

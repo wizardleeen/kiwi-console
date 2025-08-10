@@ -67,7 +67,7 @@ class MockCompiler implements KiwiCompiler, PageCompiler {
     }
 
     @Override
-    public void reset(long appId, String templateRepo) {
+    public void reset(long appId, String templateRepo, String branch) {
         if (commits.isEmpty())
             working = new HashMap<>();
         else

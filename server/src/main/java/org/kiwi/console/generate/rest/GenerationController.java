@@ -2,8 +2,8 @@ package org.kiwi.console.generate.rest;
 
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.kiwi.console.generate.AttachmentService;
 import org.kiwi.console.generate.GenerationService;
-import org.kiwi.console.generate.AttachmentServiceImpl;
 import org.kiwi.console.generate.event.GenerationListener;
 import org.kiwi.console.kiwi.*;
 import org.kiwi.console.util.BusinessException;
@@ -26,14 +26,14 @@ public class GenerationController {
     private final AppClient appClient;
     private final ExchangeClient exchangeClient;
     private final UserClient userClient;
-    private final AttachmentServiceImpl screenshotService;
+    private final AttachmentService screenshotService;
 
-    public GenerationController(GenerationService generationService, AppClient appClient, ExchangeClient exchangeClient, UserClient userClient, AttachmentServiceImpl screenshotService) {
+    public GenerationController(GenerationService generationService, AppClient appClient, ExchangeClient exchangeClient, UserClient userClient, AttachmentService attachmentService) {
         this.generationService = generationService;
         this.appClient = appClient;
         this.exchangeClient = exchangeClient;
         this.userClient = userClient;
-        this.screenshotService = screenshotService;
+        this.screenshotService = attachmentService;
     }
 
     @PostMapping
