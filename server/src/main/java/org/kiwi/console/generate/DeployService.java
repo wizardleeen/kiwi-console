@@ -1,9 +1,14 @@
 package org.kiwi.console.generate;
 
+import lombok.SneakyThrows;
+
 import java.io.InputStream;
 
 public interface DeployService {
-    void deploy(long appId, InputStream input);
+    String deploy(long appId, InputStream input);
+
+    @SneakyThrows
+    String getDeployStatus(long appId, String deployId);
 
     void revert(long appId);
 

@@ -21,13 +21,21 @@ public class FilesController {
     @SneakyThrows
     @PostMapping
     public UploadResult upload(@RequestParam("file") MultipartFile file, HttpServletRequest request) {
+        var r = uploadV2(file, request);
+        return new UploadResult(r.url());
+    }
+
+    @SneakyThrows
+    @PostMapping("/v2")
+    public UploadV2Result uploadV2(@RequestParam("file") MultipartFile file, HttpServletRequest request) {
         var appIdHeader = request.getHeader("X-App-ID");
         if (appIdHeader == null)
             throw new IllegalArgumentException("X-App-ID header is required");
         var appId = Long.parseLong(appIdHeader);
         var fileName = file.getOriginalFilename();
         var input = file.getInputStream();
-        return new UploadResult(fileService.upload(appId, fileName, input));
+        return new UploadV2Result(fileService.upload(appId, fileName, input));
     }
+
 
 }

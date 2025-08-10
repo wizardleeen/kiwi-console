@@ -1,5 +1,6 @@
 package org.kiwi.console.util;
 
+import org.kiwi.console.file.UrlFetcher;
 import org.kiwi.console.generate.*;
 import org.kiwi.console.kiwi.*;
 import org.kiwi.console.file.FileService;
@@ -104,7 +105,7 @@ public class ConsoleConfig {
                                                UserClient userClient,
                                                ExchangeClient exchangeClient,
                                                GenerationConfigClient generationConfigClient,
-                                               AttachmentService attachmentService,
+                                               UrlFetcher urlFetcher,
                                                @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor) {
         return new GenerationService(
                 geminiAgent,
@@ -116,7 +117,7 @@ public class ConsoleConfig {
                 urlTemplates.product,
                 urlTemplates.management,
                 generationConfigClient,
-                attachmentService,
+                urlFetcher,
                 taskExecutor);
     }
 
@@ -151,7 +152,7 @@ public class ConsoleConfig {
     }
 
     @Bean
-    public AttachmentService generationUploadService(FileService fileService) {
+    public AttachmentService attachmentService(FileService fileService) {
         return new AttachmentServiceImpl(kiwiConfig.chatAppId, fileService);
     }
 
@@ -178,6 +179,11 @@ public class ConsoleConfig {
     @Bean
     public HttpClient httpClient() {
         return HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
+    }
+
+    @Bean
+    public UrlFetcher urlFetcher() {
+        return new UrlFetcher(Format.format(urlTemplates.product(), Long.toString(kiwiConfig.chatAppId())));
     }
 
     public record ServerConfig(int port) {}

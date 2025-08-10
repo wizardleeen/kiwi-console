@@ -23,6 +23,8 @@ public class MockGenerationConfigClient implements GenerationConfigClient {
                 Utils.loadResource("/prompt/create-analyze.md"),
                 Utils.loadResource("/prompt/update-analyze.md"),
                 "",
+                "",
+                "",
                 ""
                 );
         configs.put(preset.id(), preset);
@@ -59,7 +61,9 @@ public class MockGenerationConfigClient implements GenerationConfigClient {
                 config.createAnalyzePrompt(),
                 config.updateAnalyzePrompt(),
                 config.pageTemplateRepo(),
-                config.kiwiTemplateRepo()
+                config.pageTemplateBranch(),
+                config.kiwiTemplateRepo(),
+                config.kiwiTemplateBranch()
         );
     }
 

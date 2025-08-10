@@ -31,4 +31,12 @@ public interface UserClient {
     @Headers("Content-Type: application/json")
     String getBySysUserId(GetBySysUserIdRequest request);
 
+    @RequestLine("POST /api/user-service/generate-sso-code")
+    @Headers("Content-Type: application/json")
+    String generateSsoCode(UserIdRequest request);
+
+    @RequestLine("POST /api/user-service/login-with-sso-code")
+    @Headers("Content-Type: application/json")
+    String loginWithSsoCode(LoginWithSsoCodeRequest request);
+
 }

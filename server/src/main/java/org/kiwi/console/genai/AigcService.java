@@ -45,7 +45,7 @@ public class AigcService {
     }
 
     public void generate(GenerateRequest request) {
-        compiler.reset(request.appId(), Constants.KIWI_TEMPLATE_REPO);
+        compiler.reset(request.appId(), Constants.KIWI_TEMPLATE_REPO, "main");
         var chat = agent.createChat();
         var existingCode = compiler.getSourceFiles(request.appId());
         String text;

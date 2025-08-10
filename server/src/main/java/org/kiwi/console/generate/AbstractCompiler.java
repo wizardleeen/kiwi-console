@@ -64,13 +64,14 @@ public abstract class AbstractCompiler implements Compiler {
     }
 
     @Override
-    public void reset(long appId, String templateRepo) {
+    public void reset(long appId, String templateRepo, String branch) {
         var dir = baseDir.resolve(Long.toString(appId));
         if (dir.toFile().exists()) {
             Utils.executeCommand(getWorkDir(appId).root(), "git", "reset", "--hard", "HEAD");
-            Utils.executeCommand(getWorkDir(appId).root(), "git", "clean", "-fdx", "--exclude=node_modules");
+            Utils.executeCommand(getWorkDir(appId).root(), "git", "clean", "-fdx", "--exclude=node_modules", "--exclude=dist");
         } else {
             Utils.executeCommand(baseDir, "git", "clone", templateRepo, Long.toString(appId));
+            Utils.executeCommand(baseDir, "git", "checkout", branch);
             initWorkDir(getWorkDir(appId), appId);
         }
     }

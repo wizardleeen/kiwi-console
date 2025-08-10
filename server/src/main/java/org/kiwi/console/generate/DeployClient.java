@@ -24,7 +24,7 @@ public class DeployClient implements DeployService {
 
     @SneakyThrows
     @Override
-    public void deploy(long appId, InputStream input) {
+    public String deploy(long appId, InputStream input) {
         var uri = new URI(host + "/internal-api/deploy/" + appId);
         HttpRequest httpRequest = HttpRequest.newBuilder()
                 .uri(uri)
@@ -33,10 +33,31 @@ public class DeployClient implements DeployService {
                 .POST(HttpRequest.BodyPublishers.ofByteArray(input.readAllBytes()))
                 .build();
         var resp = client.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+        return processResponse(resp, String.class);
+    }
+
+    @SneakyThrows
+    @Override
+    public String getDeployStatus(long appId, String deployId) {
+        var uri = new URI(host + "/internal-api/deploy/status/" + appId + "/" + deployId);
+        HttpRequest httpRequest = HttpRequest.newBuilder()
+                .uri(uri)
+                .GET()
+                .build();
+        var resp = client.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+        return processResponse(resp, String.class);
+    }
+
+    private <R> R processResponse(HttpResponse<String> resp, Class<R> cls) {
         if (resp.statusCode() != 200) {
             var errorResp = Utils.readJSONString(resp.body(), ErrorResponse.class);
             throw new BusinessException(ErrorCode.DEPLOY_FAILED, errorResp.message());
         }
+        if (cls == String.class)
+            //noinspection unchecked
+            return (R) resp.body();
+        else
+            return Utils.readJSONString(resp.body(), cls);
     }
 
     @SneakyThrows

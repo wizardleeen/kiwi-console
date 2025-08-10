@@ -50,4 +50,14 @@ public class MockUserClient implements UserClient {
         throw new UnsupportedOperationException();
     }
 
+    @Override
+    public String generateSsoCode(UserIdRequest request) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public String loginWithSsoCode(LoginWithSsoCodeRequest request) {
+        throw new UnsupportedOperationException();
+    }
+
 }
