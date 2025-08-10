@@ -32,7 +32,7 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/login", "/auth/register", "/aigc/**", "/files/", "/files",
+                        .requestMatchers("/auth/login", "/auth/register", "/aigc/**", "/files/", "/files/v2",
                                 "/auth/login-with-sso-code")
                         .permitAll()
                         .anyRequest().authenticated())
