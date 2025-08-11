@@ -10,7 +10,7 @@ import java.util.List;
 public class User {
     private String id;
     private String name;
-    private String sysUserId;
+    private String kiwiUserId;
     private List<App> apps;
     private String genConfigId;
 }

@@ -11,7 +11,7 @@ public class App {
     private String id;
     private String name;
     private String ownerId;
-    private long systemAppId;
+    private long kiwiAppId;
     private List<String> memberIds;
     private String genConfigId;
 

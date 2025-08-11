@@ -27,9 +27,9 @@ public interface UserClient {
     @Headers("Content-Type: application/json")
     String register(RegisterRequest request);
 
-    @RequestLine("POST /api/user-service/get-by-sys-user-id")
+    @RequestLine("POST /api/user-service/get-by-kiwi-user-id")
     @Headers("Content-Type: application/json")
-    String getBySysUserId(GetBySysUserIdRequest request);
+    String getByKiwiUserId(GetByKiwiUserIdRequest request);
 
     @RequestLine("POST /api/user-service/generate-sso-code")
     @Headers("Content-Type: application/json")
