@@ -33,7 +33,7 @@ public class AuthController {
 
     private String issueToken(String userId) {
         var user = userClient.get(userId);
-        return sysUserClient.issueToken(new IssueTokenRequest(user.getSysUserId()));
+        return sysUserClient.issueToken(new IssueTokenRequest(user.getKiwiUserId()));
     }
 
     @PostMapping("/logout")

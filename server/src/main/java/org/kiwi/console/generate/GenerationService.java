@@ -137,7 +137,7 @@ public class GenerationService {
 
     private void runTask(Task task) {
         try {
-            var sysAppId = task.app.getSystemAppId();
+            var sysAppId = task.app.getKiwiAppId();
             kiwiCompiler.reset(sysAppId, task.genConfig.kiwiTemplateRepo(), task.genConfig.kiwiTemplateBranch());
             pageCompiler.reset(sysAppId, task.genConfig.pageTemplateRepo(), task.genConfig.pageTemplateBranch());
             var plan = executeGen(() -> plan(task));
@@ -211,9 +211,9 @@ public class GenerationService {
         var exch = exchClient.get(exchangeId);
         var app = appClient.get(exch.getAppId());
         if (exch.isStageSuccessful(StageType.BACKEND))
-            kiwiCompiler.revert(app.getSystemAppId());
+            kiwiCompiler.revert(app.getKiwiAppId());
         if (exch.isStageSuccessful(StageType.FRONTEND))
-            pageCompiler.revert(app.getSystemAppId());
+            pageCompiler.revert(app.getKiwiAppId());
     }
 
     private record Plan(boolean generateKiwi, boolean generatePage, @Nullable String appName) {
@@ -240,8 +240,8 @@ public class GenerationService {
         var exch = task.exchange;
         if (exch.isSkipPageGeneration())
             return task.isStageSuccessful(StageType.BACKEND) ? Plan.none : Plan.kiwiOnly;
-        var kiwiCode = PatchReader.buildCode(kiwiCompiler.getSourceFiles(task.app.getSystemAppId()));
-        var pageCode = PatchReader.buildCode(pageCompiler.getSourceFiles(task.app.getSystemAppId()));
+        var kiwiCode = PatchReader.buildCode(kiwiCompiler.getSourceFiles(task.app.getKiwiAppId()));
+        var pageCode = PatchReader.buildCode(pageCompiler.getSourceFiles(task.app.getKiwiAppId()));
         var chat = agent.createChat();
         var planPrompt = createPlanPrompt(exch, kiwiCode, pageCode, task);
         log.info("Plan prompt:\n{}", planPrompt);
@@ -302,7 +302,7 @@ public class GenerationService {
     }
 
     private void generateKiwi(Task task) {
-        var sysAppId = task.app.getSystemAppId();
+        var sysAppId = task.app.getKiwiAppId();
         var userPrompt = task.exchange.getPrompt();
         var stageIdx = task.enterStageAndAttempt(StageType.BACKEND);
         try {
@@ -342,7 +342,7 @@ public class GenerationService {
     private DeployResult generateCode(Chat chat, String prompt, Task task, Compiler compiler) {
         try {
             var patch = new PatchReader(generateContent(chat, prompt, task)).read();
-            return runCompiler(compiler, task.app.getSystemAppId(), patch.addedFiles(), patch.removedFiles());
+            return runCompiler(compiler, task.app.getKiwiAppId(), patch.addedFiles(), patch.removedFiles());
         } catch (MalformedHunkException e) {
             return new DeployResult(false, e.getMessage());
         }
@@ -407,7 +407,7 @@ public class GenerationService {
     private void generatePages(String apiSource, Task task) {
         var stageIdx = task.enterStageAndAttempt(StageType.FRONTEND);
         try {
-            var appId = task.app.getSystemAppId();
+            var appId = task.app.getKiwiAppId();
             var chat = agent.createChat();
             var existingFiles = pageCompiler.getSourceFiles(appId);
             String prompt;

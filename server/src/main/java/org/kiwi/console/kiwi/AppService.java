@@ -28,10 +28,10 @@ public class AppService implements AppClient {
 
     @Override
     public String save(App app) {
-        long sysAppId = app.getSystemAppId();
+        long sysAppId = app.getKiwiAppId();
         var user = userClient.get(app.getOwnerId());
-        var sysUserId = user.getSysUserId();
-        if (app.getSystemAppId() == -1)
+        var sysUserId = user.getKiwiUserId();
+        if (app.getKiwiAppId() == -1)
             sysAppId = sysAppClient.save(new SystemApp(null, app.getName(), sysUserId));
         else
             sysAppClient.save(new SystemApp(sysAppId, app.getName(), sysUserId));
@@ -49,14 +49,14 @@ public class AppService implements AppClient {
     public void updateName(UpdateNameRequest request) {
         var app = get(request.applicationId());
         var user = userClient.get(app.getOwnerId());
-        sysAppClient.save(new SystemApp(app.getSystemAppId(), request.name(), user.getSysUserId()));
+        sysAppClient.save(new SystemApp(app.getKiwiAppId(), request.name(), user.getKiwiUserId()));
         appClient.updateName(request);
     }
 
     @Override
     public void delete(DeleteAppRequest request) {
         var r = appClient.get(request.appId());
-        sysAppClient.delete(r.getSystemAppId());
+        sysAppClient.delete(r.getKiwiAppId());
         appClient.delete(request);
     }
 
@@ -89,7 +89,7 @@ public class AppService implements AppClient {
         System.out.println("Search successful, found " + searchResult.total() + " applications.");
         for (App item : searchResult.items()) {
             System.out.println("Application ID: " + item.getId() + ", Name: " + item.getName() +
-                    ", Owner ID: " + item.getOwnerId() + ", System App ID: " + item.getSystemAppId());
+                    ", Owner ID: " + item.getOwnerId() + ", System App ID: " + item.getKiwiAppId());
         }
 
 //        var r = appService.get("01a49cdab90700");

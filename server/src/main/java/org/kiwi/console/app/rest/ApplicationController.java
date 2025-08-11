@@ -55,8 +55,8 @@ public class ApplicationController {
         var app = appClient.get(id);
         if (!app.getOwnerId().equals(userId))
             throw new BusinessException(ErrorCode.FORBIDDEN);
-        pageCompiler.delete(app.getSystemAppId());
-        kiwiCompiler.delete(app.getSystemAppId());
+        pageCompiler.delete(app.getKiwiAppId());
+        kiwiCompiler.delete(app.getKiwiAppId());
         appClient.delete(new DeleteAppRequest(id));
     }
 

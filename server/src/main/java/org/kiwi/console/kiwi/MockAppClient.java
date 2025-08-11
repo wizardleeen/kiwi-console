@@ -48,7 +48,7 @@ public class MockAppClient implements AppClient {
         if (app.getId() == null) {
             app.setGenConfigId(userClient.get(app.getOwnerId()).getGenConfigId());
             app.setId(Long.toString(System.currentTimeMillis()));
-            app.setSystemAppId(random.nextInt(10000));
+            app.setKiwiAppId(random.nextInt(10000));
         }
         apps.put(app.getId(), app);
         return app.getId();
@@ -56,7 +56,7 @@ public class MockAppClient implements AppClient {
 
     private App copy(App app) {
         return new App(app.getId(), app.getName(), app.getOwnerId(),
-                app.getSystemAppId(), app.getMemberIds(), app.getGenConfigId());
+                app.getKiwiAppId(), app.getMemberIds(), app.getGenConfigId());
     }
 
     @Override
