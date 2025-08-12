@@ -364,6 +364,8 @@ public class GenerationService {
                 buf.append(contentChunk);
             }
         }, () -> task.cancelled);
+        if (buf.isEmpty())
+            throw new AgentException("No content generated");
         return buf.toString();
     }
 
