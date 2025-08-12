@@ -39,7 +39,7 @@ public class AuthenticateFilter extends OncePerRequestFilter {
         var token = auth.substring(7);
         var sysUserId = sysUserClient.authenticate(new SysAuthenticateRequest(token));
         if (sysUserId != null) {
-            var userId = userClient.getBySysUserId(new GetBySysUserIdRequest(sysUserId));
+            var userId = userClient.getByKiwiUserId(new GetByKiwiUserIdRequest(sysUserId));
             var authToken = new UsernamePasswordAuthenticationToken(userId, null, List.of());
             authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
             SecurityContextHolder.getContext().setAuthentication(authToken);

@@ -70,7 +70,7 @@ public class GenerationServiceTest extends TestCase {
         genService.generate(GenerationRequest.create(null, prompt),userId, discardListener);
         var appId = exchangeClient.getLast().getAppId();
         var app = appClient.get(appId);
-        var sysAppId = app.getSystemAppId();
+        var sysAppId = app.getKiwiAppId();
 //        assertEquals("Test App", app.getName());
 
         assertEquals("class Foo {}\n", kiwiCompiler.getCode(sysAppId, MAIN_KIWI));
@@ -290,8 +290,8 @@ public class GenerationServiceTest extends TestCase {
         generationService.revert(exch.getId());
         var exch1 = exchangeClient.getFirst();
         assertSame(ExchangeStatus.REVERTED, exch1.getStatus());
-        assertEquals(0, kiwiCompiler.getSourceFiles(app.getSystemAppId()).size());
-        assertEquals(1, pageCompiler.getSourceFiles(app.getSystemAppId()).size());
+        assertEquals(0, kiwiCompiler.getSourceFiles(app.getKiwiAppId()).size());
+        assertEquals(1, pageCompiler.getSourceFiles(app.getKiwiAppId()).size());
     }
 
     private final GenerationListener discardListener = new GenerationListener() {

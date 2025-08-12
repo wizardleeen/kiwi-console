@@ -46,7 +46,7 @@ public class MockUserClient implements UserClient {
     }
 
     @Override
-    public String getBySysUserId(GetBySysUserIdRequest request) {
+    public String getByKiwiUserId(GetByKiwiUserIdRequest request) {
         throw new UnsupportedOperationException();
     }
 

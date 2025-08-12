@@ -255,8 +255,9 @@ Represents a paginated list of items.
 ### `Application`
 Represents an application.
 
-| Field      | Type     | Description          |
-|:-----------|:---------|:---------------------|
-| `id`       | `string` | Application ID       |
-| `name`     | `string` | Application          |
-| `ownerId`  | `string` | Application owner ID |
+| Field       | Type     | Description          |
+|:------------|:---------|:---------------------|
+| `id`        | `string` | Application ID       |
+| `name`      | `string` | Application          |
+| `ownerId`   | `string` | Application owner ID |
+| `kiwiAppId` | `long`   | Kiwi Application ID  |

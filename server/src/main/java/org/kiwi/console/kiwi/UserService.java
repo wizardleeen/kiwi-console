@@ -47,8 +47,8 @@ public class UserService implements UserClient {
     }
 
     @Override
-    public String getBySysUserId(GetBySysUserIdRequest request) {
-        return userClient.getBySysUserId(request);
+    public String getByKiwiUserId(GetByKiwiUserIdRequest request) {
+        return userClient.getByKiwiUserId(request);
     }
 
     @Override
@@ -79,7 +79,7 @@ public class UserService implements UserClient {
                     "123456"
             ));
             var user = client.get(userId);
-            client.getBySysUserId(new GetBySysUserIdRequest(user.getSysUserId()));
+            client.getByKiwiUserId(new GetByKiwiUserIdRequest(user.getKiwiUserId()));
         }
 //        var userId = client.register(new RegisterRequest(
 //                "hqq", "123456"
@@ -98,11 +98,11 @@ public class UserService implements UserClient {
 //
 //        System.out.println("Token: " + token);
 //
-//        var sysUserId = client.sysUserClient.authenticate(new SysAuthenticateRequest(token));
+//        var kiwiUserId = client.sysUserClient.authenticate(new SysAuthenticateRequest(token));
 //
-//        System.out.println("System user ID: " + sysUserId);
+//        System.out.println("System user ID: " + kiwiUserId);
 //
-//        var userId2 = client.getBySysUserId(new GetBySysUserIdRequest(sysUserId));
+//        var userId2 = client.getBySysUserId(new GetBySysUserIdRequest(kiwiUserId));
 //        System.out.println("User ID: " + userId2);
     }
 
