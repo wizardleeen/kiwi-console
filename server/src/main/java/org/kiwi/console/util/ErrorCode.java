@@ -28,6 +28,8 @@ public enum ErrorCode {
 
     INVALID_ATTACHMENT_TYPE(4007, "Invalid attachment type: {}"),
 
+    UNSUPPORTED_ATTACHMENT(4008, "Attachment with content type '{}' is not supported by the underlying model")
+
     ;
 
 

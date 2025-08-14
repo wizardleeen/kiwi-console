@@ -1,0 +1,431 @@
+package org.kiwi.console.generate.claude;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import okhttp3.*;
+import okhttp3.sse.EventSource;
+import okhttp3.sse.EventSourceListener;
+import okhttp3.sse.EventSources;
+import org.jetbrains.annotations.NotNull;
+import org.kiwi.console.util.Utils;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Spliterator;
+import java.util.Spliterators;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
+
+public class ClaudeClient {
+    private static final String BASE_URL = "https://api.anthropic.com/v1";
+    private static final String DEFAULT_MODEL = "claude-opus-4-1-20250805";
+    private static final String API_VERSION = "2023-06-01";
+    private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
+
+    private final OkHttpClient httpClient;
+    private final ObjectMapper objectMapper;
+    private final String apiKey;
+    private final String model;
+    private final List<Message> conversationHistory;
+
+    // A special marker object to signal the end of the stream.
+    private static final StreamEvent POISON_PILL = new StreamEvent.Done();
+
+    public ClaudeClient(String apiKey) {
+        this(apiKey, DEFAULT_MODEL);
+    }
+
+    public ClaudeClient(String apiKey, String model) {
+        this.apiKey = apiKey;
+        this.model = model;
+        this.conversationHistory = new ArrayList<>();
+        this.objectMapper = Utils.getObjectMapper();
+
+        var clientBuilder = new OkHttpClient.Builder()
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(5, TimeUnit.MINUTES) // Long timeout for streaming
+                .writeTimeout(5, TimeUnit.MINUTES);
+
+        this.httpClient = clientBuilder.build();
+    }
+
+    /**
+     * Send a text message and get a complete response
+     */
+    public CompletableFuture<ClaudeResponse> sendMessage(String message) {
+        var userMessage = new Message("user", message);
+        conversationHistory.add(userMessage);
+
+        return sendRequest(false)
+                .thenApply(response -> {
+                    if (response.content() != null && !response.content().isEmpty()) {
+                        var assistantMessage = new Message("assistant", response.content().get(0).text());
+                        conversationHistory.add(assistantMessage);
+                    }
+                    return response;
+                });
+    }
+
+    /**
+     * Send a message with images
+     */
+    public CompletableFuture<ClaudeResponse> sendMessageWithImages(String message, List<ImageData> images) {
+        var contentList = new ArrayList<Content>();
+        contentList.add(new TextContent(message));
+
+        for (var image : images) {
+            contentList.add(new ImageContent(new ImageSource(
+                    "base64",
+                    image.mediaType(),
+                    image.data()
+            )));
+        }
+
+        var userMessage = new Message("user", contentList);
+        conversationHistory.add(userMessage);
+
+        return sendRequest(false)
+                .thenApply(response -> {
+                    if (response.content() != null && !response.content().isEmpty()) {
+                        var assistantMessage = new Message("assistant", response.content().get(0).text());
+                        conversationHistory.add(assistantMessage);
+                    }
+                    return response;
+                });
+    }
+
+    /**
+     * Streams a response for a text-only message.
+     * The returned Stream blocks on `next()` until an event is available.
+     * It is recommended to use this in a try-with-resources block.
+     *
+     * @param message The user message to send.
+     * @return A Stream of StreamEvent objects.
+     * @throws RuntimeException if the initial request cannot be created.
+     */
+    public Stream<StreamEvent> streamMessage(String message) {
+        var userMessage = new Message("user", message);
+        conversationHistory.add(userMessage);
+        return createStreamForHistory(); // MODIFIED: Delegate to common stream creation logic
+    }
+
+    /**
+     * [NEW] Streams a response for a message containing text and multiple images.
+     * The returned Stream blocks on `next()` until an event is available.
+     * It is recommended to use this in a try-with-resources block.
+     *
+     * @param message The user text message to send.
+     * @param images  A list of ImageData objects to send.
+     * @return A Stream of StreamEvent objects.
+     * @throws RuntimeException if the initial request cannot be created.
+     */
+    public Stream<StreamEvent> streamMessage(String message, List<ImageData> images) {
+        var contentList = new ArrayList<Content>();
+        contentList.add(new TextContent(message));
+
+        if (images != null) {
+            for (var image : images) {
+                contentList.add(new ImageContent(new ImageSource(
+                        "base64",
+                        image.mediaType(),
+                        image.data()
+                )));
+            }
+        }
+
+        var userMessage = new Message("user", contentList);
+        conversationHistory.add(userMessage);
+        return createStreamForHistory();
+    }
+
+    public Stream<StreamEvent> streamMessage(List<Message> messages) {
+        return createStream(messages);
+    }
+
+
+    /**
+     * [REFACTORED] Private helper to create the stream from the current conversation history.
+     */
+    private Stream<StreamEvent> createStreamForHistory() {
+        return createStream(conversationHistory);
+    }
+
+    private Stream<StreamEvent> createStream(List<Message> messages) {
+        var requestPayload = new ClaudeRequest(model, 4096, messages, true);
+
+        Request request;
+        try {
+            String json = objectMapper.writeValueAsString(requestPayload);
+            RequestBody body = RequestBody.create(json, JSON);
+            request = new Request.Builder()
+                    .url(BASE_URL + "/messages")
+                    .header("Content-Type", "application/json")
+                    .header("x-api-key", apiKey)
+                    .header("anthropic-version", API_VERSION)
+                    .header("Accept", "text/event-stream")
+                    .header("Cache-Control", "no-cache")
+                    .header("User-Agent", "Claude-Java-Client-OkHttp/1.0")
+                    .post(body)
+                    .build();
+        } catch (JsonProcessingException e) {
+            // Fail fast if we can't even create the request.
+            throw new RuntimeException("Failed to serialize request payload", e);
+        }
+
+        // A thread-safe queue to bridge the async listener and the sync Stream.
+        BlockingQueue<StreamEvent> queue = new LinkedBlockingQueue<>();
+        // Atomic reference to hold any terminal exception.
+        AtomicReference<Throwable> streamError = new AtomicReference<>();
+
+        EventSourceListener listener = createStreamListener(queue, streamError);
+
+        // The EventSource will start processing events on a background thread.
+        EventSource eventSource = EventSources.createFactory(httpClient).newEventSource(request, listener);
+
+        // This custom Spliterator will block on queue.take() until an event is available.
+        var spliterator = new Spliterators.AbstractSpliterator<StreamEvent>(Long.MAX_VALUE, Spliterator.ORDERED) {
+            @Override
+            public boolean tryAdvance(Consumer<? super StreamEvent> action) {
+                // First, check if a terminal error occurred.
+                if (streamError.get() != null) {
+                    throw new RuntimeException("Stream failed with an exception", streamError.get());
+                }
+
+                try {
+                    // Block until an event is available from the listener thread.
+                    StreamEvent event = queue.take();
+
+                    // Check for the poison pill to terminate the stream.
+                    if (event == POISON_PILL) {
+                        // Re-check for error in case it happened while we were waiting
+                        if (streamError.get() != null) {
+                            throw new RuntimeException("Stream failed with an exception", streamError.get());
+                        }
+                        return false; // End of stream
+                    }
+
+                    action.accept(event);
+                    return true;
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    streamError.set(e);
+                    throw new RuntimeException("Stream consumption was interrupted", e);
+                }
+            }
+        };
+
+        // Create a stream from the spliterator and ensure the eventSource is cancelled when the stream is closed.
+        return StreamSupport.stream(spliterator, false).onClose(eventSource::cancel);
+    }
+
+    private EventSourceListener createStreamListener(BlockingQueue<StreamEvent> queue, AtomicReference<Throwable> streamError) {
+        return new EventSourceListener() {
+            private final StringBuilder fullResponse = new StringBuilder();
+
+            @Override
+            public void onEvent(@NotNull EventSource eventSource, String id, String type, @NotNull String data) {
+                try {
+                    if ("error".equals(type)) {
+                        // Handle explicit error events from the API
+                        var error = new RuntimeException("Received error event from API: " + data);
+                        streamError.set(error);
+                        queue.offer(POISON_PILL); // Unblock consumer
+                        return;
+                    }
+
+                    var streamResponse = objectMapper.readValue(data, StreamResponse.class);
+                    StreamEvent event = switch (streamResponse.type()) {
+                        case "content_block_delta" -> {
+                            var text = streamResponse.delta() != null ? streamResponse.delta().text() : null;
+                            if (text != null) {
+                                fullResponse.append(text);
+                                yield new StreamEvent.ContentDelta(text);
+                            }
+                            yield null; // No event to emit if delta is empty
+                        }
+                        case "message_start" -> new StreamEvent.MessageStart();
+                        case "content_block_start" -> new StreamEvent.ContentStart();
+                        case "content_block_stop" -> new StreamEvent.ContentStop();
+                        case "message_stop" -> new StreamEvent.MessageStop();
+                        default -> null; // Ignore unknown event types
+                    };
+
+                    if (event != null) {
+                        queue.offer(event);
+                    }
+                } catch (Exception e) {
+                    streamError.set(e);
+                    queue.offer(POISON_PILL); // Unblock consumer
+                }
+            }
+
+            @Override
+            public void onClosed(@NotNull EventSource eventSource) {
+                if (!fullResponse.isEmpty()) {
+                    var assistantMessage = new Message("assistant", fullResponse.toString());
+                    conversationHistory.add(assistantMessage);
+                }
+                queue.offer(new StreamEvent.Done()); // Signal clean completion
+                queue.offer(POISON_PILL);           // Terminate the stream
+            }
+
+            @Override
+            public void onFailure(@NotNull EventSource eventSource, Throwable t, Response response) {
+                Throwable finalError;
+                if (response != null) {
+                    try {
+                        finalError = new RuntimeException("Stream failed with HTTP " + response.code() + ": " + response.body().string(), t);
+                    } catch (IOException e) {
+                        finalError = new RuntimeException("Stream failed with HTTP " + response.code() + ", could not read body", t);
+                    }
+                } else {
+                    finalError = t;
+                }
+                streamError.set(finalError);
+                queue.offer(POISON_PILL); // Unblock consumer and signal termination
+            }
+        };
+    }
+
+    /**
+     * [DEPRECATED] Use streamMessage() instead.
+     * Stream a response with real-time updates using callbacks.
+     */
+    @Deprecated
+    public void streamMessageWithCallbacks(String message, Consumer<StreamEvent> onEvent, Consumer<Throwable> onError) {
+        var userMessage = new Message("user", message);
+        conversationHistory.add(userMessage);
+
+        var requestPayload = new ClaudeRequest(model, 4096, conversationHistory, true);
+
+        try {
+            String json = objectMapper.writeValueAsString(requestPayload);
+            RequestBody body = RequestBody.create(json, JSON);
+
+            Request request = new Request.Builder()
+                    .url(BASE_URL + "/messages")
+                    .header("Content-Type", "application/json")
+                    .header("x-api-key", apiKey)
+                    .header("anthropic-version", API_VERSION)
+                    .header("Accept", "text/event-stream")
+                    .header("Cache-Control", "no-cache")
+                    .header("User-Agent", "Claude-Java-Client-OkHttp/1.0")
+                    .post(body)
+                    .build();
+
+            // This listener is simplified as it doesn't need to coordinate with a queue.
+            EventSourceListener listener = new EventSourceListener() {
+                private final StringBuilder fullResponse = new StringBuilder();
+
+                @Override
+                public void onEvent(@NotNull EventSource eventSource, String id, String type, @NotNull String data) {
+                    try {
+                        var streamResponse = objectMapper.readValue(data, StreamResponse.class);
+                        switch (streamResponse.type()) {
+                            case "content_block_delta" -> {
+                                var text = streamResponse.delta() != null ? streamResponse.delta().text() : null;
+                                if (text != null) {
+                                    fullResponse.append(text);
+                                    onEvent.accept(new StreamEvent.ContentDelta(text));
+                                }
+                            }
+                            case "message_start" -> onEvent.accept(new StreamEvent.MessageStart());
+                            case "content_block_start" -> onEvent.accept(new StreamEvent.ContentStart());
+                            case "content_block_stop" -> onEvent.accept(new StreamEvent.ContentStop());
+                            case "message_stop" -> onEvent.accept(new StreamEvent.MessageStop());
+                        }
+                    } catch (Exception e) {
+                        onError.accept(e);
+                    }
+                }
+
+                @Override
+                public void onClosed(@NotNull EventSource eventSource) {
+                    if (!fullResponse.isEmpty()) {
+                        conversationHistory.add(new Message("assistant", fullResponse.toString()));
+                    }
+                    onEvent.accept(new StreamEvent.Done());
+                }
+
+                @Override
+                public void onFailure(@NotNull EventSource eventSource, Throwable t, Response response) {
+                    try {
+                        if (response != null) {
+                            onError.accept(new RuntimeException("Stream failed with HTTP " + response.code() + ": " + response.body().string(), t));
+                        } else {
+                            onError.accept(t);
+                        }
+                    } catch (IOException e) {
+                        onError.accept(new RuntimeException("Stream failed with HTTP " + response.code() + ", could not read body", e));
+                    }
+                }
+            };
+            EventSources.createFactory(httpClient).newEventSource(request, listener);
+        } catch (JsonProcessingException e) {
+            onError.accept(e);
+        }
+    }
+
+
+    private CompletableFuture<ClaudeResponse> sendRequest(boolean stream) {
+        var future = new CompletableFuture<ClaudeResponse>();
+        var requestPayload = new ClaudeRequest(
+                model,
+                4096, // max_tokens
+                conversationHistory,
+                stream ? true : null // Only include stream field if true
+        );
+
+        try {
+            String json = objectMapper.writeValueAsString(requestPayload);
+            RequestBody body = RequestBody.create(json, JSON);
+
+            Request request = new Request.Builder()
+                    .url(BASE_URL + "/messages")
+                    .header("Content-Type", "application/json")
+                    .header("x-api-key", apiKey)
+                    .header("anthropic-version", API_VERSION)
+                    .header("User-Agent", "Claude-Java-Client-OkHttp/1.0")
+                    .post(body)
+                    .build();
+
+            httpClient.newCall(request).enqueue(new Callback() {
+                @Override
+                public void onFailure(@NotNull Call call, @NotNull IOException e) {
+                    future.completeExceptionally(e);
+                }
+
+                @Override
+                public void onResponse(@NotNull Call call, @NotNull Response response) throws IOException {
+                    try (response) {
+                        String responseBody = response.body().string();
+                        if (!response.isSuccessful()) {
+                            future.completeExceptionally(new RuntimeException("HTTP " + response.code() + ": " + responseBody));
+                            return;
+                        }
+                        ClaudeResponse claudeResponse = objectMapper.readValue(responseBody, ClaudeResponse.class);
+                        future.complete(claudeResponse);
+                    } catch (Exception e) {
+                        future.completeExceptionally(e);
+                    }
+                }
+            });
+
+        } catch (JsonProcessingException e) {
+            future.completeExceptionally(e);
+        }
+        return future;
+    }
+
+    public void clearHistory() {
+        conversationHistory.clear();
+    }
+
+    public List<Message> getConversationHistory() {
+        return List.copyOf(conversationHistory);
+    }
+}

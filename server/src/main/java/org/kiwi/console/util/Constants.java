@@ -1,5 +1,7 @@
 package org.kiwi.console.util;
 
+import java.nio.file.Path;
+
 public class Constants {
 
     public static final long PLATFORM_APP_ID = 2;
@@ -20,4 +22,6 @@ public class Constants {
     public static final String KIWI_WORKDIR = "/Users/leen/develop/kiwi-works";
     public static final String PAGE_WORKDIR = "/Users/leen/develop/page-works";
     public static final String KIWI_TEMPLATE_REPO = "git@github.com:wizardleeen/kiwi-template.git";
+    public static final Path CLAUDE_APIKEY_PATH = Path.of("/Users/leen/develop/claude_apikey");
+
 }
