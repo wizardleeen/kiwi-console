@@ -21,8 +21,6 @@ public class ClaudeClientExample {
         var client = new ClaudeClient(apiKey);
         
         try {
-            simpleConversation(client);
-            
             streamingResponse(client);
 
             sendImage(client);
@@ -32,16 +30,7 @@ public class ClaudeClientExample {
             e.printStackTrace();
         }
     }
-    
-    private static void simpleConversation(ClaudeClient client) throws Exception {
-        System.out.println("\n=== Simple Conversation ===");
-        
-        var response = client.sendMessage("Hello! Can you tell me a short joke?").get();
-        
-        System.out.println("Claude: " + response.content().get(0).text());
-        System.out.println("Tokens used: " + response.usage().outputTokens());
-    }
-    
+
     private static void streamingResponse(ClaudeClient client) throws Exception {
         System.out.println("\n=== Streaming Response ===");
         

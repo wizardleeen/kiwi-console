@@ -9,9 +9,14 @@ import java.util.List;
 record ClaudeRequest(
         String model,
         @JsonProperty("max_tokens") int maxTokens,
+        Thinking thinking,
         List<Message> messages,
         Boolean stream // Use Boolean to allow null
 ) {}
+
+record Thinking(String type, @JsonProperty("budget_tokens") int budgetTokens) {
+
+}
 
 // Response model
 record ClaudeResponse(
