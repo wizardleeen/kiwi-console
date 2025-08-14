@@ -155,7 +155,7 @@ public class ClaudeClient {
     }
 
     private Stream<StreamEvent> createStream(List<Message> messages) {
-        var requestPayload = new ClaudeRequest(model, 4096, messages, true);
+        var requestPayload = new ClaudeRequest(model, 32000, messages, true);
 
         Request request;
         try {
