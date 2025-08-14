@@ -40,9 +40,7 @@ public class FileService {
     }
 
     private String convertFileName(String fileName) {
-        var lastIdx = fileName.lastIndexOf('.');
-        var ext = fileName.substring(lastIdx);
-        return UUID.randomUUID() + ext;
+        return FileNameGenerator.generateUniqueFileName(fileName);
     }
 
     public boolean exists(long appId, String url) {
