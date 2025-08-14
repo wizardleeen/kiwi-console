@@ -79,6 +79,9 @@ public class Utils {
 
     }
 
+    public static ObjectMapper getObjectMapper() {
+        return OBJECT_MAPPER;
+    }
 
     public static <T> T readJSONString(String jsonStr, Class<T> type) {
         try {

@@ -2,6 +2,7 @@ package org.kiwi.console.util;
 
 import org.kiwi.console.file.UrlFetcher;
 import org.kiwi.console.generate.*;
+import org.kiwi.console.generate.claude.ClaudeAgent;
 import org.kiwi.console.kiwi.*;
 import org.kiwi.console.file.FileService;
 import org.springframework.beans.factory.annotation.Configurable;
@@ -98,7 +99,7 @@ public class ConsoleConfig {
     }
 
     @Bean
-    public GenerationService generationService(GeminiAgent geminiAgent,
+    public GenerationService generationService(Agent agent,
                                                KiwiCompiler kiwiCompiler,
                                                PageCompiler pageCompiler,
                                                AppClient appClient,
@@ -108,7 +109,7 @@ public class ConsoleConfig {
                                                UrlFetcher urlFetcher,
                                                @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor) {
         return new GenerationService(
-                geminiAgent,
+                agent,
                 kiwiCompiler,
                 pageCompiler,
                 exchangeClient,
@@ -137,8 +138,8 @@ public class ConsoleConfig {
     }
 
     @Bean
-    public GeminiAgent geminiAgent() {
-        return new GeminiAgent(geminiConfig.apiKey);
+    public Agent agent() {
+        return new ClaudeAgent(geminiConfig.apiKey);
     }
 
     @Bean
