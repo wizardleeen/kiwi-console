@@ -9,22 +9,26 @@ import org.kiwi.console.util.ErrorCode;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 
-public class ClaudeAgent implements Agent {
+public class ClaudeModel implements Model {
 
     private final ClaudeClient client;
 
-    public ClaudeAgent(String apikey) {
+    public ClaudeModel(String apikey) {
         this.client = new ClaudeClient(apikey);
     }
 
     @Override
     public Chat createChat() {
         return new ClaudeChat();
+    }
+
+    @Override
+    public String getName() {
+        return "claude-opus-4";
     }
 
     class ClaudeChat implements Chat {
@@ -50,7 +54,7 @@ public class ClaudeAgent implements Agent {
             }
             var message = new Message("user", contents);
             history.add(message);
-            try (var events = client.streamMessage(history)) {
+            try (var events = client.send(history)) {
                 var buf = new StringBuilder();
                 var it = events.iterator();
                 loop: while (it.hasNext()) {
@@ -75,7 +79,7 @@ public class ClaudeAgent implements Agent {
 
     @SneakyThrows
     public static void main(String[] args) {
-        var agent = new ClaudeAgent(Files.readString(Constants.CLAUDE_APIKEY_PATH).trim());
+        var agent = new ClaudeModel(Files.readString(Constants.CLAUDE_APIKEY_PATH).trim());
         var chat = agent.createChat();
         var listener = new ChatStreamListener() {
 
@@ -96,13 +100,10 @@ public class ClaudeAgent implements Agent {
                 return false;
             }
         };
-        chat.send("Describe the image", List.of(new File(
-                Files.readAllBytes(Path.of("/Users/leen/DeskTop/chris.jpeg")),
-                "image/jpeg"
-        )), listener, ctrl);
+        chat.send("I am Leen", List.of(), listener, ctrl);
         System.out.println();
+        chat.send("Who I am", List.of(), listener, ctrl);
         System.out.println();
-        chat.send("Give me a brief title for the image", List.of(), listener, ctrl);
     }
 
 }

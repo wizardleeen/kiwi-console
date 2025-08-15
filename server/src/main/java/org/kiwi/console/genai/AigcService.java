@@ -22,14 +22,14 @@ import java.util.Objects;
 @Component
 public class AigcService {
 
-    private final Agent agent;
+    private final Model model;
     private final String createPrompt;
     private final String fixPrompt;
     private final String updatePrompt;
     private final KiwiCompiler compiler;
 
-    public AigcService(Agent agent, KiwiCompiler compiler) {
-        this.agent = agent;
+    public AigcService(GeminiModel model, KiwiCompiler compiler) {
+        this.model = model;
         this.compiler = compiler;
         createPrompt = loadPrompt("/prompt/kiwi-create.md");
         fixPrompt = loadPrompt("/prompt/kiwi-fix.md");
@@ -46,7 +46,7 @@ public class AigcService {
 
     public void generate(GenerateRequest request) {
         compiler.reset(request.appId(), Constants.KIWI_TEMPLATE_REPO, "main");
-        var chat = agent.createChat();
+        var chat = model.createChat();
         var existingCode = compiler.getSourceFiles(request.appId());
         String text;
         if (!existingCode.isEmpty())
@@ -125,7 +125,7 @@ public class AigcService {
         var apikeyPath = "/Users/leen/develop/gemini/apikey";
         var apikey = Files.readString(Path.of(apikeyPath));
         var chatService = new AigcService(
-                new GeminiAgent(apikey),
+                new GeminiModel(apikey),
                 new DefaultKiwiCompiler(
                         Path.of("/tmp/kiwi-works"),
                         new DeployClient("http://localhost:8080", HttpClient.newBuilder()

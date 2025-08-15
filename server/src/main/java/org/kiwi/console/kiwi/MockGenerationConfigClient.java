@@ -14,6 +14,7 @@ public class MockGenerationConfigClient implements GenerationConfigClient {
         preset = new GenerationConfig(
                 UUID.randomUUID().toString(),
                 "default",
+                "mock",
                 Utils.loadResource("/prompt/page-create.md"),
                 Utils.loadResource("/prompt/page-update.md"),
                 Utils.loadResource("/prompt/page-fix.md"),
@@ -52,6 +53,7 @@ public class MockGenerationConfigClient implements GenerationConfigClient {
         return new GenerationConfig(
                 config.id() != null ? config.id() :UUID.randomUUID().toString(),
                 config.name(),
+                config.model(),
                 config.pageCreatePrompt(),
                 config.pageUpdatePrompt(),
                 config.pageFixPrompt(),

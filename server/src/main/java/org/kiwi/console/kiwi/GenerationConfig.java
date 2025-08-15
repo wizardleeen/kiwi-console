@@ -3,6 +3,7 @@ package org.kiwi.console.kiwi;
 public record GenerationConfig(
         String id,
         String name,
+        String model,
         String pageCreatePrompt,
         String pageUpdatePrompt,
         String pageFixPrompt,

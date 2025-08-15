@@ -4,21 +4,19 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
-// Request model - matches Anthropic API exactly
 @JsonInclude(JsonInclude.Include.NON_NULL)
 record ClaudeRequest(
         String model,
         @JsonProperty("max_tokens") int maxTokens,
         Thinking thinking,
         List<Message> messages,
-        Boolean stream // Use Boolean to allow null
+        Boolean stream
 ) {}
 
 record Thinking(String type, @JsonProperty("budget_tokens") int budgetTokens) {
 
 }
 
-// Response model
 record ClaudeResponse(
         String id,
         String type,
@@ -40,23 +38,19 @@ record ContentBlock(
         String text
 ) {}
 
-// Simplified Message structure that can handle both string and complex content
 record Message(
         String role,
-        Object content // Can be String or List<Content>
+        Object content
 ) {
-    // Constructor for simple text messages
     public Message(String role, String text) {
         this(role, (Object) text);
     }
 
-    // Constructor for complex content (with images)
     public Message(String role, List<Content> contentList) {
         this(role, (Object) contentList);
     }
 }
 
-// Content types for complex messages
 sealed interface Content permits TextContent, ImageContent {}
 
 record TextContent(
@@ -83,7 +77,6 @@ record ImageSource(
         String data
 ) {}
 
-// Helper for image data
 record ImageData(
         String mediaType,
         String data
@@ -105,7 +98,6 @@ record ImageData(
     }
 }
 
-// Streaming models
 record StreamResponse(
         String type,
         Delta delta,
@@ -123,7 +115,6 @@ record StreamMessage(
         Usage usage
 ) {}
 
-// Stream events
 sealed interface StreamEvent {
     record MessageStart() implements StreamEvent {}
     record ContentStart() implements StreamEvent {}

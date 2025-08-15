@@ -1,7 +1,9 @@
 package org.kiwi.console.generate;
 
-public interface Agent {
+public interface Model {
 
     Chat createChat();
+
+    String getName();
 
 }

@@ -1,9 +1,14 @@
 package org.kiwi.console.generate;
 
-class MockAgent implements Agent {
+class MockModel implements Model {
 
     @Override
     public Chat createChat() {
         return new MockChat();
+    }
+
+    @Override
+    public String getName() {
+        return "mock";
     }
 }
