@@ -56,7 +56,8 @@ public class GenerationServiceTest extends TestCase {
     }
 
     public void testGeneration() {
-        var genService = new GenerationService(new MockAgent(), kiwiCompiler, pageCompiler,
+        var genService = new GenerationService(List.of(new MockModel()),
+                kiwiCompiler, pageCompiler,
                 exchangeClient,
                 appClient,
                 userClient, "http://{}.metavm.test",
@@ -126,7 +127,7 @@ public class GenerationServiceTest extends TestCase {
 
     public void testCancel() {
         var taskExecutor = new DelayedTaskExecutor();
-        var generationService = new GenerationService(new MockAgent(), kiwiCompiler, pageCompiler,
+        var generationService = new GenerationService(List.of(new MockModel()), kiwiCompiler, pageCompiler,
                 exchangeClient,
                 appClient,
                 userClient, "http://{}.metavm.test",
@@ -148,7 +149,7 @@ public class GenerationServiceTest extends TestCase {
     }
 
     public void testHideAttempts() {
-        var genService = new GenerationService(new MockAgent(), kiwiCompiler, pageCompiler,
+        var genService = new GenerationService(List.of(new MockModel()), kiwiCompiler, pageCompiler,
                 exchangeClient,
                 appClient,
                 userClient,
@@ -193,7 +194,7 @@ public class GenerationServiceTest extends TestCase {
                 return super.run(appId, sourceFiles, removedFiles);
             }
         };
-        var generationService = new GenerationService(new MockAgent(), kiwiCompiler, pageCompiler,
+        var generationService = new GenerationService(List.of(new MockModel()), kiwiCompiler, pageCompiler,
                 exchangeClient,
                 appClient,
                 userClient, "http://{}.metavm.test",
@@ -215,7 +216,7 @@ public class GenerationServiceTest extends TestCase {
     }
 
     public void testPreventingDuplicateGeneration() {
-        var genService = new GenerationService(new MockAgent(), kiwiCompiler, pageCompiler,
+        var genService = new GenerationService(List.of(new MockModel()), kiwiCompiler, pageCompiler,
                 exchangeClient,
                 appClient,
                 userClient, "http://{}.metavm.test",
@@ -233,7 +234,7 @@ public class GenerationServiceTest extends TestCase {
     }
 
     public void testFailExpiredExchanges() {
-        var genService = new GenerationService(new MockAgent(), kiwiCompiler, pageCompiler,
+        var genService = new GenerationService(List.of(new MockModel()), kiwiCompiler, pageCompiler,
                 exchangeClient,
                 appClient,
                 userClient, "http://{}.metavm.test",
@@ -252,7 +253,7 @@ public class GenerationServiceTest extends TestCase {
     }
 
     public void testReconnectToLostTask() {
-        var genService = new GenerationService(new MockAgent(), kiwiCompiler, pageCompiler,
+        var genService = new GenerationService(List.of(new MockModel()), kiwiCompiler, pageCompiler,
                 exchangeClient,
                 appClient,
                 userClient, "http://{}.metavm.test",
@@ -275,7 +276,7 @@ public class GenerationServiceTest extends TestCase {
     }
 
     public void testRevert() {
-        var generationService = new GenerationService(new MockAgent(), kiwiCompiler, pageCompiler,
+        var generationService = new GenerationService(List.of(new MockModel()), kiwiCompiler, pageCompiler,
                 exchangeClient,
                 appClient,
                 userClient, "http://{}.metavm.test",

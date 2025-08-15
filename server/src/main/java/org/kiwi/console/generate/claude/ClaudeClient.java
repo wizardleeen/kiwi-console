@@ -10,11 +10,12 @@ import org.jetbrains.annotations.NotNull;
 import org.kiwi.console.util.Utils;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Spliterator;
 import java.util.Spliterators;
-import java.util.concurrent.*;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
@@ -30,7 +31,6 @@ public class ClaudeClient {
     private final ObjectMapper objectMapper;
     private final String apiKey;
     private final String model;
-    private final List<Message> conversationHistory;
 
     // A special marker object to signal the end of the stream.
     private static final StreamEvent POISON_PILL = new StreamEvent.Done();
@@ -42,7 +42,6 @@ public class ClaudeClient {
     public ClaudeClient(String apiKey, String model) {
         this.apiKey = apiKey;
         this.model = model;
-        this.conversationHistory = new ArrayList<>();
         this.objectMapper = Utils.getObjectMapper();
 
         var clientBuilder = new OkHttpClient.Builder()
@@ -53,63 +52,8 @@ public class ClaudeClient {
         this.httpClient = clientBuilder.build();
     }
 
-    /**
-     * Streams a response for a text-only message.
-     * The returned Stream blocks on `next()` until an event is available.
-     * It is recommended to use this in a try-with-resources block.
-     *
-     * @param message The user message to send.
-     * @return A Stream of StreamEvent objects.
-     * @throws RuntimeException if the initial request cannot be created.
-     */
-    public Stream<StreamEvent> streamMessage(String message) {
-        var userMessage = new Message("user", message);
-        conversationHistory.add(userMessage);
-        return createStreamForHistory(); // MODIFIED: Delegate to common stream creation logic
-    }
 
-    /**
-     * [NEW] Streams a response for a message containing text and multiple images.
-     * The returned Stream blocks on `next()` until an event is available.
-     * It is recommended to use this in a try-with-resources block.
-     *
-     * @param message The user text message to send.
-     * @param images  A list of ImageData objects to send.
-     * @return A Stream of StreamEvent objects.
-     * @throws RuntimeException if the initial request cannot be created.
-     */
-    public Stream<StreamEvent> streamMessage(String message, List<ImageData> images) {
-        var contentList = new ArrayList<Content>();
-        contentList.add(new TextContent(message));
-
-        if (images != null) {
-            for (var image : images) {
-                contentList.add(new ImageContent(new ImageSource(
-                        "base64",
-                        image.mediaType(),
-                        image.data()
-                )));
-            }
-        }
-
-        var userMessage = new Message("user", contentList);
-        conversationHistory.add(userMessage);
-        return createStreamForHistory();
-    }
-
-    public Stream<StreamEvent> streamMessage(List<Message> messages) {
-        return createStream(messages);
-    }
-
-
-    /**
-     * [REFACTORED] Private helper to create the stream from the current conversation history.
-     */
-    private Stream<StreamEvent> createStreamForHistory() {
-        return createStream(conversationHistory);
-    }
-
-    private Stream<StreamEvent> createStream(List<Message> messages) {
+    Stream<StreamEvent> send(List<Message> messages) {
         var requestPayload = new ClaudeRequest(model,
                 32000,
                 new Thinking("enabled", 31999),
@@ -224,10 +168,6 @@ public class ClaudeClient {
 
             @Override
             public void onClosed(@NotNull EventSource eventSource) {
-                if (!fullResponse.isEmpty()) {
-                    var assistantMessage = new Message("assistant", fullResponse.toString());
-                    conversationHistory.add(assistantMessage);
-                }
                 queue.offer(new StreamEvent.Done()); // Signal clean completion
                 queue.offer(POISON_PILL);           // Terminate the stream
             }
@@ -251,11 +191,4 @@ public class ClaudeClient {
     }
 
 
-    public void clearHistory() {
-        conversationHistory.clear();
-    }
-
-    public List<Message> getConversationHistory() {
-        return List.copyOf(conversationHistory);
-    }
 }

@@ -2,7 +2,9 @@ package org.kiwi.console.util;
 
 import org.kiwi.console.file.UrlFetcher;
 import org.kiwi.console.generate.*;
-import org.kiwi.console.generate.claude.ClaudeAgent;
+import org.kiwi.console.generate.claude.ClaudeModel;
+import org.kiwi.console.generate.k2.K2Model;
+import org.kiwi.console.generate.qwen.QwenModel;
 import org.kiwi.console.kiwi.*;
 import org.kiwi.console.file.FileService;
 import org.springframework.beans.factory.annotation.Configurable;
@@ -18,6 +20,7 @@ import org.yaml.snakeyaml.error.YAMLException;
 import java.io.FileInputStream;
 import java.net.http.HttpClient;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Objects;
 
 @Component
@@ -25,7 +28,7 @@ import java.util.Objects;
 public class ConsoleConfig {
     public static String CONFIG_PATH;
 
-    private final GeminiConfig geminiConfig;
+    private final ApiKeys apiKeys;
     private final KiwiConfig kiwiConfig;
     private final ServerConfig serverConfig;
     private final PageConfig pageConfig;
@@ -36,7 +39,7 @@ public class ConsoleConfig {
     public ConsoleConfig() {
         var config = getConfig();
         serverConfig = buildServerConfig(config);
-        geminiConfig = buildGeminiConfig(config);
+        apiKeys = buildApiKeys(config);
         kiwiConfig = buildKiwiConfig(config);
         pageConfig = buildPageConfig(config);
         urlTemplates = buildUrlTemplates(config);
@@ -58,8 +61,13 @@ public class ConsoleConfig {
             ProxyUtils.setupPacProxy(pacFileUrl);
     }
 
-    private GeminiConfig buildGeminiConfig(YmlConfig config) {
-        return new GeminiConfig(config.getString("gemini", "apikey"));
+    private ApiKeys buildApiKeys(YmlConfig config) {
+        return new ApiKeys(
+                config.getString("apikeys", "gemini"),
+                config.getString("apikeys", "claude"),
+                config.getString("apikeys", "k2"),
+                config.getString("apikeys", "qwen")
+        );
     }
 
     private KiwiConfig buildKiwiConfig(YmlConfig config) {
@@ -99,7 +107,7 @@ public class ConsoleConfig {
     }
 
     @Bean
-    public GenerationService generationService(Agent agent,
+    public GenerationService generationService(List<Model> models,
                                                KiwiCompiler kiwiCompiler,
                                                PageCompiler pageCompiler,
                                                AppClient appClient,
@@ -109,7 +117,7 @@ public class ConsoleConfig {
                                                UrlFetcher urlFetcher,
                                                @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor) {
         return new GenerationService(
-                agent,
+                models,
                 kiwiCompiler,
                 pageCompiler,
                 exchangeClient,
@@ -138,8 +146,23 @@ public class ConsoleConfig {
     }
 
     @Bean
-    public Agent agent() {
-        return new ClaudeAgent(geminiConfig.apiKey);
+    public GeminiModel geminiModel() {
+        return new GeminiModel(apiKeys.gemini);
+    }
+
+    @Bean
+    public ClaudeModel claudeModel() {
+        return new ClaudeModel(apiKeys.claude);
+    }
+
+    @Bean
+    public K2Model k2Model() {
+        return new K2Model(apiKeys.k2);
+    }
+
+    @Bean
+    public QwenModel qwenModel() {
+        return new QwenModel(apiKeys.qwen);
     }
 
     @Bean
@@ -189,7 +212,7 @@ public class ConsoleConfig {
 
     public record ServerConfig(int port) {}
 
-    public record GeminiConfig(String apiKey) {}
+    public record ApiKeys(String gemini, String claude, String k2, String qwen) {}
 
     private record KiwiConfig(String host, long chatAppId, String worksDir) {}
 

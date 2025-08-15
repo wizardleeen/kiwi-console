@@ -8,7 +8,7 @@ All endpoints require a logged-in user and an `X-App-ID: 2` header. See the [Log
 
 ### 1. Generate
 
-Sends a prompt to an AI agent to generate or modify a Kiwi program.
+Sends a prompt to an AI model to generate or modify a Kiwi program.
 
 *   `POST /aigc/generate`
 *   **Request Body:**

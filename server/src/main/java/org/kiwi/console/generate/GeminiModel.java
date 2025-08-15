@@ -13,13 +13,13 @@ import org.kiwi.console.util.ErrorCode;
 import java.util.ArrayList;
 import java.util.List;
 
-public class GeminiAgent implements Agent {
+public class GeminiModel implements Model {
 
     public static final String model = "gemini-2.5-pro";
 
     private final Client client;
 
-    public GeminiAgent(String apiKey) {
+    public GeminiModel(String apiKey) {
         if (apiKey != null) {
             client = Client.builder()
                     .apiKey(apiKey)
@@ -38,7 +38,13 @@ public class GeminiAgent implements Agent {
                                 .includeThoughts(true)
                                 .build()
                 )
+                .maxOutputTokens(8192)
                 .build()));
+    }
+
+    @Override
+    public String getName() {
+        return model;
     }
 
     @Slf4j

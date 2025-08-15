@@ -25,7 +25,7 @@ class MockChat implements Chat {
             case FIX -> requireNonNull(lastCode).replace("Error", "Fixed");
             case COMMIT_MSG -> "commit";
         };
-        listener.onContent(lastCode);
+        listener.onContent(lastCode + "@@@@");
     }
 
 

@@ -36,7 +36,9 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import static org.kiwi.console.util.Constants.*;
 
@@ -56,7 +58,7 @@ public class GenerationService {
             "video/mp4"
     );
 
-    private final Agent agent;
+    private final Map<String, Model> models;
     private final KiwiCompiler kiwiCompiler;
     private final PageCompiler pageCompiler;
     private final AppClient appClient;
@@ -70,7 +72,7 @@ public class GenerationService {
     private final TaskExecutor taskExecutor;
 
     public GenerationService(
-            Agent agent,
+            List<Model> models,
             KiwiCompiler kiwiCompiler,
             PageCompiler pageCompiler,
             ExchangeClient exchClient,
@@ -81,7 +83,7 @@ public class GenerationService {
             UrlFetcher urlFetcher,
             TaskExecutor taskExecutor
     ) {
-        this.agent = agent;
+        this.models = models.stream().collect(Collectors.toUnmodifiableMap(Model::getName, Function.identity()));
         this.kiwiCompiler = kiwiCompiler;
         this.pageCompiler = pageCompiler;
         this.appClient = appClient;
@@ -109,13 +111,18 @@ public class GenerationService {
         var attachments = Utils.map(attachmentUrls, this::readAttachment);
         var exchange = Exchange.create(appId, userId, request.prompt(), attachmentUrls, creating, request.skipPageGeneration());
         var app = appClient.get(appId);
+        var genConfig = generationConfigClient.get(app.getGenConfigId());
         exchange.setId(exchClient.save(exchange));
         var task = new Task(exchange, app, false,
-                generationConfigClient.get(app.getGenConfigId()),
-                attachments, listener);
+                genConfig,
+                attachments, listener, getModel(genConfig.model()));
         task.sendProgress();
         taskExecutor.execute(() -> runTask(task));
         return appId;
+    }
+
+    private Model getModel(String name) {
+        return Objects.requireNonNull(models.get(name), () -> "Cannot find model: "  + name);
     }
 
     private File readAttachment(String url) {
@@ -199,9 +206,10 @@ public class GenerationService {
         exchClient.retry(new ExchangeIdRequest(request.exchangeId()));
         var attachments = Utils.map(exch.getAttachmentUrls(), this::readAttachment);
         exch = exchClient.get(request.exchangeId());  // Reload
+        var genConfig = generationConfigClient.get(app.getGenConfigId());
         var task = new Task(exch, app, false,
-                generationConfigClient.get(app.getGenConfigId()),
-                attachments, listener);
+                genConfig,
+                attachments, listener, getModel(genConfig.model()));
         task.sendProgress();
         taskExecutor.execute(() -> runTask(task));
     }
@@ -242,7 +250,7 @@ public class GenerationService {
             return task.isStageSuccessful(StageType.BACKEND) ? Plan.none : Plan.kiwiOnly;
         var kiwiCode = PatchReader.buildCode(kiwiCompiler.getSourceFiles(task.app.getKiwiAppId()));
         var pageCode = PatchReader.buildCode(pageCompiler.getSourceFiles(task.app.getKiwiAppId()));
-        var chat = agent.createChat();
+        var chat = task.model.createChat();
         var planPrompt = createPlanPrompt(exch, kiwiCode, pageCode, task);
         log.info("Plan prompt:\n{}", planPrompt);
         var text = generateContent(chat, planPrompt, task);
@@ -306,7 +314,7 @@ public class GenerationService {
         var userPrompt = task.exchange.getPrompt();
         var stageIdx = task.enterStageAndAttempt(StageType.BACKEND);
         try {
-            var chat = agent.createChat();
+            var chat = task.model.createChat();
             String prompt;
             var existingFiles = kiwiCompiler.getSourceFiles(sysAppId);
             if (!existingFiles.isEmpty())
@@ -350,7 +358,17 @@ public class GenerationService {
 
     private String generateContent(Chat chat, String prompt, Task task) {
         var buf = new StringBuilder();
-        chat.send(prompt, task.attachments, new ChatStreamListener() {
+        send(chat, prompt, task, buf);
+        int endPos;
+        while ((endPos = getEndPosition(buf)) == -1) {
+            log.info("Continue generation");
+            send(chat, "Continue generation", task, buf);
+        }
+        return buf.substring(0, endPos);
+    }
+
+    private void send(Chat chat, String text, Task task, StringBuilder buf) {
+        chat.send(text, task.attachments, new ChatStreamListener() {
             @Override
             public void onThought(String thoughtChunk) {
                 task.onThought(thoughtChunk);
@@ -364,9 +382,25 @@ public class GenerationService {
                 buf.append(contentChunk);
             }
         }, () -> task.cancelled);
-        if (buf.isEmpty())
-            throw new AgentException("No content generated");
-        return buf.toString();
+
+    }
+
+    private int getEndPosition(CharSequence output) {
+        var i = output.length() - 1;
+        loop: while (i >= 0) {
+            var c = output.charAt(i);
+            switch (c) {
+                case '\n', '\r', ' ', '\t' -> i--;
+                default -> {
+                    break loop;
+                }
+            }
+        }
+        if (i >= 3 && output.charAt(i) == '@' && output.charAt(i - 1) == '@' &&
+                output.charAt(i - 2) == '@' && output.charAt(i - 3) == '@')
+            return i - 3;
+        else
+            return -1;
     }
 
     private String createApp(String name, String userId) {
@@ -410,7 +444,7 @@ public class GenerationService {
         var stageIdx = task.enterStageAndAttempt(StageType.FRONTEND);
         try {
             var appId = task.app.getKiwiAppId();
-            var chat = agent.createChat();
+            var chat = task.model.createChat();
             var existingFiles = pageCompiler.getSourceFiles(appId);
             String prompt;
             var existingSource = PatchReader.buildCode(existingFiles);
@@ -457,13 +491,15 @@ public class GenerationService {
         private Exchange exchange;
         private final App app;
         private boolean cancelled;
+        private final Model model;
         private final GenerationConfig genConfig;
         private final boolean showAttempts;
         private final List<File> attachments;
 
-        public Task(Exchange exchange, App app, boolean showAttempts, GenerationConfig genConfig, List<File> attachments, @Nonnull GenerationListener listener) {
+        public Task(Exchange exchange, App app, boolean showAttempts, GenerationConfig genConfig, List<File> attachments, @Nonnull GenerationListener listener, Model model) {
             this.genConfig = genConfig;
             this.attachments = attachments;
+            this.model = model;
             listeners.add(listener);
             this.app = app;
             this.exchange = exchange;
@@ -621,7 +657,7 @@ public class GenerationService {
                 java.nio.file.Path.of(Constants.KIWI_WORKDIR),
                 new DeployClient(host, httpClient));
         var service = new GenerationService(
-                new GeminiAgent(apikey),
+                List.of(new GeminiModel(apikey)),
                 kiwiCompiler,
                 new DefaultPageCompiler(java.nio.file.Path.of(PAGE_WORKDIR)),
                 createFeignClient(ExchangeClient.class, CHAT_APP_ID),
