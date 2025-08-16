@@ -260,4 +260,3 @@ Represents an application.
 | `id`        | `string` | Application ID       |
 | `name`      | `string` | Application          |
 | `ownerId`   | `string` | Application owner ID |
-| `kiwiAppId` | `long`   | Kiwi Application ID  |

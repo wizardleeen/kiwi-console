@@ -28,11 +28,17 @@ public class ApplicationController {
 
     @PostMapping("/search")
     public SearchResult<App> search(@AuthenticationPrincipal String userId, @RequestBody AppSearchRequest request) {
+        var page = request.page();
+        var pageSize = request.pageSize();
+        if (page == 0)
+            page = 1;
+        if (pageSize == 0)
+            pageSize = 20;
         var modifiedRequest = new AppSearchRequest(
                 request.name(),
                 userId,
-                request.page(),
-                request.pageSize(),
+                page,
+                pageSize,
                 request.newlyChangedId()
         );
         return appClient.search(modifiedRequest);
