@@ -7,6 +7,8 @@ import org.kiwi.console.generate.k2.K2Model;
 import org.kiwi.console.generate.qwen.QwenModel;
 import org.kiwi.console.kiwi.*;
 import org.kiwi.console.file.FileService;
+import org.kiwi.console.object.ObjectClient;
+import org.kiwi.console.schema.SchemaClient;
 import org.springframework.beans.factory.annotation.Configurable;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.web.server.ConfigurableWebServerFactory;
@@ -188,6 +190,16 @@ public class ConsoleConfig {
     @Bean
     public SysUserClient sysUserClient() {
         return Utils.createFeignClient(kiwiConfig.host, SysUserClient.class);
+    }
+
+    @Bean
+    public ObjectClient objectClient() {
+        return Utils.createFeignClient(kiwiConfig.host, ObjectClient.class);
+    }
+
+    @Bean
+    public SchemaClient schemaClient() {
+        return Utils.createFeignClient(kiwiConfig.host, SchemaClient.class);
     }
 
     @Bean

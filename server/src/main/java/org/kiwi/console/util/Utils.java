@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
+import com.google.gson.GsonBuilder;
 import feign.Feign;
 import feign.RequestInterceptor;
 import feign.gson.GsonDecoder;
@@ -20,6 +21,7 @@ import jakarta.annotation.Nullable;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.kiwi.console.generate.GenerationService;
+import org.kiwi.console.schema.dto.*;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -254,9 +256,26 @@ public class Utils {
         });
     }
 
-    private static final GsonEncoder gsonEncoder = new GsonEncoder();
-    private static final GsonDecoder gsonDecoder = new GsonDecoder();
+    private static final GsonEncoder gsonEncoder;
+    private static final GsonDecoder gsonDecoder;
     private static final FeignErrorDecoder feignErrorDecoder = new FeignErrorDecoder();
+
+    static {
+        var typeFactory = RuntimeTypeAdapterFactory
+                .of(TypeDTO.class, "kind")
+                .registerSubtype(PrimitiveTypeDTO.class, "primitive")
+                .registerSubtype(ClassTypeDTO.class, "class")
+                .registerSubtype(ArrayTypeDTO.class, "array")
+                .registerSubtype(UnionTypeDTO.class, "union");
+
+        var gson = new GsonBuilder()
+                .registerTypeAdapterFactory(typeFactory)
+                .setPrettyPrinting()
+                .create();
+
+        gsonEncoder = new GsonEncoder(gson);
+        gsonDecoder = new GsonDecoder(gson);
+    }
 
     public static <T> T createFeignClient(String url, Class<T> type) {
         return createFeignClient(url, type, null);
