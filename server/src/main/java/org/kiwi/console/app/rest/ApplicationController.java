@@ -27,7 +27,7 @@ public class ApplicationController {
     }
 
     @PostMapping("/search")
-    public SearchResult<App> search(@AuthenticationPrincipal String userId, @RequestBody AppSearchRequest request) {
+    public SearchResult<App> search(@AuthenticationPrincipal String userId, @RequestBody org.kiwi.console.app.rest.AppSearchRequest request) {
         var page = request.page();
         var pageSize = request.pageSize();
         if (page == 0)
@@ -39,7 +39,7 @@ public class ApplicationController {
                 userId,
                 page,
                 pageSize,
-                request.newlyChangedId()
+                request.newlyCreatedId()
         );
         return appClient.search(modifiedRequest);
     }
