@@ -336,7 +336,7 @@ public class GenerationService {
             log.info("Kiwi deployed successfully");
             kiwiCompiler.commit(sysAppId, generateKIwiCommitMsg(task));
             log.info("Kiwi source code committed");
-            task.exchange.setManagementURL(Format.format(mgmtUrlTempl, sysAppId));
+            task.exchange.setManagementURL(Format.format(mgmtUrlTempl, task.app.getId()));
         } catch (Exception e) {
             task.failStage(stageIdx, e.getMessage());
             throw e;
