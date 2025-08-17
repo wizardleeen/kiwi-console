@@ -57,6 +57,31 @@ Retrieves the next action from the AI agent for an iterative auto-test session. 
     }
     ```
 
+### 2. Cancel Test Session
+
+Explicitly cancels an ongoing auto-test session. This is useful for abandoning a test before it naturally concludes with a `PASSED` or `FAILED` status.
+
+*   `POST /auto-test/cancel`
+*   **Request Body:** `AutoTestCancelRequest`
+
+| Field        | Type     | Description                                        |
+|:-------------|:---------|:---------------------------------------------------|
+| `exchangeId` | `string` | The ID of the `Exchange` session to be canceled.   |
+
+*   **Response Body:** None. A successful request returns a `200 OK` or `204 No Content` status with an empty body.
+
+*   **Example:**
+    *   **Request:**
+    ```http
+    POST /auto-test/cancel
+    Content-Type: application/json
+    Authorization: Bearer {token}
+
+    {
+        "exchangeId": "e9z8y7x6"
+    }
+    ```
+
 ## Data Structures
 
 ### `AutoTestStepRequest`
@@ -67,6 +92,14 @@ Represents the context for a single step in an auto-test session, provided to th
 |:-----------------|:-----------|:-------------------------------------------------------------------------|
 | `exchangeId`     | `string`   | The ID of the `Exchange` session this test is for.                       |
 | `attachmentUrls` | `string[]` | (Optional) A list of URLs for attachments (e.g., screenshots).           |
+
+### `AutoTestCancelRequest`
+
+Represents the request to cancel a specific auto-test session.
+
+| Field        | Type     | Description                                        |
+|:-------------|:---------|:---------------------------------------------------|
+| `exchangeId` | `string` | The ID of the `Exchange` session to be canceled.   |
 
 ### `AutoTestAction`
 
