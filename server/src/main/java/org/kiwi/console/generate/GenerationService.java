@@ -9,9 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.kiwi.console.file.File;
 import org.kiwi.console.file.UrlFetcher;
 import org.kiwi.console.generate.event.GenerationListener;
-import org.kiwi.console.generate.rest.CancelRequest;
-import org.kiwi.console.generate.rest.GenerationRequest;
-import org.kiwi.console.generate.rest.RetryRequest;
+import org.kiwi.console.generate.rest.*;
 import org.kiwi.console.kiwi.*;
 import org.kiwi.console.patch.PatchReader;
 import org.kiwi.console.util.BusinessException;
@@ -22,7 +20,6 @@ import org.springframework.core.task.SyncTaskExecutor;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.scheduling.annotation.Scheduled;
 
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -35,7 +32,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -68,7 +64,8 @@ public class GenerationService {
     private final GenerationConfigClient generationConfigClient;
     private final UserClient userClient;
     private final UrlFetcher urlFetcher;
-    private final Map<String, Task> runningTasks = new ConcurrentHashMap<>();
+    private final Map<String, GenerationTask> runningTasks = new ConcurrentHashMap<>();
+    private final Map<String, AutoTestTask> autoTestTasks = new ConcurrentHashMap<>();
     private final TaskExecutor taskExecutor;
 
     public GenerationService(
@@ -113,12 +110,22 @@ public class GenerationService {
         var app = appClient.get(appId);
         var genConfig = generationConfigClient.get(app.getGenConfigId());
         exchange.setId(exchClient.save(exchange));
-        var task = new Task(exchange, app, false,
+        var task = createGenerationTask(exchange, app,
                 genConfig,
                 attachments, listener, getModel(genConfig.model()));
         task.sendProgress();
         taskExecutor.execute(() -> runTask(task));
         return appId;
+    }
+
+    private GenerationTask createGenerationTask(Exchange exch, App app, GenerationConfig genConfig,
+                                                List<File> attachments, GenerationListener listener, Model model
+                                                ) {
+        var task = new GenerationTask(
+                exchClient, exch, app, false, genConfig, attachments, listener, model
+        );
+        runningTasks.put(exch.getId(), task);
+        return task;
     }
 
     private Model getModel(String name) {
@@ -142,7 +149,7 @@ public class GenerationService {
             throw new BusinessException(ErrorCode.GENERATION_ALREADY_RUNNING);
     }
 
-    private void runTask(Task task) {
+    private void runTask(GenerationTask task) {
         try {
             var sysAppId = task.app.getKiwiAppId();
             kiwiCompiler.reset(sysAppId, task.genConfig.kiwiTemplateRepo(), task.genConfig.kiwiTemplateBranch());
@@ -207,7 +214,7 @@ public class GenerationService {
         var attachments = Utils.map(exch.getAttachmentUrls(), this::readAttachment);
         exch = exchClient.get(request.exchangeId());  // Reload
         var genConfig = generationConfigClient.get(app.getGenConfigId());
-        var task = new Task(exch, app, false,
+        var task = createGenerationTask(exch, app,
                 genConfig,
                 attachments, listener, getModel(genConfig.model()));
         task.sendProgress();
@@ -244,7 +251,7 @@ public class GenerationService {
     }
 
     @SneakyThrows
-    private Plan plan(Task task) {
+    private Plan plan(GenerationTask task) {
         var exch = task.exchange;
         if (exch.isSkipPageGeneration())
             return task.isStageSuccessful(StageType.BACKEND) ? Plan.none : Plan.kiwiOnly;
@@ -280,7 +287,7 @@ public class GenerationService {
         };
     }
 
-    private String createPlanPrompt(Exchange exch, String kiwiCode, String pageCode, Task task) {
+    private String createPlanPrompt(Exchange exch, String kiwiCode, String pageCode, GenerationTask task) {
         if (exch.isFirst())
             return Format.format(task.genConfig.createAnalyzePrompt(), exch.getPrompt());
         else
@@ -309,7 +316,7 @@ public class GenerationService {
         throw new BusinessException(ErrorCode.CODE_GENERATION_FAILED);
     }
 
-    private void generateKiwi(Task task) {
+    private void generateKiwi(GenerationTask task) {
         var sysAppId = task.app.getKiwiAppId();
         var userPrompt = task.exchange.getPrompt();
         var stageIdx = task.enterStageAndAttempt(StageType.BACKEND);
@@ -347,7 +354,7 @@ public class GenerationService {
         return compiler.run(appId, files, removedFiles);
     }
 
-    private DeployResult generateCode(Chat chat, String prompt, Task task, Compiler compiler) {
+    private DeployResult generateCode(Chat chat, String prompt, GenerationTask task, Compiler compiler) {
         try {
             var patch = new PatchReader(generateContent(chat, prompt, task)).read();
             return runCompiler(compiler, task.app.getKiwiAppId(), patch.addedFiles(), patch.removedFiles());
@@ -368,7 +375,7 @@ public class GenerationService {
     }
 
     private void send(Chat chat, String text, Task task, StringBuilder buf) {
-        chat.send(text, task.attachments, new ChatStreamListener() {
+        chat.send(text, task.getAttachments(), new ChatStreamListener() {
             @Override
             public void onThought(String thoughtChunk) {
                 task.onThought(thoughtChunk);
@@ -381,7 +388,7 @@ public class GenerationService {
                 task.sendHeartBeatIfRequired();
                 buf.append(contentChunk);
             }
-        }, () -> task.cancelled);
+        }, task::isCancelled);
 
     }
 
@@ -416,15 +423,15 @@ public class GenerationService {
         return appClient.get(id);
     }
 
-    private String generateKIwiCommitMsg(Task task) {
+    private String generateKIwiCommitMsg(GenerationTask task) {
         return task.exchange.getPrompt();
     }
 
-    private String generatePagesCommitMsg(Task task) {
+    private String generatePagesCommitMsg(GenerationTask task) {
         return task.exchange.getPrompt();
     }
 
-    private void fix(long sysAppId, String error, Task task, Chat chat, Compiler compiler, String promptTemplate) {
+    private void fix(long sysAppId, String error, GenerationTask task, Chat chat, Compiler compiler, String promptTemplate) {
         for (int i = 0; i < 5; i++) {
             task.startAttempt();
             var fixPrompt = Format.format(promptTemplate, error);
@@ -440,7 +447,7 @@ public class GenerationService {
         throw new RuntimeException("Failed to fix compilation errors after 5 attempts: " + error);
     }
 
-    private void generatePages(String apiSource, Task task) {
+    private void generatePages(String apiSource, GenerationTask task) {
         var stageIdx = task.enterStageAndAttempt(StageType.FRONTEND);
         try {
             var appId = task.app.getKiwiAppId();
@@ -469,181 +476,59 @@ public class GenerationService {
         }
     }
 
-    private String buildPageUpdatePrompt(Task task, String existingCode, String apiSource) {
+    private AutoTestTask startAutoTest(String exchId) {
+        var exch = exchClient.get(exchId);
+        var app = appClient.get(exch.getAppId());
+        var genConfig = generationConfigClient.get(app.getGenConfigId());
+        var model = getModel(genConfig.model());
+        var task = new AutoTestTask(app, genConfig, exch, model);
+        autoTestTasks.put(exchId, task);
+        return task;
+    }
+
+    public AutoTestAction autoTestStep(AutoTestStepRequest request) {
+        return executeGen(() -> {
+            var task = autoTestTasks.get(request.exchangeId());
+            if (task == null)
+                task = startAutoTest(request.exchangeId());
+            var attachments = Utils.map(request.attachmentUrls(), this::readAttachment);
+            task.setAttachments(attachments);
+            var code = PatchReader.buildCode(pageCompiler.getSourceFiles(task.getApp().getKiwiAppId()));
+            var prompt = buildAutoTestPrompt(task.getGenConfig().autoTestPrompt(), task.getExch().getPrompt(), code, task.getActions());;
+            var chat = task.getModel().createChat();
+            var text = generateContent(chat, prompt, task);
+            var action = AutoTestActionParser.parse(text);
+            if (action.type() == AutoTestActionType.FAILED || action.type() == AutoTestActionType.PASSED)
+                autoTestTasks.remove(request.exchangeId());
+            task.addAction(action);
+            return action;
+        });
+    }
+
+    private String buildAutoTestPrompt(String template, String prompt, String code, List<AutoTestAction> actions) {
+        return Format.format(
+                template,
+                prompt,
+                code,
+                actions.stream().map(AutoTestAction::toString).collect(Collectors.joining("\n"))
+        );
+    }
+
+    private String buildPageUpdatePrompt(GenerationTask task, String existingCode, String apiSource) {
         var exch = task.exchange;
         return Format.format(task.genConfig.pageUpdatePrompt(), exch.getPrompt(), existingCode, apiSource);
     }
 
-    private String buildPageCreatePrompt(Task task, String existingSource, String apiSource) {
+    private String buildPageCreatePrompt(GenerationTask task, String existingSource, String apiSource) {
         return Format.format(task.genConfig.pageCreatePrompt(), task.app.getName(), task.exchange.getPrompt(), existingSource, apiSource);
     }
 
-    private String buildCreatePrompt(String prompt, Task task) {
+    private String buildCreatePrompt(String prompt, GenerationTask task) {
         return Format.format(task.genConfig.kiwiCreatePrompt(), prompt);
     }
 
-    private String buildUpdatePrompt(String prompt, String code, Task task) {
+    private String buildUpdatePrompt(String prompt, String code, GenerationTask task) {
         return Format.format(task.genConfig.kiwiUpdatePrompt(), prompt, code);
-    }
-
-    private class Task implements ChatStreamListener {
-        private final List<GenerationListener> listeners = new CopyOnWriteArrayList<>();
-        private Exchange exchange;
-        private final App app;
-        private boolean cancelled;
-        private final Model model;
-        private final GenerationConfig genConfig;
-        private final boolean showAttempts;
-        private final List<File> attachments;
-
-        public Task(Exchange exchange, App app, boolean showAttempts, GenerationConfig genConfig, List<File> attachments, @Nonnull GenerationListener listener, Model model) {
-            this.genConfig = genConfig;
-            this.attachments = attachments;
-            this.model = model;
-            listeners.add(listener);
-            this.app = app;
-            this.exchange = exchange;
-            this.showAttempts = showAttempts;
-            runningTasks.put(exchange.getId(), this);
-        }
-
-        int enterStageAndAttempt(StageType type) {
-            if (exchange.getStatus() == ExchangeStatus.PLANNING)
-                exchange.setStatus(ExchangeStatus.GENERATING);
-            var stage = Stage.create(type);
-            stage.addAttempt(Attempt.create());
-            var stageIdx = exchange.getStages().size();
-            exchange.addStage(stage);
-            saveExchange();
-            return stageIdx;
-        }
-
-        void startAttempt() {
-            currentStage().addAttempt(Attempt.create());
-            saveExchange();
-        }
-
-        void finishAttempt(boolean successful, @Nullable String errorMsg) {
-            var attempt = currentAttempt();
-            if (successful) {
-                attempt.setStatus(AttemptStatus.SUCCESSFUL);
-                currentStage().setStatus(StageStatus.SUCCESSFUL);
-            } else {
-                attempt.setStatus(AttemptStatus.FAILED);
-                attempt.setErrorMessage(errorMsg);
-            }
-            saveExchange();
-        }
-
-        void finish(String productUrl) {
-            exchange.setStatus(ExchangeStatus.SUCCESSFUL);
-            exchange.setProductURL(productUrl);
-            saveExchange();
-        }
-
-        void abort(String errorMsg) {
-            if (!cancelled) {
-                exchange.fail(errorMsg);
-                saveExchange();
-            }
-        }
-
-        private Attempt currentAttempt() {
-            return exchange.getStages().getLast().getAttempts().getLast();
-        }
-
-        private Stage currentStage() {
-            return exchange.getStages().getLast();
-        }
-
-        void failStage(int stageIdx, String errMsg) {
-            exchange.getStages().get(stageIdx).fail(errMsg);
-            saveExchange();
-        }
-
-        void saveExchange() {
-            ensureNotCancelled();
-            exchange.setLastHeartBeatAt(System.currentTimeMillis());
-            exchange = exchClient.get(exchClient.save(exchange));
-            sendProgress();
-        }
-
-        private static final long SEND_HEART_BEAT_INTERVAL = 1000 * 10;
-
-        void sendHeartBeatIfRequired() {
-            if (exchange.isRunning() && System.currentTimeMillis() - exchange.getLastHeartBeatAt() >  SEND_HEART_BEAT_INTERVAL) {
-                try {
-                    exchClient.sendHeartBeat(new ExchangeHeartBeatRequest(exchange.getId()));
-                    reloadExchange();
-                } catch (Exception e) {
-                    log.warn("Failed to send heartbeat for exchange {}", exchange.getId(), e);
-                }
-            }
-        }
-
-        void reloadExchange() {
-            exchange = exchClient.get(exchange.getId());
-        }
-
-        void sendProgress() {
-            var it = listeners.iterator();
-            while (it.hasNext()) {
-                var listener = it.next();
-                try {
-                    listener.onProgress(showAttempts ? exchange : exchange.clearDetails());
-                }
-                catch (Exception e) {
-                    log.error("Failed to send progress", e);
-                    it.remove();
-                }
-            }
-        }
-
-        boolean isBackendSuccessful() {
-            return isStageSuccessful(StageType.BACKEND);
-        }
-
-        boolean isFrontendSuccessful() {
-            return isStageSuccessful(StageType.FRONTEND);
-        }
-
-        boolean isStageSuccessful(StageType type) {
-            for (Stage stage : exchange.getStages()) {
-                if (stage.getType() == type && !stage.getAttempts().isEmpty()
-                        && stage.getAttempts().getLast().getStatus() == AttemptStatus.SUCCESSFUL)
-                    return true;
-            }
-            return false;
-        }
-
-        @Override
-        public void onThought(String thoughtChunk) {
-            System.out.print(thoughtChunk);
-            for (var listener : listeners) {
-                listener.onThought(thoughtChunk);
-            }
-        }
-
-        @Override
-        public void onContent(String contentChunk) {
-            System.out.print(contentChunk);
-            for (var listener : listeners) {
-                listener.onContent(contentChunk);
-            }
-        }
-
-        public void addListener(GenerationListener listener) {
-            listeners.add(listener);
-        }
-
-        private void ensureNotCancelled() {
-            if (cancelled)
-                throw new BusinessException(ErrorCode.TASK_CANCELLED);
-        }
-
-        public void cancel() {
-            cancelled = true;
-        }
     }
 
     public static final String APP_ID = "0196b0e0b90700";

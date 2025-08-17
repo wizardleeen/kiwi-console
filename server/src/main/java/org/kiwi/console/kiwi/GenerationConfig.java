@@ -12,6 +12,7 @@ public record GenerationConfig(
         String kiwiFixPrompt,
         String createAnalyzePrompt,
         String updateAnalyzePrompt,
+        String autoTestPrompt,
         String pageTemplateRepo,
         String pageTemplateBranch,
         String kiwiTemplateRepo,
