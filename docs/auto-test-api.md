@@ -16,7 +16,7 @@ Retrieves the next action from the AI agent for an iterative auto-test session. 
 | Field            | Type       | Description                                                                                             |
 |:-----------------|:-----------|:--------------------------------------------------------------------------------------------------------|
 | `exchangeId`     | `string`   | The ID of the `Exchange` session this test is for.                                                      |
-| `attachmentUrls` | `string[]` | (Optional) A list of URLs for attachments (e.g., screenshots of the current application state) to provide context for the next step. |
+| `attachmentUrls` | `string[]` | A list of URLs for attachments that provide the full context of the application's current state. The list **must** include URLs for a screenshot, the full DOM structure, and console logs. |
 
 *   **Response Body:** `AutoTestAction`
 
@@ -29,7 +29,11 @@ Retrieves the next action from the AI agent for an iterative auto-test session. 
     
     {
         "exchangeId": "e9z8y7x6",
-        "attachmentUrls": [ "/uploads/uuid3-test-step1.png" ]
+        "attachmentUrls": [
+            "/uploads/step1-screenshot.png",
+            "/uploads/step1-dom.html",
+            "/uploads/step1-logs.txt"
+        ]
     }
     ```
     *   **Response (Next Step):** The test is in progress. The AI has determined the next command to execute.
@@ -91,7 +95,7 @@ Represents the context for a single step in an auto-test session, provided to th
 | Field            | Type       | Description                                                              |
 |:-----------------|:-----------|:-------------------------------------------------------------------------|
 | `exchangeId`     | `string`   | The ID of the `Exchange` session this test is for.                       |
-| `attachmentUrls` | `string[]` | (Optional) A list of URLs for attachments (e.g., screenshots).           |
+| `attachmentUrls` | `string[]` | A list of URLs for attachments that provide the full context of the application's current state. The list **must** include URLs for a screenshot, the full DOM structure, and console logs. |
 
 ### `AutoTestCancelRequest`
 
