@@ -21,4 +21,9 @@ public class AutoTestController {
         return generationService.autoTestStep(request);
     }
 
+    @PostMapping("/cancel")
+    public void cancel(@RequestBody AutoTestCancelRequest request) {
+        generationService.cancelAutoTest(request);
+    }
+
 }

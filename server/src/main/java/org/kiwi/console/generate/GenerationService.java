@@ -231,6 +231,10 @@ public class GenerationService {
             pageCompiler.revert(app.getKiwiAppId());
     }
 
+    public void cancelAutoTest(AutoTestCancelRequest request) {
+        autoTestTasks.remove(request.exchangeId());
+    }
+
     private record Plan(boolean generateKiwi, boolean generatePage, @Nullable String appName) {
 
         public static final Plan none = new Plan(false, false, null);
