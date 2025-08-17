@@ -78,7 +78,7 @@ public class UrlFetcher {
             String mimeType = response.headers().firstValue("Content-Type").orElse("application/octet-stream").trim();
             var semiColonIdx = mimeType.indexOf(';');
             if (semiColonIdx != -1)
-                mimeType = mimeType.substring(semiColonIdx).trim();
+                mimeType = mimeType.substring(0, semiColonIdx).trim();
             // Read from the input stream with our size-limiting logic
             byte[] content;
             try (InputStream bodyStream = response.body()) {
