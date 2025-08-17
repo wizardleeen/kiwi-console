@@ -45,13 +45,15 @@ public class ApplicationController {
     }
 
     @PostMapping
-    public String save(@AuthenticationPrincipal String userId, App app) {
-        if (app.getId() == null)
-            app.setOwnerId(userId);
-        else {
-            var existing = appClient.get(app.getId());
-            if (!existing.getOwnerId().equals(userId))
+    public String save(@AuthenticationPrincipal String userId, @RequestBody AppDTO appDTO) {
+        App app;
+        if (appDTO.id() == null) {
+            app = App.create(appDTO.name(), userId);
+        } else {
+            app = appClient.get(appDTO.id());
+            if (!app.getOwnerId().equals(userId))
                 throw new BusinessException(ErrorCode.FORBIDDEN);
+            app.setName(appDTO.name());
         }
         return appClient.save(app);
     }
@@ -67,12 +69,12 @@ public class ApplicationController {
     }
 
     @GetMapping("/{id}")
-    public App get(@AuthenticationPrincipal String userId, @PathVariable("id") String id) {
+    public AppDTO get(@AuthenticationPrincipal String userId, @PathVariable("id") String id) {
         var app = appClient.get(id);
         if (!app.getOwnerId().equals(userId) && !app.getMemberIds().contains(userId))
             throw new BusinessException(ErrorCode.FORBIDDEN);
         else
-            return app;
+            return new AppDTO(app.getId(), app.getName(), app.getOwnerId());
     }
 
 }
