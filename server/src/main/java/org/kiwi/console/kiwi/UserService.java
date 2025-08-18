@@ -9,11 +9,11 @@ import java.util.List;
 import java.util.Random;
 
 public class UserService implements UserClient {
-    private final SysUserClient sysUserClient;
+    private final KiwiUserClient kiwiUserClient;
     private final UserClient userClient;
 
     public UserService(String url, long appId) {
-        this.sysUserClient = Utils.createFeignClient(url, SysUserClient.class);
+        this.kiwiUserClient = Utils.createFeignClient(url, KiwiUserClient.class);
         this.userClient = Utils.createKiwiFeignClient(url, UserClient.class, appId);
     }
 
@@ -39,11 +39,11 @@ public class UserService implements UserClient {
 
     @Override
     public String register(RegisterRequest request) {
-        var sysUserId = sysUserClient.save(new SystemUser(request.userName(), request.userName(),
+        var kiwiUserId = kiwiUserClient.save(new SystemUser(request.userName(), request.userName(),
                 request.password(),
                 List.of()
         ));
-        return userClient.register(new RegisterRequest(request.userName(), request.password(), sysUserId));
+        return userClient.register(new RegisterRequest(request.userName(), request.password(), kiwiUserId));
     }
 
     @Override

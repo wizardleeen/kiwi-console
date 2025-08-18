@@ -7,13 +7,13 @@ import org.kiwi.console.util.Utils;
 public class AppService implements AppClient {
 
     private final AppClient appClient;
-    private final SysAppClient sysAppClient;
+    private final KiwiAppClient kiwiAppClient;
     private final UserClient userClient;
 
-    public AppService(String url, long sysAppId, UserClient userClient) {
+    public AppService(String url, long kiwiAppId, UserClient userClient) {
         this.userClient = userClient;
-        this.appClient = Utils.createKiwiFeignClient(url, AppClient.class, sysAppId);
-        this.sysAppClient = Utils.createFeignClient(url, SysAppClient.class);
+        this.appClient = Utils.createKiwiFeignClient(url, AppClient.class, kiwiAppId);
+        this.kiwiAppClient = Utils.createFeignClient(url, KiwiAppClient.class);
     }
 
     @Override
@@ -28,18 +28,18 @@ public class AppService implements AppClient {
 
     @Override
     public String save(App app) {
-        long sysAppId = app.getKiwiAppId();
+        long kiwiAppId = app.getKiwiAppId();
         var user = userClient.get(app.getOwnerId());
-        var sysUserId = user.getKiwiUserId();
+        var kiwiUserId = user.getKiwiUserId();
         if (app.getKiwiAppId() == -1)
-            sysAppId = sysAppClient.save(new SystemApp(null, app.getName(), sysUserId));
+            kiwiAppId = kiwiAppClient.save(new SystemApp(null, app.getName(), kiwiUserId));
         else
-            sysAppClient.save(new SystemApp(sysAppId, app.getName(), sysUserId));
+            kiwiAppClient.save(new SystemApp(kiwiAppId, app.getName(), kiwiUserId));
         return appClient.save(new App(
                 app.getId(),
                 app.getName(),
                 app.getOwnerId(),
-                sysAppId,
+                kiwiAppId,
                 app.getMemberIds(),
                 app.getGenConfigId()
         ));
@@ -49,14 +49,14 @@ public class AppService implements AppClient {
     public void updateName(UpdateNameRequest request) {
         var app = get(request.applicationId());
         var user = userClient.get(app.getOwnerId());
-        sysAppClient.save(new SystemApp(app.getKiwiAppId(), request.name(), user.getKiwiUserId()));
+        kiwiAppClient.save(new SystemApp(app.getKiwiAppId(), request.name(), user.getKiwiUserId()));
         appClient.updateName(request);
     }
 
     @Override
     public void delete(DeleteAppRequest request) {
         var r = appClient.get(request.appId());
-        sysAppClient.delete(r.getKiwiAppId());
+        kiwiAppClient.delete(r.getKiwiAppId());
         appClient.delete(request);
     }
 

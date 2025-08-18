@@ -4,7 +4,7 @@ import feign.Headers;
 import feign.RequestLine;
 import org.kiwi.console.auth.IssueTokenRequest;
 
-public interface SysUserClient {
+public interface KiwiUserClient {
 
     @RequestLine("POST /internal-api/user/issue-token")
     @Headers("Content-Type: application/json")

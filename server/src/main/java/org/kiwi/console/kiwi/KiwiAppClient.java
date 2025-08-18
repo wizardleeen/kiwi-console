@@ -4,7 +4,7 @@ import feign.Headers;
 import feign.Param;
 import feign.RequestLine;
 
-public interface SysAppClient {
+public interface KiwiAppClient {
 
     @RequestLine("POST /internal-api/app/save")
     @Headers("Content-Type: application/json")

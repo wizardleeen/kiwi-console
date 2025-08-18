@@ -151,9 +151,9 @@ public class GenerationService {
 
     private void runTask(GenerationTask task) {
         try {
-            var sysAppId = task.app.getKiwiAppId();
-            kiwiCompiler.reset(sysAppId, task.genConfig.kiwiTemplateRepo(), task.genConfig.kiwiTemplateBranch());
-            pageCompiler.reset(sysAppId, task.genConfig.pageTemplateRepo(), task.genConfig.pageTemplateBranch());
+            var kiwiAppId = task.app.getKiwiAppId();
+            kiwiCompiler.reset(kiwiAppId, task.genConfig.kiwiTemplateRepo(), task.genConfig.kiwiTemplateBranch());
+            pageCompiler.reset(kiwiAppId, task.genConfig.pageTemplateRepo(), task.genConfig.pageTemplateBranch());
             var plan = executeGen(() -> plan(task));
             if (task.exchange.isFirst() && plan.appName != null) {
                 updateAppName(task.app, plan.appName);
@@ -163,10 +163,10 @@ public class GenerationService {
                 executeGen(() -> generateKiwi(task));
             }
             if (plan.generatePage) {
-                var apiSource = kiwiCompiler.generateApi(sysAppId);
+                var apiSource = kiwiCompiler.generateApi(kiwiAppId);
                 executeGen(() -> generatePages(apiSource, task));
             }
-            var url = Format.format(productUrlTempl, sysAppId);
+            var url = Format.format(productUrlTempl, kiwiAppId);
             task.finish(url);
             log.info("Generation Completed. Application: {}", url);
         } catch (Exception e) {
@@ -321,13 +321,13 @@ public class GenerationService {
     }
 
     private void generateKiwi(GenerationTask task) {
-        var sysAppId = task.app.getKiwiAppId();
+        var kiwiAppId = task.app.getKiwiAppId();
         var userPrompt = task.exchange.getPrompt();
         var stageIdx = task.enterStageAndAttempt(StageType.BACKEND);
         try {
             var chat = task.model.createChat();
             String prompt;
-            var existingFiles = kiwiCompiler.getSourceFiles(sysAppId);
+            var existingFiles = kiwiCompiler.getSourceFiles(kiwiAppId);
             if (!existingFiles.isEmpty())
                 prompt = buildUpdatePrompt(userPrompt, PatchReader.buildCode(existingFiles), task);
             else
@@ -341,11 +341,11 @@ public class GenerationService {
 //        }
             if (!r.successful()) {
                 task.finishAttempt(false, r.output());
-                fix(sysAppId, r.output(), task, chat, kiwiCompiler, task.genConfig.kiwiFixPrompt());
+                fix(kiwiAppId, r.output(), task, chat, kiwiCompiler, task.genConfig.kiwiFixPrompt());
             } else
                 task.finishAttempt(true, null);
             log.info("Kiwi deployed successfully");
-            kiwiCompiler.commit(sysAppId, generateKIwiCommitMsg(task));
+            kiwiCompiler.commit(kiwiAppId, generateKIwiCommitMsg(task));
             log.info("Kiwi source code committed");
             task.exchange.setManagementURL(Format.format(mgmtUrlTempl, task.app.getId()));
         } catch (Exception e) {
@@ -435,7 +435,7 @@ public class GenerationService {
         return task.exchange.getPrompt();
     }
 
-    private void fix(long sysAppId, String error, GenerationTask task, Chat chat, Compiler compiler, String promptTemplate) {
+    private void fix(long kiwiAppId, String error, GenerationTask task, Chat chat, Compiler compiler, String promptTemplate) {
         for (int i = 0; i < 5; i++) {
             task.startAttempt();
             var fixPrompt = Format.format(promptTemplate, error);
