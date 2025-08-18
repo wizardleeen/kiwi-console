@@ -38,7 +38,6 @@ public class GeminiModel implements Model {
                                 .includeThoughts(true)
                                 .build()
                 )
-                .maxOutputTokens(8192)
                 .build()));
     }
 
