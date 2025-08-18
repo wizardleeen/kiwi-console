@@ -71,11 +71,11 @@ public class GenerationServiceTest extends TestCase {
         genService.generate(GenerationRequest.create(null, prompt),userId, discardListener);
         var appId = exchangeClient.getLast().getAppId();
         var app = appClient.get(appId);
-        var sysAppId = app.getKiwiAppId();
+        var kiwiAppId = app.getKiwiAppId();
 //        assertEquals("Test App", app.getName());
 
-        assertEquals("class Foo {}\n", kiwiCompiler.getCode(sysAppId, MAIN_KIWI));
-        assertEquals("// Test App\nclass Foo {}\n", pageCompiler.getCode(sysAppId, APP_TSX));
+        assertEquals("class Foo {}\n", kiwiCompiler.getCode(kiwiAppId, MAIN_KIWI));
+        assertEquals("// Test App\nclass Foo {}\n", pageCompiler.getCode(kiwiAppId, APP_TSX));
         assertEquals(
         String.format("""
                 Status: SUCCESSFUL
@@ -84,13 +84,13 @@ public class GenerationServiceTest extends TestCase {
                         Attempt SUCCESSFUL
                     Stage FRONTEND: SUCCESSFUL
                         Attempt SUCCESSFUL
-                """, sysAppId),
+                """, kiwiAppId),
                 exchangeClient.getLast().toString()
         );
 
         genService.generate(GenerationRequest.create(appId, "class Bar{}"), userId, discardListener);
-        assertEquals("class Bar{}\n", kiwiCompiler.getCode(sysAppId, MAIN_KIWI));
-        assertEquals("class Bar{}\n", pageCompiler.getCode(sysAppId, APP_TSX));
+        assertEquals("class Bar{}\n", kiwiCompiler.getCode(kiwiAppId, MAIN_KIWI));
+        assertEquals("class Bar{}\n", pageCompiler.getCode(kiwiAppId, APP_TSX));
         assertEquals(
                 String.format("""
                         Status: SUCCESSFUL
@@ -99,14 +99,14 @@ public class GenerationServiceTest extends TestCase {
                                 Attempt SUCCESSFUL
                             Stage FRONTEND: SUCCESSFUL
                                 Attempt SUCCESSFUL
-                        """, sysAppId),
+                        """, kiwiAppId),
                 exchangeClient.getLast().toString()
         );
 
 
         genService.generate(GenerationRequest.create(appId, "class Error{}"), userId, discardListener);
-        assertEquals("class Fixed{}\n", kiwiCompiler.getCode(sysAppId, MAIN_KIWI));
-        assertEquals("class Fixed{}\n", pageCompiler.getCode(sysAppId, APP_TSX));
+        assertEquals("class Fixed{}\n", kiwiCompiler.getCode(kiwiAppId, MAIN_KIWI));
+        assertEquals("class Fixed{}\n", pageCompiler.getCode(kiwiAppId, APP_TSX));
         assertEquals(
                 String.format("""
                         Status: SUCCESSFUL
@@ -119,7 +119,7 @@ public class GenerationServiceTest extends TestCase {
                                 Attempt FAILED
                                     Compilation failed.
                                 Attempt SUCCESSFUL
-                        """, sysAppId),
+                        """, kiwiAppId),
                 exchangeClient.getLast().toString()
         );
 

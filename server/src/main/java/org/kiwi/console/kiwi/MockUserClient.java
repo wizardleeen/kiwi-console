@@ -40,7 +40,7 @@ public class MockUserClient implements UserClient {
 
     @Override
     public String register(RegisterRequest request) {
-        var user = new User(System.currentTimeMillis() + "", request.userName(), request.sysUserId(), List.of(), genConfigClient.getPresetId());
+        var user = new User(System.currentTimeMillis() + "", request.userName(), request.kiwiUserId(), List.of(), genConfigClient.getPresetId());
         userMap.put(user.getId(), user);
         return user.getId();
     }

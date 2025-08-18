@@ -16,11 +16,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final UserClient userClient;
-    private final SysUserClient sysUserClient;
+    private final KiwiUserClient kiwiUserClient;
 
-    public AuthController(UserClient userClient, SysUserClient sysUserClient) {
+    public AuthController(UserClient userClient, KiwiUserClient kiwiUserClient) {
         this.userClient = userClient;
-        this.sysUserClient = sysUserClient;
+        this.kiwiUserClient = kiwiUserClient;
     }
 
     @PostMapping("/login")
@@ -33,7 +33,7 @@ public class AuthController {
 
     private String issueToken(String userId) {
         var user = userClient.get(userId);
-        return sysUserClient.issueToken(new IssueTokenRequest(user.getKiwiUserId()));
+        return kiwiUserClient.issueToken(new IssueTokenRequest(user.getKiwiUserId()));
     }
 
     @PostMapping("/logout")
@@ -42,7 +42,7 @@ public class AuthController {
         if (auth == null || !auth.startsWith("Bearer "))
             throw new BusinessException(ErrorCode.AUTHENTICATION_FAILED, "Invalid token");
         var token = auth.substring(7);
-        sysUserClient.logout(new SysLogoutRequest(token));
+        kiwiUserClient.logout(new SysLogoutRequest(token));
     }
 
     @PostMapping("/register")

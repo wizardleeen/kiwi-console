@@ -18,11 +18,11 @@ import java.util.List;
 public class AuthenticateFilter extends OncePerRequestFilter {
 
     private final UserClient userClient;
-    private final SysUserClient sysUserClient;
+    private final KiwiUserClient kiwiUserClient;
 
-    public AuthenticateFilter(UserClient userClient, SysUserClient sysUserClient) {
+    public AuthenticateFilter(UserClient userClient, KiwiUserClient kiwiUserClient) {
         this.userClient = userClient;
-        this.sysUserClient = sysUserClient;
+        this.kiwiUserClient = kiwiUserClient;
     }
 
     @Override
@@ -37,9 +37,9 @@ public class AuthenticateFilter extends OncePerRequestFilter {
             return;
         }
         var token = auth.substring(7);
-        var sysUserId = sysUserClient.authenticate(new SysAuthenticateRequest(token));
-        if (sysUserId != null) {
-            var userId = userClient.getByKiwiUserId(new GetByKiwiUserIdRequest(sysUserId));
+        var kiwiUserId = kiwiUserClient.authenticate(new SysAuthenticateRequest(token));
+        if (kiwiUserId != null) {
+            var userId = userClient.getByKiwiUserId(new GetByKiwiUserIdRequest(kiwiUserId));
             var authToken = new UsernamePasswordAuthenticationToken(userId, null, List.of());
             authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
             SecurityContextHolder.getContext().setAuthentication(authToken);

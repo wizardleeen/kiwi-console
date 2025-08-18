@@ -188,8 +188,8 @@ public class ConsoleConfig {
     }
 
     @Bean
-    public SysUserClient sysUserClient() {
-        return Utils.createFeignClient(kiwiConfig.host, SysUserClient.class);
+    public KiwiUserClient kiwiUserClient() {
+        return Utils.createFeignClient(kiwiConfig.host, KiwiUserClient.class);
     }
 
     @Bean
