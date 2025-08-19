@@ -59,6 +59,7 @@ public class GenerationService {
     private final PageCompiler pageCompiler;
     private final AppClient appClient;
     private final String productUrlTempl;
+    private final String sourceCodeUrlTempl;
     private final String mgmtUrlTempl;
     private final ExchangeClient exchClient;
     private final GenerationConfigClient generationConfigClient;
@@ -75,6 +76,7 @@ public class GenerationService {
             AppClient appClient,
             String productUrlTempl,
             String mgmtUrlTempl,
+            String sourceCodeUrlTempl,
             GenerationConfigClient generationConfigClient,
             UrlFetcher urlFetcher,
             TaskExecutor taskExecutor
@@ -85,6 +87,7 @@ public class GenerationService {
         this.appClient = appClient;
         this.productUrlTempl = productUrlTempl;
         this.mgmtUrlTempl = mgmtUrlTempl;
+        this.sourceCodeUrlTempl = sourceCodeUrlTempl;
         this.exchClient = exchClient;
         this.generationConfigClient = generationConfigClient;
         this.urlFetcher = urlFetcher;
@@ -165,7 +168,8 @@ public class GenerationService {
                 executeGen(() -> generatePages(apiSource, task));
             }
             var url = Format.format(productUrlTempl, kiwiAppId);
-            task.finish(url);
+            var sourceCodeUrl = Format.format(sourceCodeUrlTempl, kiwiAppId);
+            task.finish(url, sourceCodeUrl);
             log.info("Generation Completed. Application: {}", url);
         } catch (Exception e) {
             log.error("Failed to generate code for app {}", task.exchange.getAppId(), e);
@@ -555,6 +559,7 @@ public class GenerationService {
                 )),
                 "http://{}.metavm.test",
                 "http://localhost:5173/app/{}",
+                "https://admin.metavm.test/source-{}.zip",
                 Utils.createKiwiFeignClient(host, GenerationConfigClient.class, CHAT_APP_ID),
                 new UrlFetcher("https://1000061024.metavm.test")
                 ,

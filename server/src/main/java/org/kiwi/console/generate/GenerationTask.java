@@ -64,9 +64,10 @@ class GenerationTask implements Task {
         saveExchange();
     }
 
-    void finish(String productUrl) {
+    void finish(String productUrl, String sourceCodeUrl) {
         exchange.setStatus(ExchangeStatus.SUCCESSFUL);
         exchange.setProductURL(productUrl);
+        exchange.setSourceCodeURL(sourceCodeUrl);
         saveExchange();
     }
 

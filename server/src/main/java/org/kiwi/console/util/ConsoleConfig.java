@@ -88,7 +88,8 @@ public class ConsoleConfig {
     private UrlTemplates buildUrlTemplates(YmlConfig config) {
         return new UrlTemplates(
                 config.getString("url-templates", "product"),
-                config.getString("url-templates", "management")
+                config.getString("url-templates", "management"),
+                config.getString("url-templates", "source-code")
         );
     }
 
@@ -127,6 +128,7 @@ public class ConsoleConfig {
                 appClient,
                 urlTemplates.product,
                 urlTemplates.management,
+                urlTemplates.sourceCode,
                 generationConfigClient,
                 urlFetcher,
                 taskExecutor);
@@ -240,7 +242,8 @@ public class ConsoleConfig {
 
     private record UrlTemplates(
             String product,
-            String management
+            String management,
+            String sourceCode
     ) {}
 
     private record UploadConfig(
