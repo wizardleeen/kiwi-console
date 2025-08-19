@@ -47,6 +47,7 @@ public class MockExchangeClient implements ExchangeClient {
                 Utils.map(exchange.getStages(), this::copyStage),
                 exchange.getProductURL(),
                 exchange.getManagementURL(),
+                exchange.getSourceCodeURL(),
                 exchange.getErrorMessage(),
                 exchange.isFirst(),
                 exchange.isSkipPageGeneration(),

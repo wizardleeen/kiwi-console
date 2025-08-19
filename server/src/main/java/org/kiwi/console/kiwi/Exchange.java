@@ -21,6 +21,7 @@ public class Exchange {
     private List<Stage> stages;
     private @Nullable String productURL;
     private @Nullable String managementURL;
+    private @Nullable String sourceCodeURL;
     private @Nullable String errorMessage;
     private boolean first;
     private boolean skipPageGeneration;
@@ -39,6 +40,7 @@ public class Exchange {
                 attachmentUrls,
                 ExchangeStatus.PLANNING,
                 new ArrayList<>(),
+                null,
                 null,
                 null,
                 null,
@@ -100,6 +102,7 @@ public class Exchange {
                 Utils.map(stages, Stage::clearAttempts),
                 productURL,
                 managementURL,
+                sourceCodeURL,
                 null,
                 first,
                 skipPageGeneration,

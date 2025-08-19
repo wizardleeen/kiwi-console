@@ -62,6 +62,7 @@ public class GenerationServiceTest extends TestCase {
                 appClient,
                 "http://{}.metavm.test",
                 "http://localhost:8080",
+                "https://admin.metavm.test/source-{}.zip",
                 genConfigClient,
                 urlFetcher,
                 new SyncTaskExecutor());
@@ -132,6 +133,7 @@ public class GenerationServiceTest extends TestCase {
                 appClient,
                 "http://{}.metavm.test",
                 "http://localhost:8080",
+                "https://admin.metavm.test/source-{}.zip",
                 genConfigClient,
                 urlFetcher,
                 taskExecutor);
@@ -154,6 +156,7 @@ public class GenerationServiceTest extends TestCase {
                 appClient,
                 "http://{}.metavm.test",
                 "http://localhost:8080",
+                "https://admin.metavm.test/source-{}.zip",
                 genConfigClient,
                 urlFetcher,
                 new SyncTaskExecutor());
@@ -198,6 +201,7 @@ public class GenerationServiceTest extends TestCase {
                 appClient,
                 "http://{}.metavm.test",
                 "http://localhost:8080",
+                "https://admin.metavm.test/source-{}.zip",
                 genConfigClient,
                 urlFetcher,
                 new SyncTaskExecutor());
@@ -220,6 +224,7 @@ public class GenerationServiceTest extends TestCase {
                 appClient,
                 "http://{}.metavm.test",
                 "http://localhost:8080",
+                "https://admin.metavm.test/source-{}.zip",
                 genConfigClient,
                 urlFetcher,
                 t -> {});
@@ -238,6 +243,7 @@ public class GenerationServiceTest extends TestCase {
                 appClient,
                 "http://{}.metavm.test",
                 "http://localhost:8080",
+                "https://admin.metavm.test/source-{}.zip",
                 genConfigClient,
                 urlFetcher,
                 t -> {});
@@ -257,6 +263,7 @@ public class GenerationServiceTest extends TestCase {
                 appClient,
                 "http://{}.metavm.test",
                 "http://localhost:8080",
+                "https://admin.metavm.test/source-{}.zip",
                 genConfigClient,
                 urlFetcher,
                 t -> {});
@@ -280,6 +287,7 @@ public class GenerationServiceTest extends TestCase {
                 appClient,
                 "http://{}.metavm.test",
                 "http://localhost:8080",
+                "https://admin.metavm.test/source-{}.zip",
                 genConfigClient,
                 urlFetcher,
                 new SyncTaskExecutor());

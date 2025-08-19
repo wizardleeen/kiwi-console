@@ -119,6 +119,7 @@ Initiates an AI generation process. This endpoint establishes a long-lived conne
       "status": "SUCCESSFUL",
       "productURL": "https://xyz001.metavm.tech",
       "managementURL": "https://manage.xyz001.metavm.tech",
+      "sourceCodeURL": "https://source.metavm.tech/xyz001.zip",
       "stages": [
         {
           "id": "s1a2b3c4",
@@ -226,6 +227,7 @@ Retrieves a paginated list of past `Exchange` interactions for a specific applic
           "status": "SUCCESSFUL",
           "productURL": "https://xyz123.metavm.tech",
           "managementURL": "https://manage.xyz123.metavm.tech",
+          "sourceCodeURL": "https://source.metavm.tech/xyz123-v2.zip",
           "stages": [
             { "id": "c89b3dfa", "type": "BACKEND", "status": "SUCCESSFUL", "attempts": [] },
             { "id": "d90c4e0b", "type": "FRONTEND", "status": "SUCCESSFUL", "attempts": [] }
@@ -347,6 +349,7 @@ Represents a single interaction with the generation AI.
 | `errorMessage` | `string`   | An error message if the exchange failed. Will be `null` if successful.                                                           |
 | `productURL`   | `string`   | The URL where the generated product can be accessed if the exchange was successful. Will be `null` otherwise.                    |
 | `managementURL`| `string`   | The URL for managing the application. This is populated after the BACKEND stage completes successfully.                          |
+| `sourceCodeURL`| `string`   | The URL to download the generated source code. Available once the generation is `SUCCESSFUL`. Will be `null` otherwise.      |
 
 ### `Stage`
 Represents a major step within an `Exchange`.
