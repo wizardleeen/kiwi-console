@@ -15,11 +15,12 @@ import java.util.List;
 
 public class GeminiModel implements Model {
 
-    public static final String model = "gemini-2.5-pro";
+    public final String model;
 
     private final Client client;
 
-    public GeminiModel(String apiKey) {
+    public GeminiModel(String model, String apiKey) {
+        this.model = model;
         if (apiKey != null) {
             client = Client.builder()
                     .apiKey(apiKey)
@@ -30,12 +31,12 @@ public class GeminiModel implements Model {
     }
 
     @Override
-    public Chat createChat() {
+    public Chat createChat(boolean outputThought) {
         return new GeminiChat(client.chats.create(model, GenerateContentConfig
                 .builder()
                 .thinkingConfig(
                         ThinkingConfig.builder()
-                                .includeThoughts(true)
+                                .includeThoughts(outputThought)
                                 .build()
                 )
                 .build()));

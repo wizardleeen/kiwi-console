@@ -22,7 +22,7 @@ public class ClaudeModel implements Model {
     }
 
     @Override
-    public Chat createChat() {
+    public Chat createChat(boolean outputThought) {
         return new ClaudeChat();
     }
 
@@ -80,7 +80,7 @@ public class ClaudeModel implements Model {
     @SneakyThrows
     public static void main(String[] args) {
         var agent = new ClaudeModel(Files.readString(Constants.CLAUDE_APIKEY_PATH).trim());
-        var chat = agent.createChat();
+        var chat = agent.createChat(false);
         var listener = new ChatStreamListener() {
 
             @Override

@@ -4,6 +4,7 @@ public record GenerationConfig(
         String id,
         String name,
         String model,
+        String autoTestModel,
         String pageCreatePrompt,
         String pageUpdatePrompt,
         String pageFixPrompt,
@@ -16,6 +17,7 @@ public record GenerationConfig(
         String pageTemplateRepo,
         String pageTemplateBranch,
         String kiwiTemplateRepo,
-        String kiwiTemplateBranch
+        String kiwiTemplateBranch,
+        boolean outputThinking
 ) {
 }

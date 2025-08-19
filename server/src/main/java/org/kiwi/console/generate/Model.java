@@ -2,7 +2,7 @@ package org.kiwi.console.generate;
 
 public interface Model {
 
-    Chat createChat();
+    Chat createChat(boolean outputThought);
 
     String getName();
 

@@ -15,6 +15,7 @@ public class MockGenerationConfigClient implements GenerationConfigClient {
                 UUID.randomUUID().toString(),
                 "default",
                 "mock",
+                "mock",
                 Utils.loadResource("/prompt/page-create.md"),
                 Utils.loadResource("/prompt/page-update.md"),
                 Utils.loadResource("/prompt/page-fix.md"),
@@ -27,7 +28,8 @@ public class MockGenerationConfigClient implements GenerationConfigClient {
                 "",
                 "",
                 "",
-                ""
+                "",
+                false
                 );
         configs.put(preset.id(), preset);
     }
@@ -55,6 +57,7 @@ public class MockGenerationConfigClient implements GenerationConfigClient {
                 config.id() != null ? config.id() :UUID.randomUUID().toString(),
                 config.name(),
                 config.model(),
+                config.autoTestModel(),
                 config.pageCreatePrompt(),
                 config.pageUpdatePrompt(),
                 config.pageFixPrompt(),
@@ -67,7 +70,8 @@ public class MockGenerationConfigClient implements GenerationConfigClient {
                 config.pageTemplateRepo(),
                 config.pageTemplateBranch(),
                 config.kiwiTemplateRepo(),
-                config.kiwiTemplateBranch()
+                config.kiwiTemplateBranch(),
+                config.outputThinking()
         );
     }
 

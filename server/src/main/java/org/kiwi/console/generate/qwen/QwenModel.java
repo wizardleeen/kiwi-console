@@ -21,7 +21,7 @@ public class QwenModel implements Model {
     }
 
     @Override
-    public Chat createChat() {
+    public Chat createChat(boolean outputThought) {
         return new QwenChat();
     }
 
@@ -71,7 +71,7 @@ public class QwenModel implements Model {
     @SneakyThrows
     public static void main(String[] args) {
         var agent = new QwenModel(Files.readString(Path.of("/Users/leen/develop/qwen_apikey")).trim());
-        var chat = agent.createChat();
+        var chat = agent.createChat(false);
         var l = new ChatStreamListener() {
 
             @Override
