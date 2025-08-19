@@ -46,7 +46,7 @@ public class AigcService {
 
     public void generate(GenerateRequest request) {
         compiler.reset(request.appId(), Constants.KIWI_TEMPLATE_REPO, "main");
-        var chat = model.createChat();
+        var chat = model.createChat(false);
         var existingCode = compiler.getSourceFiles(request.appId());
         String text;
         if (!existingCode.isEmpty())
@@ -125,7 +125,7 @@ public class AigcService {
         var apikeyPath = "/Users/leen/develop/gemini/apikey";
         var apikey = Files.readString(Path.of(apikeyPath));
         var chatService = new AigcService(
-                new GeminiModel(apikey),
+                new GeminiModel("gemini-2.5-pro", apikey),
                 new DefaultKiwiCompiler(
                         Path.of("/tmp/kiwi-works"),
                         new DeployClient("http://localhost:8080", HttpClient.newBuilder()

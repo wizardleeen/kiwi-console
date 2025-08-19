@@ -7,7 +7,7 @@ Provides a GET /schema endpoint to retrieve structural information about defined
 ## Endpoint
 
 *   `GET /schema`
-*   
+*
 *   **Headers:** `Authorization: Bearer {token}` and `X-App-ID: {app-id}`
 *   **Response:** Successful response use [SchemaResponse](#schemaresponse) schema. Error responses use the [ErrorResponse](#errorresponse) schema.
 
@@ -57,13 +57,14 @@ Represents a class constructor.
 ### `Field`
 Represents a class field.
 
-| Field     | Type          | Description                                           |
-|:----------|:--------------|:------------------------------------------------------|
-| `access`  | `string`      | Field access modifier (see `Class.access` for values) |
-| `name`    | `string`      | Field name                                            |
-| `type`    | [Type](#type) | Field type                                            |
-| `summary` | `boolean`     | True if this is the summary field                     |
-| `label`   | `string`      | Display label                                         |
+| Field          | Type          | Description                                           |
+|:---------------|:--------------|:------------------------------------------------------|
+| `access`       | `string`      | Field access modifier (see `Class.access` for values) |
+| `name`         | `string`      | Field name                                            |
+| `type`         | [Type](#type) | Field type                                            |
+| `summary`      | `boolean`     | True if this is the summary field                     |
+| `label`        | `string`      | Display label                                         |
+| `numberFormat` | `string?`     | Optional format hint. Possible values: `date`.        |
 
 ### `Method`
 Represents a class method.
@@ -161,14 +162,14 @@ class Product(
 bean OrderService {
 
     fn placeOrder(products: Product[]) -> Order {
-        val price = products.map<double>(p -> p.price).sum()
-        val order = Order(price)
-        products.forEach(p -> {
-            p.reduceStock(1)
-            order.Item(p, 1)
-        })
-        return order
-    }
+    val price = products.map<double>(p -> p.price).sum()
+    val order = Order(price)
+    products.forEach(p -> {
+    p.reduceStock(1)
+    order.Item(p, 1)
+})
+    return order
+}
 
 }
 
@@ -186,7 +187,7 @@ enum Category {
     CLOTHING,
     OTHER
 
-;
+    ;
 }
 ```
 

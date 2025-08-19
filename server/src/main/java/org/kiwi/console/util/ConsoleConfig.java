@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.web.server.ConfigurableWebServerFactory;
 import org.springframework.boot.web.server.WebServerFactoryCustomizer;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.stereotype.Component;
 import org.yaml.snakeyaml.Yaml;
@@ -124,7 +125,6 @@ public class ConsoleConfig {
                 pageCompiler,
                 exchangeClient,
                 appClient,
-                userClient,
                 urlTemplates.product,
                 urlTemplates.management,
                 generationConfigClient,
@@ -147,9 +147,15 @@ public class ConsoleConfig {
         return new DefaultPageCompiler(Path.of(pageConfig.worksDir));
     }
 
+    @Primary
     @Bean
-    public GeminiModel geminiModel() {
-        return new GeminiModel(apiKeys.gemini);
+    public GeminiModel gemini2_5_ProModel() {
+        return new GeminiModel("gemini-2.5-pro", apiKeys.gemini);
+    }
+
+    @Bean
+    public GeminiModel gemini2_5_FlashModel() {
+        return new GeminiModel("gemini-2.5-flash", apiKeys.gemini);
     }
 
     @Bean

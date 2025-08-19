@@ -21,7 +21,7 @@ public class K2Model implements Model {
     }
 
     @Override
-    public Chat createChat() {
+    public Chat createChat(boolean outputThought) {
         return new k2Chat();
     }
 
@@ -73,7 +73,7 @@ public class K2Model implements Model {
     @SneakyThrows
     public static void main(String[] args) {
         var agent = new K2Model(Files.readString(Path.of("/Users/leen/develop/k2_apikey")).trim());
-        var chat = agent.createChat();
+        var chat = agent.createChat(false);
         var l = new ChatStreamListener() {
 
             @Override

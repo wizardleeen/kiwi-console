@@ -62,7 +62,6 @@ public class GenerationService {
     private final String mgmtUrlTempl;
     private final ExchangeClient exchClient;
     private final GenerationConfigClient generationConfigClient;
-    private final UserClient userClient;
     private final UrlFetcher urlFetcher;
     private final Map<String, GenerationTask> runningTasks = new ConcurrentHashMap<>();
     private final Map<String, AutoTestTask> autoTestTasks = new ConcurrentHashMap<>();
@@ -74,7 +73,7 @@ public class GenerationService {
             PageCompiler pageCompiler,
             ExchangeClient exchClient,
             AppClient appClient,
-            UserClient userClient, String productUrlTempl,
+            String productUrlTempl,
             String mgmtUrlTempl,
             GenerationConfigClient generationConfigClient,
             UrlFetcher urlFetcher,
@@ -87,7 +86,6 @@ public class GenerationService {
         this.productUrlTempl = productUrlTempl;
         this.mgmtUrlTempl = mgmtUrlTempl;
         this.exchClient = exchClient;
-        this.userClient = userClient;
         this.generationConfigClient = generationConfigClient;
         this.urlFetcher = urlFetcher;
         this.taskExecutor = taskExecutor;
@@ -261,7 +259,7 @@ public class GenerationService {
             return task.isStageSuccessful(StageType.BACKEND) ? Plan.none : Plan.kiwiOnly;
         var kiwiCode = PatchReader.buildCode(kiwiCompiler.getSourceFiles(task.app.getKiwiAppId()));
         var pageCode = PatchReader.buildCode(pageCompiler.getSourceFiles(task.app.getKiwiAppId()));
-        var chat = task.model.createChat();
+        var chat = task.model.createChat(task.genConfig.outputThinking());
         var planPrompt = createPlanPrompt(exch, kiwiCode, pageCode, task);
         log.info("Plan prompt:\n{}", planPrompt);
         var text = generateContent(chat, planPrompt, task);
@@ -325,7 +323,7 @@ public class GenerationService {
         var userPrompt = task.exchange.getPrompt();
         var stageIdx = task.enterStageAndAttempt(StageType.BACKEND);
         try {
-            var chat = task.model.createChat();
+            var chat = task.model.createChat(task.genConfig.outputThinking());
             String prompt;
             var existingFiles = kiwiCompiler.getSourceFiles(kiwiAppId);
             if (!existingFiles.isEmpty())
@@ -455,7 +453,7 @@ public class GenerationService {
         var stageIdx = task.enterStageAndAttempt(StageType.FRONTEND);
         try {
             var appId = task.app.getKiwiAppId();
-            var chat = task.model.createChat();
+            var chat = task.model.createChat(task.genConfig.outputThinking());
             var existingFiles = pageCompiler.getSourceFiles(appId);
             String prompt;
             var existingSource = PatchReader.buildCode(existingFiles);
@@ -484,7 +482,7 @@ public class GenerationService {
         var exch = exchClient.get(exchId);
         var app = appClient.get(exch.getAppId());
         var genConfig = generationConfigClient.get(app.getGenConfigId());
-        var model = getModel(genConfig.model());
+        var model = getModel(genConfig.autoTestModel());
         var task = new AutoTestTask(app, genConfig, exch, model);
         autoTestTasks.put(exchId, task);
         return task;
@@ -499,7 +497,7 @@ public class GenerationService {
             task.setAttachments(attachments);
             var code = PatchReader.buildCode(pageCompiler.getSourceFiles(task.getApp().getKiwiAppId()));
             var prompt = buildAutoTestPrompt(task.getGenConfig().autoTestPrompt(), task.getExch().getPrompt(), code, task.getActions());;
-            var chat = task.getModel().createChat();
+            var chat = task.getModel().createChat(task.getGenConfig().outputThinking());
             var text = generateContent(chat, prompt, task);
             var action = AutoTestActionParser.parse(text);
             if (action.type() == AutoTestActionType.FAILED || action.type() == AutoTestActionType.PASSED)
@@ -546,7 +544,7 @@ public class GenerationService {
                 java.nio.file.Path.of(Constants.KIWI_WORKDIR),
                 new DeployClient(host, httpClient));
         var service = new GenerationService(
-                List.of(new GeminiModel(apikey)),
+                List.of(new GeminiModel("gemini-2.5-pro", apikey)),
                 kiwiCompiler,
                 new DefaultPageCompiler(java.nio.file.Path.of(PAGE_WORKDIR)),
                 createFeignClient(ExchangeClient.class, CHAT_APP_ID),
@@ -555,7 +553,7 @@ public class GenerationService {
                         UserClient.class,
                         CHAT_APP_ID
                 )),
-                Utils.createKiwiFeignClient(host, UserClient.class, CHAT_APP_ID), "http://{}.metavm.test",
+                "http://{}.metavm.test",
                 "http://localhost:5173/app/{}",
                 Utils.createKiwiFeignClient(host, GenerationConfigClient.class, CHAT_APP_ID),
                 new UrlFetcher("https://1000061024.metavm.test")
