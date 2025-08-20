@@ -8,8 +8,6 @@ public interface Task extends ChatStreamListener {
 
     List<File> getAttachments();
 
-    void sendHeartBeatIfRequired();
-
     boolean isCancelled();
 
 }

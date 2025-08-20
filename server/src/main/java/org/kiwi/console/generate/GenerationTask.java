@@ -98,22 +98,9 @@ class GenerationTask implements Task {
         sendProgress();
     }
 
-    private static final long SEND_HEART_BEAT_INTERVAL = 1000 * 10;
-
     @Override
     public List<File> getAttachments() {
         return attachments;
-    }
-
-    public void sendHeartBeatIfRequired() {
-        if (exchange.isRunning() && System.currentTimeMillis() - exchange.getLastHeartBeatAt() > SEND_HEART_BEAT_INTERVAL) {
-            try {
-                exchClient.sendHeartBeat(new ExchangeHeartBeatRequest(exchange.getId()));
-                reloadExchange();
-            } catch (Exception e) {
-                log.warn("Failed to send heartbeat for exchange {}", exchange.getId(), e);
-            }
-        }
     }
 
     @Override

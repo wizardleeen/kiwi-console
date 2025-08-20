@@ -193,6 +193,19 @@ public class GenerationService {
         }
     }
 
+    @Scheduled(fixedDelay = 10 * 1000)
+    public void sendHeartBeat() {
+        for (var task : runningTasks.values()) {
+            if (task.exchange.isRunning()) {
+                try {
+                    exchClient.sendHeartBeat(new ExchangeHeartBeatRequest(task.exchange.getId()));
+                } catch (Exception e) {
+                    log.warn("Failed to send heartbeat for exchange {}", task.exchange.getId(), e);
+                }
+            }
+        }
+    }
+
     public void reconnect(String exchangeId, GenerationListener listener) {
         var task = runningTasks.get(exchangeId);
         if (task == null)
@@ -385,13 +398,11 @@ public class GenerationService {
             @Override
             public void onThought(String thoughtChunk) {
                 task.onThought(thoughtChunk);
-                task.sendHeartBeatIfRequired();
             }
 
             @Override
             public void onContent(String contentChunk) {
                 task.onContent(contentChunk);
-                task.sendHeartBeatIfRequired();
                 buf.append(contentChunk);
             }
         }, task::isCancelled);
