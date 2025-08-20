@@ -44,11 +44,6 @@ public class AutoTestTask implements Task {
         this.attachments = attachments;
     }
 
-    @Override
-    public void sendHeartBeatIfRequired() {
-
-    }
-
     public void addAction(AutoTestAction action) {
         actions.add(action);
     }
