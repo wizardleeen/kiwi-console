@@ -61,10 +61,7 @@ public class DefaultKiwiCompiler extends AbstractCompiler implements KiwiCompile
     public String generateApi(long appId) {
         var wd = WorkDir.from(baseDir, appId);
         var version = getVersion(wd);
-        var command = new ArrayList<>(List.of("kiwi", "gen-api"));
-        if (version > 0)
-            command.add("--return-full-object");
-        var r = Utils.executeCommand(wd.root(), command);
+        var r = Utils.executeCommand(wd.root(), "kiwi", "gen-api", "--version", Long.toString(version));
         if (r.exitCode() != 0)
             throw new RuntimeException("Failed to generate API: " + r.output());
         return Files.readString(wd.root().resolve("apigen").resolve("api.ts"));

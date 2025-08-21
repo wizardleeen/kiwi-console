@@ -71,8 +71,9 @@ public abstract class AbstractCompiler implements Compiler {
             Utils.executeCommand(getWorkDir(appId).root(), "git", "clean", "-fdx", "--exclude=node_modules", "--exclude=dist");
         } else {
             Utils.executeCommand(baseDir, "git", "clone", templateRepo, Long.toString(appId));
-            Utils.executeCommand(baseDir, "git", "checkout", branch);
-            initWorkDir(getWorkDir(appId), appId);
+            var workdir = getWorkDir(appId);
+            Utils.executeCommand(workdir.root(), "git", "checkout", branch);
+            initWorkDir(workdir, appId);
         }
     }
 
