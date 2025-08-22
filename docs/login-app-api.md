@@ -24,7 +24,8 @@ Authenticates a user.
 
 | Field      | Type     | Description                    |
 |:-----------|:---------|:-------------------------------|
-| `token`    | `string` | token for authentication       |
+| `token`    | `string` | Token for authentication       |
+| `user`     | `UserDTO`  | Information about the logged-in user. See [UserDTO](#userdto) data structure. |
 
 *   **Example:**
     ```http
@@ -39,7 +40,12 @@ Authenticates a user.
     * Response:
     ```json
     {
-      "token": "{token}"
+      "token": "{token}",
+      "user": {
+        "id": "{user-id}",
+        "name": "demo",
+        "allowSourceDownload": true
+      }
     }
     ```
 
@@ -118,7 +124,8 @@ Authenticates a user using a previously generated SSO code.
 
 | Field | Type     | Description              |
 |:------|:---------|:-------------------------|
-| `token` | `string` | token for authentication |
+| `token` | `string` | Token for authentication |
+| `user`  | `UserDTO`  | Information about the logged-in user. See [UserDTO](#userdto) data structure. |
 
 *   **Example:**
     ```http
@@ -132,7 +139,12 @@ Authenticates a user using a previously generated SSO code.
     * Response:
     ```json
     {
-      "token": "{token}"
+      "token": "{token}",
+      "user": {
+        "id": "{user-id}",
+        "name": "demo",
+        "allowSourceDownload": false
+      }
     }
     ```
 
@@ -260,3 +272,12 @@ Represents an application.
 | `id`        | `string` | Application ID       |
 | `name`      | `string` | Application          |
 | `ownerId`   | `string` | Application owner ID |
+
+### `UserDTO`
+Represents user information returned upon successful login.
+
+| Field                 | Type      | Description                                          |
+|:----------------------|:----------|:-----------------------------------------------------|
+| `id`                  | `string`  | User ID                                              |
+| `name`                | `string`  | User name                                            |
+| `allowSourceDownload` | `boolean` | Whether the user is permitted to download source code|

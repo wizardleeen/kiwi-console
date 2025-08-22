@@ -13,4 +13,5 @@ public class User {
     private String kiwiUserId;
     private List<App> apps;
     private String genConfigId;
+    private boolean allowSourceDownload;
 }

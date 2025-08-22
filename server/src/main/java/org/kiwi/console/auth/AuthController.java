@@ -28,7 +28,7 @@ public class AuthController {
         var userId = userClient.login(request).userId();
         if (userId == null)
             throw new BusinessException(ErrorCode.AUTHENTICATION_FAILED);
-        return new LoginResult(issueToken(userId));
+        return new LoginResult(issueToken(userId), toUserDTO(userClient.get(userId)));
     }
 
     private String issueToken(String userId) {
@@ -58,10 +58,15 @@ public class AuthController {
     @PostMapping("/login-with-sso-code")
     public LoginResult loginWithSsoCode(@RequestBody LoginWithSsoCodeRequest request) {
         var userId = userClient.loginWithSsoCode(new org.kiwi.console.kiwi.LoginWithSsoCodeRequest(request.code()));
-        if (userId != null)
-            return new LoginResult(issueToken(userId));
-        else
+        if (userId != null) {
+            var user = userClient.get(userId);
+            return new LoginResult(issueToken(userId), toUserDTO(user));
+        } else
             throw new BusinessException(ErrorCode.AUTHENTICATION_FAILED, "Invalid SSO code");
+    }
+
+    private UserDTO toUserDTO(User user) {
+        return new UserDTO(user.getId(), user.getName(), user.isAllowSourceDownload());
     }
 
 }
