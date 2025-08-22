@@ -13,7 +13,7 @@ class MockCompiler implements KiwiCompiler, PageCompiler {
     private final List<Commit> commits = new ArrayList<>();
 
     @Override
-    public DeployResult run(long appId, List<SourceFile> sourceFiles, List<Path> removedFiles) {
+    public DeployResult run(long appId, List<SourceFile> sourceFiles, List<Path> removedFiles, boolean deploySource) {
         var files = getWorkdir(appId);
         sourceFiles.forEach(f -> files.put(f.path().toString(), f.content()));
         for (Path removedFile : removedFiles) {
@@ -52,7 +52,7 @@ class MockCompiler implements KiwiCompiler, PageCompiler {
     }
 
     @Override
-    public DeployResult deploy(long appId) {
+    public DeployResult deploy(long appId, boolean deploySource) {
         return new DeployResult(true, "");
     }
 
@@ -84,7 +84,7 @@ class MockCompiler implements KiwiCompiler, PageCompiler {
     }
 
     @Override
-    public void revert(long appId) {
+    public void revert(long appId, boolean deploySource) {
         if (commits.isEmpty())
             throw new IllegalStateException("No commits to revert to.");
         if (commits.size() == 1)

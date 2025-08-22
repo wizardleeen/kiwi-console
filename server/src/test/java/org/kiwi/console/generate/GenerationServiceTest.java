@@ -60,12 +60,12 @@ public class GenerationServiceTest extends TestCase {
                 kiwiCompiler, pageCompiler,
                 exchangeClient,
                 appClient,
+                userClient,
                 "http://{}.metavm.test",
                 "http://localhost:8080",
                 "https://admin.metavm.test/source-{}.zip",
                 genConfigClient,
-                urlFetcher,
-                new SyncTaskExecutor());
+                urlFetcher, new SyncTaskExecutor());
         var prompt = """
                 class Foo {}
                 """;
@@ -131,12 +131,12 @@ public class GenerationServiceTest extends TestCase {
         var generationService = new GenerationService(List.of(new MockModel()), kiwiCompiler, pageCompiler,
                 exchangeClient,
                 appClient,
+                userClient,
                 "http://{}.metavm.test",
                 "http://localhost:8080",
                 "https://admin.metavm.test/source-{}.zip",
                 genConfigClient,
-                urlFetcher,
-                taskExecutor);
+                urlFetcher, taskExecutor);
         generationService.generate(GenerationRequest.create(null, "class Foo{}"), userId, discardListener);
         var exch = exchangeClient.getFirst();
         generationService.cancel(new CancelRequest(exch.getId()));
@@ -154,12 +154,12 @@ public class GenerationServiceTest extends TestCase {
         var genService = new GenerationService(List.of(new MockModel()), kiwiCompiler, pageCompiler,
                 exchangeClient,
                 appClient,
+                userClient,
                 "http://{}.metavm.test",
                 "http://localhost:8080",
                 "https://admin.metavm.test/source-{}.zip",
                 genConfigClient,
-                urlFetcher,
-                new SyncTaskExecutor());
+                urlFetcher, new SyncTaskExecutor());
         var exchanges = new ArrayList<Exchange>();
         genService.generate(GenerationRequest.create(null, "class Foo {}"), userId, new GenerationListener() {
             @Override
@@ -190,21 +190,21 @@ public class GenerationServiceTest extends TestCase {
             boolean failing = true;
 
             @Override
-            public DeployResult run(long appId, List<SourceFile> sourceFiles, List<Path> removedFiles) {
+            public DeployResult run(long appId, List<SourceFile> sourceFiles, List<Path> removedFiles, boolean deploySource) {
                 if (failing)
                     throw new RuntimeException("Failed");
-                return super.run(appId, sourceFiles, removedFiles);
+                return super.run(appId, sourceFiles, removedFiles, deploySource);
             }
         };
         var generationService = new GenerationService(List.of(new MockModel()), kiwiCompiler, pageCompiler,
                 exchangeClient,
                 appClient,
+                userClient,
                 "http://{}.metavm.test",
                 "http://localhost:8080",
                 "https://admin.metavm.test/source-{}.zip",
                 genConfigClient,
-                urlFetcher,
-                new SyncTaskExecutor());
+                urlFetcher, new SyncTaskExecutor());
         try {
             generationService.generate(GenerationRequest.create(null, "class Foo{}"), userId, discardListener);
             fail();
@@ -222,12 +222,12 @@ public class GenerationServiceTest extends TestCase {
         var genService = new GenerationService(List.of(new MockModel()), kiwiCompiler, pageCompiler,
                 exchangeClient,
                 appClient,
+                userClient,
                 "http://{}.metavm.test",
                 "http://localhost:8080",
                 "https://admin.metavm.test/source-{}.zip",
                 genConfigClient,
-                urlFetcher,
-                t -> {});
+                urlFetcher, t -> {});
         var appId = genService.generate(GenerationRequest.create(null, "class Foo {}"), userId, discardListener);
         try {
             genService.generate(GenerationRequest.create(appId, "class Foo {}"), userId, discardListener);
@@ -241,12 +241,12 @@ public class GenerationServiceTest extends TestCase {
         var genService = new GenerationService(List.of(new MockModel()), kiwiCompiler, pageCompiler,
                 exchangeClient,
                 appClient,
+                userClient,
                 "http://{}.metavm.test",
                 "http://localhost:8080",
                 "https://admin.metavm.test/source-{}.zip",
                 genConfigClient,
-                urlFetcher,
-                t -> {});
+                urlFetcher, t -> {});
         genService.generate(GenerationRequest.create(null, "class Foo {}"), userId, discardListener);
         var exch = exchangeClient.getFirst();
         assertTrue(exch.isRunning());
@@ -261,12 +261,12 @@ public class GenerationServiceTest extends TestCase {
         var genService = new GenerationService(List.of(new MockModel()), kiwiCompiler, pageCompiler,
                 exchangeClient,
                 appClient,
+                userClient,
                 "http://{}.metavm.test",
                 "http://localhost:8080",
                 "https://admin.metavm.test/source-{}.zip",
                 genConfigClient,
-                urlFetcher,
-                t -> {});
+                urlFetcher, t -> {});
         genService.generate(GenerationRequest.create(null, "class Foo {}"), userId, discardListener);
         var exch = exchangeClient.getFirst();
         genService.discardTask(exch.getId());
@@ -285,12 +285,12 @@ public class GenerationServiceTest extends TestCase {
         var generationService = new GenerationService(List.of(new MockModel()), kiwiCompiler, pageCompiler,
                 exchangeClient,
                 appClient,
+                userClient,
                 "http://{}.metavm.test",
                 "http://localhost:8080",
                 "https://admin.metavm.test/source-{}.zip",
                 genConfigClient,
-                urlFetcher,
-                new SyncTaskExecutor());
+                urlFetcher, new SyncTaskExecutor());
         var appId = generationService.generate(GenerationRequest.create(null, "class Foo{}"), userId, discardListener);
         var exch = exchangeClient.getFirst();
         var app = appClient.get(appId);

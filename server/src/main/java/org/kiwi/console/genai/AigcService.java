@@ -76,7 +76,7 @@ public class AigcService {
     }
 
     private DeployResult deploy(long appId, String code) {
-        var r = compiler.run(appId, new PatchReader(code).read().addedFiles(), List.of());
+        var r = compiler.run(appId, new PatchReader(code).read().addedFiles(), List.of(), false);
         if (r.successful())
             compiler.commit(appId, "commit");
         return r;

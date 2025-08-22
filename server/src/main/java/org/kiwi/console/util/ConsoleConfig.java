@@ -126,12 +126,12 @@ public class ConsoleConfig {
                 pageCompiler,
                 exchangeClient,
                 appClient,
+                userClient,
                 urlTemplates.product,
                 urlTemplates.management,
                 urlTemplates.sourceCode,
                 generationConfigClient,
-                urlFetcher,
-                taskExecutor);
+                urlFetcher, taskExecutor);
     }
 
     @Bean

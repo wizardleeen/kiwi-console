@@ -24,14 +24,16 @@ class GenerationTask implements Task {
     final List<File> attachments;
     private Chat autoTestChat;
     private ExchangeClient exchClient;
+    private User user;
 
-    public GenerationTask(ExchangeClient exchClient, Exchange exchange, App app, boolean showAttempts, GenerationConfig genConfig, List<File> attachments, @Nonnull GenerationListener listener, Model model) {
+    public GenerationTask(ExchangeClient exchClient, Exchange exchange, App app, User user, boolean showAttempts, GenerationConfig genConfig, List<File> attachments, @Nonnull GenerationListener listener, Model model) {
         this.exchClient = exchClient;
         this.genConfig = genConfig;
         this.attachments = attachments;
         this.model = model;
         listeners.add(listener);
         this.app = app;
+        this.user = user;
         this.exchange = exchange;
         this.showAttempts = showAttempts;
     }
@@ -169,5 +171,9 @@ class GenerationTask implements Task {
 
     public void cancel() {
         cancelled = true;
+    }
+
+    public User getUser() {
+        return user;
     }
 }
