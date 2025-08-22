@@ -28,7 +28,7 @@ public class DefaultKiwiCompiler extends AbstractCompiler implements KiwiCompile
     }
 
     @Override
-    public DeployResult deploy(long appId) {
+    public DeployResult deploy(long appId, boolean deploySource) {
         try {
             var deployId = deploy(appId, getWorkDir(appId));
             waitForDeployFinish(appId, deployId);
@@ -52,8 +52,8 @@ public class DefaultKiwiCompiler extends AbstractCompiler implements KiwiCompile
     }
 
     @Override
-    public void revert(long appId) {
-        super.revert(appId);
+    public void revert(long appId, boolean deploySource) {
+        super.revert(appId, deploySource);
         deployService.revert(appId);
     }
 
@@ -97,7 +97,7 @@ public class DefaultKiwiCompiler extends AbstractCompiler implements KiwiCompile
     public static void main(String[] args) {
         var compiler = new DefaultKiwiCompiler(Path.of("/tmp/kiwi-works"), new MockDeployService());
         var code = "class Foo(var name: string)";
-        compiler.deploy(1000037184L);
+        compiler.deploy(1000037184L, false);
         var deployedCode = compiler.getCode(1000037184L, Constants.MAIN_KIWI);
         Utils.require(code.equals(deployedCode));
     }

@@ -58,6 +58,7 @@ public class GenerationService {
     private final KiwiCompiler kiwiCompiler;
     private final PageCompiler pageCompiler;
     private final AppClient appClient;
+    private final UserClient userClient;
     private final String productUrlTempl;
     private final String sourceCodeUrlTempl;
     private final String mgmtUrlTempl;
@@ -73,7 +74,7 @@ public class GenerationService {
             KiwiCompiler kiwiCompiler,
             PageCompiler pageCompiler,
             ExchangeClient exchClient,
-            AppClient appClient,
+            AppClient appClient, UserClient userClient,
             String productUrlTempl,
             String mgmtUrlTempl,
             String sourceCodeUrlTempl,
@@ -85,6 +86,7 @@ public class GenerationService {
         this.kiwiCompiler = kiwiCompiler;
         this.pageCompiler = pageCompiler;
         this.appClient = appClient;
+        this.userClient = userClient;
         this.productUrlTempl = productUrlTempl;
         this.mgmtUrlTempl = mgmtUrlTempl;
         this.sourceCodeUrlTempl = sourceCodeUrlTempl;
@@ -109,9 +111,10 @@ public class GenerationService {
         var attachments = Utils.map(attachmentUrls, this::readAttachment);
         var exchange = Exchange.create(appId, userId, request.prompt(), attachmentUrls, creating, request.skipPageGeneration());
         var app = appClient.get(appId);
+        var user = userClient.get(userId);
         var genConfig = generationConfigClient.get(app.getGenConfigId());
         exchange.setId(exchClient.save(exchange));
-        var task = createGenerationTask(exchange, app,
+        var task = createGenerationTask(exchange, app, user,
                 genConfig,
                 attachments, listener, getModel(genConfig.model()));
         task.sendProgress();
@@ -119,11 +122,11 @@ public class GenerationService {
         return appId;
     }
 
-    private GenerationTask createGenerationTask(Exchange exch, App app, GenerationConfig genConfig,
+    private GenerationTask createGenerationTask(Exchange exch, App app, User user, GenerationConfig genConfig,
                                                 List<File> attachments, GenerationListener listener, Model model
                                                 ) {
         var task = new GenerationTask(
-                exchClient, exch, app, false, genConfig, attachments, listener, model
+                exchClient, exch, app, user,false, genConfig, attachments, listener, model
         );
         runningTasks.put(exch.getId(), task);
         return task;
@@ -168,7 +171,8 @@ public class GenerationService {
                 executeGen(() -> generatePages(apiSource, task));
             }
             var url = Format.format(productUrlTempl, kiwiAppId);
-            var sourceCodeUrl = Format.format(sourceCodeUrlTempl, kiwiAppId);
+            var sourceCodeUrl = task.getUser().isAllowSourceCodeDownload() ?
+                    Format.format(sourceCodeUrlTempl, kiwiAppId) : null;
             task.finish(url, sourceCodeUrl);
             log.info("Generation Completed. Application: {}", url);
         } catch (Exception e) {
@@ -228,8 +232,9 @@ public class GenerationService {
         exchClient.retry(new ExchangeIdRequest(request.exchangeId()));
         var attachments = Utils.map(exch.getAttachmentUrls(), this::readAttachment);
         exch = exchClient.get(request.exchangeId());  // Reload
+        var user = userClient.get(userId);
         var genConfig = generationConfigClient.get(app.getGenConfigId());
-        var task = createGenerationTask(exch, app,
+        var task = createGenerationTask(exch, app, user,
                 genConfig,
                 attachments, listener, getModel(genConfig.model()));
         task.sendProgress();
@@ -240,10 +245,11 @@ public class GenerationService {
         exchClient.revert(new ExchangeIdRequest(exchangeId));
         var exch = exchClient.get(exchangeId);
         var app = appClient.get(exch.getAppId());
+        var user = userClient.get(app.getOwnerId());
         if (exch.isStageSuccessful(StageType.BACKEND))
-            kiwiCompiler.revert(app.getKiwiAppId());
+            kiwiCompiler.revert(app.getKiwiAppId(), user.isAllowSourceCodeDownload());
         if (exch.isStageSuccessful(StageType.FRONTEND))
-            pageCompiler.revert(app.getKiwiAppId());
+            pageCompiler.revert(app.getKiwiAppId(),user.isAllowSourceCodeDownload() );
     }
 
     public void cancelAutoTest(AutoTestCancelRequest request) {
@@ -369,14 +375,14 @@ public class GenerationService {
         }
     }
 
-    private DeployResult runCompiler(Compiler compiler, long appId, List<SourceFile> files, List<Path> removedFiles) {
-        return compiler.run(appId, files, removedFiles);
+    private DeployResult runCompiler(Compiler compiler, long appId, List<SourceFile> files, List<Path> removedFiles, boolean deploySource) {
+        return compiler.run(appId, files, removedFiles, deploySource);
     }
 
     private DeployResult generateCode(Chat chat, String prompt, GenerationTask task, Compiler compiler) {
         try {
             var patch = new PatchReader(generateContent(chat, prompt, task)).read();
-            return runCompiler(compiler, task.app.getKiwiAppId(), patch.addedFiles(), patch.removedFiles());
+            return runCompiler(compiler, task.app.getKiwiAppId(), patch.addedFiles(), patch.removedFiles(), task.getUser().isAllowSourceCodeDownload());
         } catch (MalformedHunkException e) {
             return new DeployResult(false, e.getMessage());
         }
@@ -568,13 +574,12 @@ public class GenerationService {
                         UserClient.class,
                         CHAT_APP_ID
                 )),
+                createFeignClient(UserClient.class, CHAT_APP_ID),
                 "http://{}.metavm.test",
                 "http://localhost:5173/app/{}",
                 "https://admin.metavm.test/source-{}.zip",
                 Utils.createKiwiFeignClient(host, GenerationConfigClient.class, CHAT_APP_ID),
-                new UrlFetcher("https://1000061024.metavm.test")
-                ,
-                new SyncTaskExecutor());
+                new UrlFetcher("https://1000061024.metavm.test"), new SyncTaskExecutor());
 //        System.out.println(kiwiCompiler.generateApi(TEST_APP_ID));
         testNewApp(service);
 //        testUpdateApp(service);

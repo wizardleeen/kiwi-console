@@ -66,7 +66,7 @@ public class AuthController {
     }
 
     private UserDTO toUserDTO(User user) {
-        return new UserDTO(user.getId(), user.getName(), user.isAllowSourceDownload());
+        return new UserDTO(user.getId(), user.getName(), user.isAllowSourceCodeDownload());
     }
 
 }

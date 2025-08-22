@@ -19,7 +19,7 @@ public abstract class AbstractCompiler implements Compiler {
     }
 
     @Override
-    public DeployResult run(long appId, List<SourceFile> sourceFiles, List<Path> removedFiles) {
+    public DeployResult run(long appId, List<SourceFile> sourceFiles, List<Path> removedFiles, boolean deploySource) {
         var workDir = getWorkDir(appId);
         for (Path removedFile : removedFiles) {
             if (workDir.exist(removedFile))
@@ -28,7 +28,7 @@ public abstract class AbstractCompiler implements Compiler {
         sourceFiles.forEach(f -> writeSourceFile(workDir, f));
         var r = build(workDir);
         if (r.successful())
-            return deploy(appId);
+            return deploy(appId, deploySource);
         else
             return new DeployResult(false, r.message());
     }
@@ -49,7 +49,7 @@ public abstract class AbstractCompiler implements Compiler {
     }
 
     @Override
-    public abstract DeployResult deploy(long appId);
+    public abstract DeployResult deploy(long appId, boolean deploySource);
 
     @Override
     public void commit(long appId, String message) {
@@ -58,7 +58,7 @@ public abstract class AbstractCompiler implements Compiler {
         Utils.executeCommand(workDir.root(), "git", "commit", "-m", "\"" + message + "\"");
     }
 
-    public void revert(long appId) {
+    public void revert(long appId, boolean deploySource) {
         var workDir = getWorkDir(appId);
         Utils.executeCommand(workDir.root(), "git", "revert", "HEAD");
     }

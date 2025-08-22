@@ -6,6 +6,7 @@ import org.kiwi.console.util.Utils;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 
 @Slf4j
 public class DefaultPageCompiler extends AbstractCompiler implements PageCompiler {
@@ -15,8 +16,12 @@ public class DefaultPageCompiler extends AbstractCompiler implements PageCompile
     }
 
     @Override
-    public DeployResult deploy(long appId) {
-        var r = Utils.executeCommand(getWorkDir(appId).root(), "deploy-page");
+    public DeployResult deploy(long appId, boolean deploySource) {
+        var cmd = new ArrayList<String>();
+        cmd.add("deploy-page");
+        if (deploySource)
+            cmd.add("-s");
+        var r = Utils.executeCommand(getWorkDir(appId).root(), cmd.toArray(String[]::new));
         if (r.exitCode() != 0)
             return new DeployResult(false, r.output());
         return new DeployResult(true, null);
@@ -35,10 +40,10 @@ public class DefaultPageCompiler extends AbstractCompiler implements PageCompile
     }
 
     @Override
-    public void revert(long appId) {
-        super.revert(appId);
+    public void revert(long appId, boolean deploySource) {
+        super.revert(appId, deploySource);
         build(getWorkDir(appId));
-        deploy(appId);
+        deploy(appId, deploySource);
     }
 
     protected BuildResult build(WorkDir workDir) {
@@ -52,7 +57,7 @@ public class DefaultPageCompiler extends AbstractCompiler implements PageCompile
 
     public static void main(String[] args) {
         var compiler = new DefaultPageCompiler(Path.of("/tmp/page-works"));
-        compiler.deploy(1);
+        compiler.deploy(1, false);
     }
 
 }
