@@ -61,7 +61,7 @@ public class GeminiModel implements Model {
             var contents = new ArrayList<Content>();
             contents.add(Content.fromParts(Part.fromText(text)));
             for (File file : attachments) {
-                contents.add(Content.fromParts(Part.fromBytes(file.bytes(), file.mimeType())));
+                contents.add(Content.fromParts(Part.fromBytes(file.bytes(), convertMimeType(file.mimeType()))));
             }
             try (var stream = chat.sendMessageStream(contents)) {
                 for (var resp : stream) {
@@ -89,5 +89,11 @@ public class GeminiModel implements Model {
 
     }
 
+    private static String convertMimeType(String mimeType) {
+        if ("application/json".equals(mimeType))
+            return "text/plain";
+        else
+            return mimeType;
+    }
 
 }

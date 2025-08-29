@@ -67,6 +67,7 @@ public class ConsoleConfig {
     private ApiKeys buildApiKeys(YmlConfig config) {
         return new ApiKeys(
                 config.getString("apikeys", "gemini"),
+                config.getString("apikeys", "gemini2"),
                 config.getString("apikeys", "claude"),
                 config.getString("apikeys", "k2"),
                 config.getString("apikeys", "qwen")
@@ -157,7 +158,7 @@ public class ConsoleConfig {
 
     @Bean
     public GeminiModel gemini2_5_FlashModel() {
-        return new GeminiModel("gemini-2.5-flash", apiKeys.gemini);
+        return new GeminiModel("gemini-2.5-flash", apiKeys.gemini2);
     }
 
     @Bean
@@ -232,7 +233,13 @@ public class ConsoleConfig {
 
     public record ServerConfig(int port) {}
 
-    public record ApiKeys(String gemini, String claude, String k2, String qwen) {}
+    public record ApiKeys(
+            String gemini,
+            String gemini2,
+            String claude,
+            String k2,
+            String qwen
+    ) {}
 
     private record KiwiConfig(String host, long chatAppId, String worksDir) {}
 

@@ -24,13 +24,11 @@ import javax.annotation.Nullable;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.StringReader;
+import java.io.StringWriter;
 import java.net.http.HttpClient;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -164,11 +162,11 @@ public class GenerationService {
             }
             log.info("{}", plan);
             if (plan.generateKiwi) {
-                executeGen(() -> generateKiwi(task));
+                executeGen(() -> generateKiwi(task, plan.suggestion));
             }
             if (plan.generatePage) {
                 var apiSource = kiwiCompiler.generateApi(kiwiAppId);
-                executeGen(() -> generatePages(apiSource, task));
+                executeGen(() -> generatePages(apiSource, task, plan.suggestion));
             }
             var url = Format.format(productUrlTempl, kiwiAppId);
             var sourceCodeUrl = task.getUser().isAllowSourceCodeDownload() ?
@@ -256,15 +254,20 @@ public class GenerationService {
         autoTestTasks.remove(request.exchangeId());
     }
 
-    private record Plan(boolean generateKiwi, boolean generatePage, @Nullable String appName) {
+    private record Plan(
+            boolean generateKiwi,
+            boolean generatePage,
+            @Nullable String appName,
+            @Nullable String suggestion
+    ) {
 
-        public static final Plan none = new Plan(false, false, null);
+        public static final Plan none = new Plan(false, false, null, null);
 
-        public static final Plan kiwiOnly = new Plan(true, false, null);
+        public static final Plan kiwiOnly = new Plan(true, false, null, null);
 
-        public static final Plan pageOnly = new Plan(false, true, null);
+        public static final Plan pageOnly = new Plan(false, true, null, null);
 
-        public static final Plan all = new Plan(true, true, null);
+        public static final Plan all = new Plan(true, true, null, null);
 
         @Override
         public String toString() {
@@ -293,21 +296,24 @@ public class GenerationService {
         } catch (NumberFormatException e) {
             throw new AgentException("Invalid plan result: " + text);
         }
+        var sw = new StringWriter();
+        reader.transferTo(sw);
+        var content = sw.toString().trim();
         return switch (r) {
             case 0 -> Plan.none;
             case 1 -> task.isBackendSuccessful() ?
-                    Plan.none : Plan.kiwiOnly;
+                    Plan.none : new Plan(true, false, null, content);
             case 2 -> task.isFrontendSuccessful() ?
-                    Plan.none : Plan.pageOnly;
+                    Plan.none : new Plan(false, true, null, content);
             default -> {
                 if (task.isFrontendSuccessful())
                     yield Plan.none;
                 if (task.isBackendSuccessful())
                     yield Plan.pageOnly;
                 if (task.exchange.isFirst()) {
-                    yield new Plan(true, true, reader.readLine());
+                    yield new Plan(true, true, content, null);
                 }
-                yield Plan.all;
+                yield new Plan(true, true, null, content);
             }
         };
     }
@@ -341,7 +347,7 @@ public class GenerationService {
         throw new BusinessException(ErrorCode.CODE_GENERATION_FAILED);
     }
 
-    private void generateKiwi(GenerationTask task) {
+    private void generateKiwi(GenerationTask task, String suggestion) {
         var kiwiAppId = task.app.getKiwiAppId();
         var userPrompt = task.exchange.getPrompt();
         var stageIdx = task.enterStageAndAttempt(StageType.BACKEND);
@@ -350,7 +356,7 @@ public class GenerationService {
             String prompt;
             var existingFiles = kiwiCompiler.getSourceFiles(kiwiAppId);
             if (!existingFiles.isEmpty())
-                prompt = buildUpdatePrompt(userPrompt, PatchReader.buildCode(existingFiles), task);
+                prompt = buildUpdatePrompt(userPrompt, suggestion, PatchReader.buildCode(existingFiles), task);
             else
                 prompt = buildCreatePrompt(userPrompt, task);
             log.info("Kiwi generation prompt: \n{}", prompt);
@@ -470,7 +476,7 @@ public class GenerationService {
         throw new RuntimeException("Failed to fix compilation errors after 5 attempts: " + error);
     }
 
-    private void generatePages(String apiSource, GenerationTask task) {
+    private void generatePages(String apiSource, GenerationTask task, String suggestion) {
         var stageIdx = task.enterStageAndAttempt(StageType.FRONTEND);
         try {
             var appId = task.app.getKiwiAppId();
@@ -481,7 +487,7 @@ public class GenerationService {
             if (existingFiles.stream().noneMatch(f -> f.path().toString().equals(API_TS)))
                 prompt = buildPageCreatePrompt(task, existingSource, apiSource);
             else
-                prompt = buildPageUpdatePrompt(task,existingSource , apiSource);
+                prompt = buildPageUpdatePrompt(task, existingSource, apiSource, suggestion);
             log.info("Page generation prompt:\n{}", prompt);
             pageCompiler.addFile(appId, new SourceFile(Path.of(API_TS), apiSource));
             var r = generateCode(chat, prompt, task, pageCompiler);
@@ -537,9 +543,9 @@ public class GenerationService {
         );
     }
 
-    private String buildPageUpdatePrompt(GenerationTask task, String existingCode, String apiSource) {
+    private String buildPageUpdatePrompt(GenerationTask task, String existingCode, String apiSource, String suggestion) {
         var exch = task.exchange;
-        return Format.format(task.genConfig.pageUpdatePrompt(), exch.getPrompt(), existingCode, apiSource);
+        return Format.format(task.genConfig.pageUpdatePrompt(), exch.getPrompt(), suggestion, existingCode, apiSource);
     }
 
     private String buildPageCreatePrompt(GenerationTask task, String existingSource, String apiSource) {
@@ -550,8 +556,8 @@ public class GenerationService {
         return Format.format(task.genConfig.kiwiCreatePrompt(), prompt);
     }
 
-    private String buildUpdatePrompt(String prompt, String code, GenerationTask task) {
-        return Format.format(task.genConfig.kiwiUpdatePrompt(), prompt, code);
+    private String buildUpdatePrompt(String prompt, String suggestion, String code, GenerationTask task) {
+        return Format.format(task.genConfig.kiwiUpdatePrompt(), prompt, suggestion, code);
     }
 
     public static final String APP_ID = "0196b0e0b90700";
