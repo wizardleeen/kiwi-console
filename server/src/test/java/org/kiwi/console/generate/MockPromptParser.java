@@ -26,9 +26,9 @@ public class MockPromptParser {
                 return new Prompt(PromptKind.CREATE, null, parts[1], null, null);
             }
             case "update" -> {
-                if (parts.length < 3)
+                if (parts.length < 4)
                     throw invalidPrompt(text);
-                return new Prompt(PromptKind.UPDATE, null, parts[1], parts[2], null);
+                return new Prompt(PromptKind.UPDATE, null, parts[1], parts[3], null);
             }
             case "page_create" -> {
                 if (parts.length < 5)
@@ -36,9 +36,9 @@ public class MockPromptParser {
                 return new Prompt(PromptKind.PAGE_CREATE, parts[1], parts[2], parts[3], parts[4]);
             }
             case "page_update" -> {
-                if (parts.length < 4)
+                if (parts.length < 5)
                     throw invalidPrompt(text);
-                return new Prompt(PromptKind.PAGE_UPDATE, null, parts[1], parts[2], parts[3]);
+                return new Prompt(PromptKind.PAGE_UPDATE, null, parts[1], parts[3], parts[4]);
             }
             case "fix" -> {
                 if (parts.length < 2)
