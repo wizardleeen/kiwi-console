@@ -2,7 +2,7 @@ package value
 
 import domain.Customer
 
-value class LoginResponse(
+value class LoginResult(
     val successful: bool,
-    val customer: Customer?
+    val token: string?
 )

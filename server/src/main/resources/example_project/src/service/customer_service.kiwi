@@ -1,19 +1,25 @@
 package service
 
 import domain.Customer
-import value.LoginResponse
+import domain.Session
+import value.LoginResult
 
 @Bean
 class CustomerService {
 
-        fn login(email: string, password: string) -> LoginResponse {
+    fn login(email: string, password: string) -> LoginResult {
         val customer = Customer.emailIdx.getFirst(email)
-        return customer != null && customer!!.checkPassword(password) ?
-                LoginResponse(true, customer) : LoginResponse(false, null)
+        if (customer != null) {
+            val session = Session(customer!!)
+            return LoginResult(true, session.token)
+        } else
+            return LoginResult(false, null)
     }
 
-        fn register(name: string, email: string, password: string) -> Customer {
-        return Customer(name, email, password)
+    fn register(name: string, email: string, password: string) -> LoginResult {
+        val c = Customer(name, email, password)
+        var s = Session(c)
+        return LoginResult(true, s.token)
     }
 
 }

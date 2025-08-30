@@ -9,14 +9,14 @@ Kiwi is an infrastructure-free programming langauge that enables application to 
 
 ### Kiwi Code Example
 
-@@ src/value/login_response.kiwi @@
+@@ src/value/login_result.kiwi @@
 package value
 
 import domain.Customer
 
-value class LoginResponse(
+value class LoginResult(
     val successful: bool,
-    val customer: Customer?
+    val token: string?
 )
 @@ src/service/product_service.kiwi @@
 package service
@@ -24,11 +24,9 @@ package service
 import domain.Product
 
 @Bean
-@Label("商品服务")
 class ProductService {
 
-    @Label("按名称查找商品")
-    fn findProductByName(@Label("名称") name: string) -> Product? {
+    fn findProductByName(name: string) -> Product? {
         return Product.nameIdx.getFirst(name)
     }
 
@@ -38,22 +36,25 @@ class ProductService {
 package service
 
 import domain.Customer
-import value.LoginResponse
+import domain.Session
+import value.LoginResult
 
 @Bean
-@Label("客户服务")
 class CustomerService {
 
-    @Label("登录")
-    fn login(@Label("邮箱") email: string, @Label("密码") password: string) -> LoginResponse {
+    fn login(email: string, password: string) -> LoginResult {
         val customer = Customer.emailIdx.getFirst(email)
-        return customer != null && customer!!.checkPassword(password) ?
-                LoginResponse(true, customer) : LoginResponse(false, null)
+        if (customer != null) {
+            val session = Session(customer!!)
+            return LoginResult(true, session.token)
+        } else
+            return LoginResult(false, null)
     }
 
-    @Label("注册")
-    fn register(@Label("用户名") name: string, @Label("邮箱") email: string, @Label("密码") password: string) -> Customer {
-        return Customer(name, email, password)
+    fn register(name: string, email: string, password: string) -> LoginResult {
+        val c = Customer(name, email, password)
+        var s = Session(c)
+        return LoginResult(true, s.token)
     }
 
 }
@@ -69,13 +70,11 @@ import domain.OrderStatus
 import domain.OrderStatusAndTime
 
 @Bean
-@Label("订单服务")
 class OrderService {
 
     static val PENDING_TIMEOUT = 15 * 60 * 1000
 
-    @Label("下单")
-    fn placeOrder(@Label("客户") customer: Customer, @Label("商品列表") products: Product[], @Label("优惠券") coupon: Coupon?) -> Order {
+        fn placeOrder(@CurrentUser customer: Customer, products: Product[], coupon: Coupon?) -> Order {
         require(products.length > 0, "Missing products")
         var price = products[0].price
         for (i in 1...products.length) {
@@ -92,24 +91,21 @@ class OrderService {
         return order
     }
 
-    fn getCustomerOrders(customer: Customer) -> Order[] {
+    fn getCustomerOrders(@CurrentUser customer: Customer) -> Order[] {
         val orders = Order.customerIdx.getAll(customer)
         // Recent orders come first
         orders.sort((o1, o2) -> o1.createdAt < o2.createdAt ? 1 : o1.createdAt == o2.createdAt ? 0 : -1)
         return orders
     }
 
-    @Label("确认订单")
-    fn confirmOrder(@Label("订单") order: Order) {
+    fn confirmOrder(order: Order) {
         order.confirm()
     }
 
-    @Label("取消订单")
-    fn confirmOrder(@Label("订单") order: Order) {
+    fn cancelOrder(order: Order) {
         order.cancel()
     }
 
-    @Label("取消超时待处理订单")
     fn cancelExpiredPendingOrders() {
         val orders = Order.statusAndCreatedAtIdx.query(
             OrderStatusAndTime(OrderStatus.PENDING, 0),
@@ -118,7 +114,6 @@ class OrderService {
         orders.forEach(o -> o.cancel())
     }
 
-    @Label("删除所有已取消订单")
     fn deleteAllCancelledOrders() {
         val orders = Order.statusAndCreatedAtIdx.query(
             OrderStatusAndTime(OrderStatus.CANCELLED, 0),
@@ -129,7 +124,7 @@ class OrderService {
         })
     }
 
-    fn deleteAllCustomerOrders(customer: Customer) {
+    fn deleteAllCustomerOrders(@CurrentUser customer: Customer) {
         val orders = Order.customerIdx.getAll(customer)
         orders.forEach(o -> {
             delete o
@@ -138,17 +133,30 @@ class OrderService {
 
 }
 
+@@ src/service/token_validator.kiwi @@
+package service
+
+import domain.Session
+
+@Bean
+class TokenValidator: security.TokenValidator {
+
+    fn validate(token: string) -> any? {
+        val s = Session.tokenIdx.getFirst(token)
+        if (s != null && s!!.isValid())
+            return s!!.customer
+        else
+            return null
+    }
+
+}
 @@ src/domain/category.kiwi @@
 package domain
 
-@Label("类目")
 enum Category {
-    @Label("电子产品")
-    ELECTRONICS,
-    @Label("服装")
-    CLOTHING,
-    @Label("其他")
-    OTHER
+        ELECTRONICS,
+        CLOTHING,
+        OTHER
     ;
 }
 
@@ -159,11 +167,8 @@ value class OrderStatusAndTime(val status: OrderStatus, val time: long)
 @@ src/domain/order.kiwi @@
 package domain
 
-@Label("订单")
 class Order(
-    @Label("客户")
     val customer: Customer,
-    @Label("总价")
     val price: Money
 ) {
 
@@ -171,18 +176,14 @@ class Order(
 
     static val customerIdx = Index<Customer, Order>(false, o -> o.customer)
 
-    @Label("创建时间")
     val createdAt = now()
-    @Label("状态")
     var status = OrderStatus.PENDING
 
-    @Label("确认")
     fn confirm() {
         require(status == OrderStatus.PENDING, "订单状态不允许确认")
         status = OrderStatus.CONFIRMED
     }
 
-    @Label("取消")
     fn cancel() {
         require(status == OrderStatus.PENDING, "订单状态不允许取消")
         status = OrderStatus.CANCELLED
@@ -192,11 +193,8 @@ class Order(
         }
     }
 
-    @Label("订单项")
     class Item(
-        @Label("商品")
         val product: Product,
-        @Label("数量")
         val quantity: int
     )
 
@@ -204,37 +202,28 @@ class Order(
 @@ src/domain/order_status.kiwi @@
 package domain
 
-@Label("订单状态")
 enum OrderStatus {
-    @Label("待确认")
-    PENDING,
-    @Label("已确认")
-    CONFIRMED,
-    @Label("已取消")
-    CANCELLED,
+        PENDING,
+        CONFIRMED,
+        CANCELLED,
     ;
 }
 
 @@ src/domain/customer.kiwi @@
 package domain
 
-@Label("客户")
 class Customer(
     @Summary
-    @Label("名称")
-    var name: string,
-    @Label("邮箱")
-    val email: string,
-    @Label("密码")
-    password: string
+        var name: string,
+        val email: string,
+        password: string
 ) {
 
     priv var passwordHash = secureHash(password, null)
 
     static val emailIdx = Index<string, Customer>(true, c -> c.email)
 
-    @Label("校验密码")
-    fn checkPassword(@Label("密码") password: string) -> bool {
+        fn checkPassword(password: string) -> bool {
         return passwordHash == secureHash(password, null)
     }
 
@@ -243,54 +232,59 @@ class Customer(
 @@ src/domain/product.kiwi @@
 package domain
 
-@Label("商品")
 class Product(
     @Summary
-    @Label("名称")
     var name: string,
-    @Label("价格")
     var price: Money,
-    @Label("库存")
     var stock: int,
-    @Label("类目")
     var category: Category
 ) {
 
     static val nameIdx = Index<string, Product>(true, p -> p.name)
 
-    @Label("扣减库存")
-    fn reduceStock(@Label("数量") quantity: int) {
+    fn reduceStock(quantity: int) {
         require(stock >= quantity, "库存不足")
         stock -= quantity
     }
 
-    @Label("补充库存")
-    fn restock(@Label("数量") quantity: int) {
+    fn restock(quantity: int) {
         require(quantity > 0, "补充数量必须大于0")
         stock += quantity
     }
 
 }
 
+@@ src/domain/session.kiwi @@
+package domain
+
+class Session(
+    val customer: Customer
+) {
+
+    val token = uuid()
+
+    var expiry = now() + 24 * 60 * 60 * 1000
+
+    static val tokenIdx = Index<string, Session>(true, s -> s.token)
+
+    fn isValid() -> bool {
+        return expiry > now()
+    }
+
+}
 @@ src/domain/coupon.kiwi @@
 package domain
 
-@Label("优惠券")
 class Coupon(
     @Summary
-    @Label("标题")
-    val title: string,
-    @Label("折扣")
-    val discount: Money,
-    @Label("过期时间")
-    val expiry: long
+        val title: string,
+        val discount: Money,
+        val expiry: long
 ) {
 
-    @Label("已核销")
-    var redeemed = false
+        var redeemed = false
 
-    @Label("核销")
-    fn redeem() -> Money {
+        fn redeem() -> Money {
         require(now() > expiry, "优惠券已过期")
         require(redeemed, "优惠券已核销")
         redeemed = true
@@ -301,77 +295,61 @@ class Coupon(
 @@ src/domain/currency.kiwi @@
 package domain
 
-@Label("币种")
 enum Currency(
-    @Label("汇率")
-    val rate: double
+        val rate: double
 ) {
 
-    @Label("人民币")
-    YUAN(7.2) {
+        YUAN(7.2) {
 
-        @Label("标签")
-        fn label() -> string {
+                fn label() -> string {
             return "元"
         }
 
     },
-    @Label("美元")
-    DOLLAR(1) {
+        DOLLAR(1) {
 
-        @Label("标签")
-        fn label() -> string {
+                fn label() -> string {
             return "美元"
         }
 
     },
-    @Label("英镑")
-    POUND(0.75) {
+        POUND(0.75) {
 
-        @Label("标签")
-        fn label() -> string {
+                fn label() -> string {
             return "英镑"
         }
 
     },
 ;
 
-    @Label("标签")
-    abstract fn label() -> string
+        abstract fn label() -> string
 
 }
 
 @@ src/domain/money.kiwi @@
 package domain
 
-@Label("金额")
 value class Money(
-    @Label("数额")
-    val amount: double,
-    @Label("币种")
-    val currency: Currency
+        val amount: double,
+        val currency: Currency
 ) {
 
     @Summary
     priv val summary = amount + " " + currency.label()
 
-    @Label("加")
-    fn add(@Label("待加金额") that: Money) -> Money {
+        fn add(that: Money) -> Money {
         return Money(amount + that.getAmount(currency), currency)
     }
 
-    @Label("减")
-    fn sub(@Label("待减金额") that: Money) -> Money {
+        fn sub(that: Money) -> Money {
         return Money(amount - that.getAmount(currency), currency)
     }
 
-    @Label("汇率转化")
-    fn getAmount(@Label("目标币种") currency: Currency) -> double {
+        fn getAmount(currency: Currency) -> double {
         return currency.rate / this.currency.rate * amount
     }
 
-    @Label("乘")
-    fn times(@Label("倍数") n: int) -> Money {
+        fn times(n: int) -> Money {
         return Money(amount * n, currency)
     }
 

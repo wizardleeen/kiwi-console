@@ -1,0 +1,16 @@
+package service
+
+import domain.Session
+
+@Bean
+internal class TokenValidator: security.TokenValidator {
+
+    fn validate(token: string) -> any? {
+        val s = Session.tokenIdx.getFirst(token)
+        if (s != null && s!!.isValid())
+            return s!!.customer
+        else
+            return null
+    }
+
+}
