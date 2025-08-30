@@ -12,7 +12,7 @@ class OrderService {
 
     static val PENDING_TIMEOUT = 15 * 60 * 1000
 
-        fn placeOrder(customer: Customer, products: Product[], coupon: Coupon?) -> Order {
+        fn placeOrder(@CurrentUser customer: Customer, products: Product[], coupon: Coupon?) -> Order {
         require(products.length > 0, "Missing products")
         var price = products[0].price
         for (i in 1...products.length) {
@@ -29,22 +29,22 @@ class OrderService {
         return order
     }
 
-    fn getCustomerOrders(customer: Customer) -> Order[] {
+    fn getCustomerOrders(@CurrentUser customer: Customer) -> Order[] {
         val orders = Order.customerIdx.getAll(customer)
         // Recent orders come first
         orders.sort((o1, o2) -> o1.createdAt < o2.createdAt ? 1 : o1.createdAt == o2.createdAt ? 0 : -1)
         return orders
     }
 
-        fn confirmOrder(order: Order) {
+    fn confirmOrder(order: Order) {
         order.confirm()
     }
 
-        fn confirmOrder(order: Order) {
+    fn cancelOrder(order: Order) {
         order.cancel()
     }
 
-        fn cancelExpiredPendingOrders() {
+    fn cancelExpiredPendingOrders() {
         val orders = Order.statusAndCreatedAtIdx.query(
             OrderStatusAndTime(OrderStatus.PENDING, 0),
             OrderStatusAndTime(OrderStatus.PENDING, now() - PENDING_TIMEOUT)
@@ -52,7 +52,7 @@ class OrderService {
         orders.forEach(o -> o.cancel())
     }
 
-        fn deleteAllCancelledOrders() {
+    fn deleteAllCancelledOrders() {
         val orders = Order.statusAndCreatedAtIdx.query(
             OrderStatusAndTime(OrderStatus.CANCELLED, 0),
             OrderStatusAndTime(OrderStatus.CANCELLED, now())
@@ -62,7 +62,7 @@ class OrderService {
         })
     }
 
-    fn deleteAllCustomerOrders(customer: Customer) {
+    fn deleteAllCustomerOrders(@CurrentUser customer: Customer) {
         val orders = Order.customerIdx.getAll(customer)
         orders.forEach(o -> {
             delete o
