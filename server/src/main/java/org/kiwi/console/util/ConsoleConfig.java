@@ -51,7 +51,10 @@ public class ConsoleConfig {
     }
 
     private UploadConfig buildUploadConfig(YmlConfig config) {
-        return new UploadConfig(config.getString("upload", "dir"));
+        return new UploadConfig(
+                config.getString("upload", "dir"),
+                config.getString("upload", "sourcemap")
+        );
     }
 
     private PageConfig buildPageConfig(YmlConfig config) {
@@ -189,7 +192,7 @@ public class ConsoleConfig {
     @Bean
     public AttachmentService attachmentService(FileService fileService, AppClient appClient) {
         return new AttachmentServiceImpl(kiwiConfig.chatAppId, fileService,
-                Path.of(pageConfig.worksDir),
+                Path.of(uploadConfig.sourcemapDir),
                 appClient);
     }
 
@@ -256,7 +259,8 @@ public class ConsoleConfig {
     ) {}
 
     private record UploadConfig(
-        String dir
+        String dir,
+        String sourcemapDir
     ) {}
 
 }

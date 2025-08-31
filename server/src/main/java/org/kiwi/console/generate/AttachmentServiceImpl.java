@@ -8,7 +8,6 @@ import org.kiwi.console.kiwi.AppClient;
 import org.kiwi.console.util.Constants;
 import org.kiwi.console.util.Utils;
 
-import javax.annotation.Nullable;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -18,13 +17,13 @@ import java.nio.file.Path;
 public class AttachmentServiceImpl implements AttachmentService {
     private final long chatAppId;
     private final FileService fileService;
-    private final Path pageRootDir;
+    private final Path sourcemapRoot;
     private final AppClient appClient;
 
-    public AttachmentServiceImpl(long chatAppId, FileService fileService, Path pageRootDir, AppClient appClient) {
+    public AttachmentServiceImpl(long chatAppId, FileService fileService, Path sourcemapRoot, AppClient appClient) {
         this.chatAppId = chatAppId;
         this.fileService = fileService;
-        this.pageRootDir = pageRootDir;
+        this.sourcemapRoot = sourcemapRoot;
         this.appClient = appClient;
     }
 
@@ -37,27 +36,19 @@ public class AttachmentServiceImpl implements AttachmentService {
     @Override
     public String uploadConsoleLog(String appId, String fileName, InputStream input) {
         var sourceMapPath = getSourceMapPath(appId);
-        if (sourceMapPath == null)
-            return upload(fileName, input);
-        else {
+        if (Files.isRegularFile(sourceMapPath)) {
             var sourceMap = Files.readString(sourceMapPath);
             var log = new String(input.readAllBytes(), StandardCharsets.UTF_8);
             var deobfuscated = StackTraceDeobfuscator.deobfuscate(sourceMap, log);
             return upload(fileName, new ByteArrayInputStream(deobfuscated.getBytes(StandardCharsets.UTF_8)));
-        }
+        } else
+            return upload(fileName, input);
     }
 
     @SneakyThrows
-    private @Nullable Path getSourceMapPath(String appId) {
+    private Path getSourceMapPath(String appId) {
         var kiwiAppId = appClient.get(appId).getKiwiAppId();
-        var proj = pageRootDir.resolve(Long.toString(kiwiAppId)).resolve("dist").resolve("assets");
-        try (var stream = Files.newDirectoryStream(proj, "*.js.map")) {
-            var it = stream.iterator();
-            if (it.hasNext())
-                return it.next();
-            else
-                return null;
-        }
+        return sourcemapRoot.resolve(Long.toString(kiwiAppId)).resolve("index.js.map");
     }
 
     @Override
