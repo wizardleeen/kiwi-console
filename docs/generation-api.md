@@ -179,14 +179,48 @@ Uploads one or more files to be used as attachments in a generation request. Ret
     }
     ```
 
-### 3. Reconnect
+### 3. Upload Console Log
+
+Uploads a client-side console log file. The server will de-obfuscate the log's stack traces using source maps, making them readable.
+
+*   `POST /generate/console-log`
+*   **Request:** `multipart/form-data`.
+    *   `appId`: `string` - The ID of the application that produced the log.
+    *   `file`: `file` - The console log file (e.g., `console.log`).
+*   **Response Body:** `UploadV2Result`
+*   **Example:**
+    *   **Request:**
+    ```http
+    POST /generate/console-log
+    Authorization: Bearer {token}
+    Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryABC123
+
+    ------WebKitFormBoundaryABC123
+    Content-Disposition: form-data; name="appId"
+
+    {app-id}
+    ------WebKitFormBoundaryABC123
+    Content-Disposition: form-data; name="file"; filename="console.log"
+    Content-Type: text/plain
+
+    (binary data of the log file)
+    ------WebKitFormBoundaryABC123--
+    ```
+    * **Response:**
+    ```json
+    {
+      "url": "/uploads/console-uuid.log"
+    }
+    ```
+
+### 4. Reconnect
 
 Reconnects to an existing SSE stream for an in-progress generation `Exchange`. This is useful if the client disconnects for any reason.
 
 *  `GET /generate/reconnect?exchange-id={exchange-id}`
 *  **Response:** SSE stream. See #[Generate](#1-generate) for details on the event stream.
 
-### 4. History
+### 5. History
 
 Retrieves a paginated list of past `Exchange` interactions for a specific application.
 
@@ -238,7 +272,7 @@ Retrieves a paginated list of past `Exchange` interactions for a specific applic
     }
     ```
 
-### 5. Cancel Generation
+### 6. Cancel Generation
 
 Cancels an in-progress generation `Exchange`.
 
@@ -262,7 +296,7 @@ Cancels an in-progress generation `Exchange`.
     }
     ```
 
-### 6. Retry Generation
+### 7. Retry Generation
 
 Retries a failed `Exchange`.
 
@@ -286,7 +320,7 @@ Retries a failed `Exchange`.
     }
     ```
 
-### 7. Revert Generation
+### 8. Revert Generation
 
 Revert an `Exchange`. The exchange **must** be the last one for the application and it **must not** be running.
 
@@ -325,6 +359,13 @@ Represents the result of a file upload operation.
 | Field   | Type      | Description                          |
 |:--------|:----------|:-------------------------------------|
 | `urls`  | `string[]`| A list of URLs for the uploaded files|
+
+### `UploadV2Result`
+Represents the result of a console log upload operation.
+
+| Field | Type     | Description                                        |
+|:------|:---------|:---------------------------------------------------|
+| `url` | `string` | The URL for the processed, de-obfuscated log file. |
 
 ### `SearchResult<T>`
 Represents a paginated list of items.

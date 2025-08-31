@@ -11,6 +11,11 @@ public class MockAttachmentService implements AttachmentService {
     }
 
     @Override
+    public String uploadConsoleLog(String appId, String fileName, InputStream input) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public File read(String fileName) {
         throw new UnsupportedOperationException();
     }
