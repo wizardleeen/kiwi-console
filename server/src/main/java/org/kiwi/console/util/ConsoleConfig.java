@@ -187,8 +187,10 @@ public class ConsoleConfig {
     }
 
     @Bean
-    public AttachmentService attachmentService(FileService fileService) {
-        return new AttachmentServiceImpl(kiwiConfig.chatAppId, fileService);
+    public AttachmentService attachmentService(FileService fileService, AppClient appClient) {
+        return new AttachmentServiceImpl(kiwiConfig.chatAppId, fileService,
+                Path.of(pageConfig.worksDir),
+                appClient);
     }
 
     @Bean

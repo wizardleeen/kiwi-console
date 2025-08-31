@@ -2,6 +2,7 @@ package org.kiwi.console.generate.rest;
 
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.kiwi.console.file.UploadV2Result;
 import org.kiwi.console.generate.AttachmentService;
 import org.kiwi.console.generate.GenerationService;
 import org.kiwi.console.generate.event.GenerationListener;
@@ -26,14 +27,14 @@ public class GenerationController {
     private final AppClient appClient;
     private final ExchangeClient exchangeClient;
     private final UserClient userClient;
-    private final AttachmentService screenshotService;
+    private final AttachmentService attachmentService;
 
     public GenerationController(GenerationService generationService, AppClient appClient, ExchangeClient exchangeClient, UserClient userClient, AttachmentService attachmentService) {
         this.generationService = generationService;
         this.appClient = appClient;
         this.exchangeClient = exchangeClient;
         this.userClient = userClient;
-        this.screenshotService = attachmentService;
+        this.attachmentService = attachmentService;
     }
 
     @PostMapping
@@ -50,9 +51,15 @@ public class GenerationController {
     public MultiUploadResult uploadAttachments(@RequestParam("files") MultipartFile[] files) {
         var urls = new ArrayList<String>();
         for (MultipartFile file : files) {
-            urls.add(screenshotService.upload(file.getOriginalFilename(), file.getInputStream()));
+            urls.add(attachmentService.upload(file.getOriginalFilename(), file.getInputStream()));
         }
         return new MultiUploadResult(urls);
+    }
+
+    @SneakyThrows
+    @PostMapping("/console-log")
+    public UploadV2Result uploadConsoleLog(@RequestParam("appId") String appId, @RequestParam("file") MultipartFile file) {
+        return new UploadV2Result(attachmentService.uploadConsoleLog(appId, file.getOriginalFilename(), file.getInputStream()));
     }
 
     @GetMapping("/reconnect")
