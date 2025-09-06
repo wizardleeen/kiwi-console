@@ -9,5 +9,5 @@ public enum PromptKind {
     PAGE_COMMIT_MSG,
     CREATE_ANALYZE,
     UPDATE_ANALYZE,
-    FIX
+    AUTO_TEST, FIX
 }

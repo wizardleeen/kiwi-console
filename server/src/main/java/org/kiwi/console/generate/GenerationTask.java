@@ -1,14 +1,18 @@
 package org.kiwi.console.generate;
 
 import lombok.extern.slf4j.Slf4j;
+import org.kiwi.console.browser.Page;
 import org.kiwi.console.file.File;
 import org.kiwi.console.generate.event.GenerationListener;
 import org.kiwi.console.kiwi.*;
 import org.kiwi.console.util.BusinessException;
 import org.kiwi.console.util.ErrorCode;
+import org.kiwi.console.util.Utils;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -22,9 +26,10 @@ class GenerationTask implements Task {
     final GenerationConfig genConfig;
     final boolean showAttempts;
     final List<File> attachments;
-    private Chat autoTestChat;
-    private ExchangeClient exchClient;
-    private User user;
+    private final ExchangeClient exchClient;
+    private final User user;
+    private final List<PlaywrightActions.GeneratedAction> actions = new ArrayList<>();
+    private Page page;
 
     public GenerationTask(ExchangeClient exchClient, Exchange exchange, App app, User user, boolean showAttempts, GenerationConfig genConfig, List<File> attachments, @Nonnull GenerationListener listener, Model model) {
         this.exchClient = exchClient;
@@ -66,10 +71,25 @@ class GenerationTask implements Task {
         saveExchange();
     }
 
-    void finish(String productUrl, String sourceCodeUrl) {
-        exchange.setStatus(ExchangeStatus.SUCCESSFUL);
+    void finishGeneration(String productUrl, String sourceCodeUrl) {
         exchange.setProductURL(productUrl);
         exchange.setSourceCodeURL(sourceCodeUrl);
+        saveExchange();
+    }
+
+    void finishTest(int result) {
+        var attempt = currentAttempt();
+        if (result == 0) {
+            attempt.setStatus(AttemptStatus.SUCCESSFUL);
+            currentStage().setStatus(StageStatus.SUCCESSFUL);
+        } else if (result == 1) {
+            attempt.setStatus(AttemptStatus.REJECTED);
+            currentStage().setStatus(StageStatus.REJECTED);
+        } else {
+            attempt.setStatus(AttemptStatus.FAILED);
+            currentStage().setStatus(StageStatus.FAILED);
+        }
+        exchange.setStatus(ExchangeStatus.SUCCESSFUL);
         saveExchange();
     }
 
@@ -78,6 +98,11 @@ class GenerationTask implements Task {
             exchange.fail(errorMsg);
             saveExchange();
         }
+    }
+
+    void destroy() {
+        if (page != null)
+            page.close();
     }
 
     private Attempt currentAttempt() {
@@ -105,6 +130,11 @@ class GenerationTask implements Task {
         return attachments;
     }
 
+    public void setAttachments(List<File> attachments) {
+        this.attachments.clear();
+        this.attachments.addAll(attachments);
+    }
+
     @Override
     public boolean isCancelled() {
         return cancelled;
@@ -119,7 +149,7 @@ class GenerationTask implements Task {
         while (it.hasNext()) {
             var listener = it.next();
             try {
-                listener.onProgress(showAttempts ? exchange : exchange.clearDetails());
+                listener.onProgress(exchange.toDTO(Utils.safeCall(page, Page::getTargetId)));
             } catch (Exception e) {
                 log.error("Failed to send progress", e);
                 it.remove();
@@ -169,11 +199,32 @@ class GenerationTask implements Task {
             throw new BusinessException(ErrorCode.TASK_CANCELLED);
     }
 
+    public List<PlaywrightActions.GeneratedAction> getActions() {
+        return Collections.unmodifiableList(actions);
+    }
+
+    public void addAction(PlaywrightActions.GeneratedAction action) {
+        actions.add(action);
+    }
+
+    public boolean isTesting() {
+        return exchange.isRunning() && !exchange.getStages().isEmpty() &&
+                exchange.getStages().getLast().getType() == StageType.TEST;
+    }
+
     public void cancel() {
         cancelled = true;
     }
 
     public User getUser() {
         return user;
+    }
+
+    public Page getPage() {
+        return page;
+    }
+
+    public void setPage(Page page) {
+        this.page = page;
     }
 }

@@ -4,6 +4,7 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.kiwi.console.util.Utils;
 
+import javax.annotation.Nullable;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -60,4 +61,18 @@ public class DefaultPageCompiler extends AbstractCompiler implements PageCompile
         compiler.deploy(1, false);
     }
 
+    @SneakyThrows
+    @Override
+    public @Nullable Path getSourceMapPath(long appId) {
+        var wd = getWorkDir(appId);
+        var assetsDir = wd.getSrcPath().resolve("dist").resolve("assets");
+        if (Files.isDirectory(assetsDir)) {
+            try (var s = Files.list(assetsDir)) {
+                var opt = s.filter(f -> f.getFileName().toString().endsWith(".js.map")).findAny();
+                if (opt.isPresent())
+                    return opt.get();
+            }
+        }
+        return null;
+    }
 }

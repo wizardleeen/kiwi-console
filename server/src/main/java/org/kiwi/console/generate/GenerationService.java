@@ -6,7 +6,11 @@ import feign.gson.GsonDecoder;
 import feign.gson.GsonEncoder;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.kiwi.console.StackTraceDeobfuscator;
+import org.kiwi.console.browser.Browser;
+import org.kiwi.console.browser.PlaywrightBrowser;
 import org.kiwi.console.file.File;
+import org.kiwi.console.file.FileService;
 import org.kiwi.console.file.UrlFetcher;
 import org.kiwi.console.generate.event.GenerationListener;
 import org.kiwi.console.generate.rest.*;
@@ -21,11 +25,9 @@ import org.springframework.core.task.TaskExecutor;
 import org.springframework.scheduling.annotation.Scheduled;
 
 import javax.annotation.Nullable;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.StringReader;
-import java.io.StringWriter;
+import java.io.*;
 import java.net.http.HttpClient;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -40,6 +42,9 @@ import static org.kiwi.console.util.Constants.*;
 public class GenerationService {
 
     public static final String NEW_APP_NAME = "New Application";
+
+    private static final int MAX_AUTO_TEST_ACTIONS = 100;
+
     private static final Set<String> allowedMimeTypes = Set.of(
             "application/pdf",
             "application/json",
@@ -64,8 +69,9 @@ public class GenerationService {
     private final GenerationConfigClient generationConfigClient;
     private final UrlFetcher urlFetcher;
     private final Map<String, GenerationTask> runningTasks = new ConcurrentHashMap<>();
-    private final Map<String, AutoTestTask> autoTestTasks = new ConcurrentHashMap<>();
     private final TaskExecutor taskExecutor;
+    private final Browser browser;
+    private final AttachmentService attachmentService;
 
     public GenerationService(
             List<Model> models,
@@ -78,7 +84,7 @@ public class GenerationService {
             String sourceCodeUrlTempl,
             GenerationConfigClient generationConfigClient,
             UrlFetcher urlFetcher,
-            TaskExecutor taskExecutor
+            TaskExecutor taskExecutor, Browser browser, AttachmentService attachmentService
     ) {
         this.models = models.stream().collect(Collectors.toUnmodifiableMap(Model::getName, Function.identity()));
         this.kiwiCompiler = kiwiCompiler;
@@ -92,6 +98,8 @@ public class GenerationService {
         this.generationConfigClient = generationConfigClient;
         this.urlFetcher = urlFetcher;
         this.taskExecutor = taskExecutor;
+        this.browser = browser;
+        this.attachmentService = attachmentService;
     }
 
     public String generate(GenerationRequest request, String userId, GenerationListener listener) {
@@ -106,10 +114,15 @@ public class GenerationService {
             creating = true;
         }
         List<String> attachmentUrls = Objects.requireNonNullElse(request.attachmentUrls(), List.of());
-        var attachments = Utils.map(attachmentUrls, this::readAttachment);
         var exchange = Exchange.create(appId, userId, request.prompt(), attachmentUrls, creating, request.skipPageGeneration());
-        var app = appClient.get(appId);
-        var user = userClient.get(userId);
+        generate0(exchange, attachmentUrls, listener);
+        return appId;
+    }
+
+    private void generate0(Exchange exchange, List<String> attachmentUrls, GenerationListener listener) {
+        var attachments = Utils.map(attachmentUrls, this::readAttachment);
+        var app = appClient.get(exchange.getAppId());
+        var user = userClient.get(exchange.getUserId());
         var genConfig = generationConfigClient.get(app.getGenConfigId());
         exchange.setId(exchClient.save(exchange));
         var task = createGenerationTask(exchange, app, user,
@@ -117,7 +130,7 @@ public class GenerationService {
                 attachments, listener, getModel(genConfig.model()));
         task.sendProgress();
         taskExecutor.execute(() -> runTask(task));
-        return appId;
+
     }
 
     private GenerationTask createGenerationTask(Exchange exch, App app, User user, GenerationConfig genConfig,
@@ -143,7 +156,9 @@ public class GenerationService {
     }
 
     void discardTask(String exchangeId) {
-        runningTasks.remove(exchangeId);
+        var task = runningTasks.remove(exchangeId);
+        if (task != null)
+            task.destroy();
     }
 
     private void ensureNotGenerating(String appId) {
@@ -154,33 +169,36 @@ public class GenerationService {
     private void runTask(GenerationTask task) {
         try {
             var kiwiAppId = task.app.getKiwiAppId();
-            kiwiCompiler.reset(kiwiAppId, task.genConfig.kiwiTemplateRepo(), task.genConfig.kiwiTemplateBranch());
-            pageCompiler.reset(kiwiAppId, task.genConfig.pageTemplateRepo(), task.genConfig.pageTemplateBranch());
-            var plan = executeGen(() -> plan(task));
-            if (task.exchange.isFirst() && plan.appName != null) {
-                updateAppName(task.app, plan.appName);
+            if (!task.isTesting()) {
+                kiwiCompiler.reset(kiwiAppId, task.genConfig.kiwiTemplateRepo(), task.genConfig.kiwiTemplateBranch());
+                pageCompiler.reset(kiwiAppId, task.genConfig.pageTemplateRepo(), task.genConfig.pageTemplateBranch());
+                var plan = executeGen(() -> plan(task));
+                if (task.exchange.isFirst() && plan.appName != null) {
+                    updateAppName(task.app, plan.appName);
+                }
+                log.info("{}", plan);
+                if (plan.generateKiwi) {
+                    executeGen(() -> generateKiwi(task, plan.suggestion));
+                }
+                if (plan.generatePage) {
+                    var apiSource = kiwiCompiler.generateApi(kiwiAppId);
+                    executeGen(() -> generatePages(apiSource, task, plan.suggestion));
+                }
+                var url = Format.format(productUrlTempl, kiwiAppId);
+                var sourceCodeUrl = task.getUser().isAllowSourceCodeDownload() ?
+                        Format.format(sourceCodeUrlTempl, kiwiAppId) : null;
+                task.finishGeneration(url, sourceCodeUrl);
             }
-            log.info("{}", plan);
-            if (plan.generateKiwi) {
-                executeGen(() -> generateKiwi(task, plan.suggestion));
-            }
-            if (plan.generatePage) {
-                var apiSource = kiwiCompiler.generateApi(kiwiAppId);
-                executeGen(() -> generatePages(apiSource, task, plan.suggestion));
-            }
-            var url = Format.format(productUrlTempl, kiwiAppId);
-            var sourceCodeUrl = task.getUser().isAllowSourceCodeDownload() ?
-                    Format.format(sourceCodeUrlTempl, kiwiAppId) : null;
-            task.finish(url, sourceCodeUrl);
-            log.info("Generation Completed. Application: {}", url);
+            runAutoTest(task);
+            log.info("Generation Completed. Application: {}", task.exchange.getProductURL());
         } catch (Exception e) {
             log.error("Failed to generate code for app {}", task.exchange.getAppId(), e);
             task.abort(e.getMessage());
             throw e;
-        } finally {
+        }  finally {
+            task.destroy();
             runningTasks.remove(task.exchange.getId());
         }
-
     }
 
     @Scheduled(fixedDelay = 60 * 1000)
@@ -248,10 +266,6 @@ public class GenerationService {
             kiwiCompiler.revert(app.getKiwiAppId(), user.isAllowSourceCodeDownload());
         if (exch.isStageSuccessful(StageType.FRONTEND))
             pageCompiler.revert(app.getKiwiAppId(),user.isAllowSourceCodeDownload() );
-    }
-
-    public void cancelAutoTest(AutoTestCancelRequest request) {
-        autoTestTasks.remove(request.exchangeId());
     }
 
     private record Plan(
@@ -505,41 +519,119 @@ public class GenerationService {
         }
     }
 
-    private AutoTestTask startAutoTest(String exchId) {
-        var exch = exchClient.get(exchId);
-        var app = appClient.get(exch.getAppId());
-        var genConfig = generationConfigClient.get(app.getGenConfigId());
-        var model = getModel(genConfig.autoTestModel());
-        var task = new AutoTestTask(app, genConfig, exch, model);
-        autoTestTasks.put(exchId, task);
+    private GenerationTask getTask(String exchangeId) {
+        var task = runningTasks.get(exchangeId);
+        if (task == null)
+            throw new BusinessException(ErrorCode.TASK_NOT_RUNNING);
         return task;
     }
 
-    public AutoTestAction autoTestStep(AutoTestStepRequest request) {
+    @SneakyThrows
+    private void runAutoTest(GenerationTask task) {
+        var page = browser.createPage();
+        page.navigate(task.exchange.getProductURL());
+        task.setPage(page);
+        task.enterStageAndAttempt(StageType.TEST);
+        for (var i = 0; i < MAX_AUTO_TEST_ACTIONS; i++) {
+            if (task.isCancelled())
+                break;
+            var consoleLogs = page.getConsoleLogs();
+            var sourceMapPath = pageCompiler.getSourceMapPath(task.app.getKiwiAppId());
+            if (sourceMapPath != null) {
+                consoleLogs = StackTraceDeobfuscator.deobfuscate(
+                        Files.readString(sourceMapPath),
+                        consoleLogs
+                );
+            }
+            var screenshot = page.getScreenshot();
+            var dom = page.getDOM();
+            task.setAttachments(List.of(
+                    new File(consoleLogs.getBytes(StandardCharsets.UTF_8), "text/plain"),
+                    new File(dom.getBytes(StandardCharsets.UTF_8), "text/html"),
+                    new File(screenshot, "image/png")
+            ));
+//            log.debug("Console Logs\n{}", consoleLogs);
+//            Files.write(Path.of("/tmp/screenshot.png"), screenshot);
+            var action = autoTestStep(task);
+            if (action instanceof PlaywrightActions.AcceptAction) {
+                task.finishTest(0);
+                break;
+            }
+            if (action instanceof PlaywrightActions.RejectAction rejectAction) {
+                task.finishTest(1);
+                startFix(task.app.getId(), task.getUser().getId(), rejectAction.getBugReport(), screenshot, dom, consoleLogs);
+                break;
+            }
+            if (action instanceof PlaywrightActions.AbortAction) {
+                task.finishTest(2);
+                break;
+            }
+            var stepAction = (PlaywrightActions.StepAction) action;
+            out: {
+                for (var cmd : stepAction.getCommands()) {
+                    var r = page.execute(cmd);
+                    if (!r.successful()) {
+                        stepAction.setErrorMessage(Objects.requireNonNull(r.errorMessage()));
+                        break out;
+                    }
+                }
+                stepAction.setSuccessful(true);
+            }
+//            log.debug("Last action:\n{}", Utils.toPrettyJSONString(action));
+        }
+        page.close();
+        task.setPage(null);
+    }
+
+    private void startFix(String appId, String userId, String bugReport, byte[] screenshot, String dom, String consoleLog) {
+        var urls = List.of(
+                attachmentService.upload("index.html", new ByteArrayInputStream(dom.getBytes(StandardCharsets.UTF_8))),
+                attachmentService.upload("screenshot.png", new ByteArrayInputStream(screenshot)),
+                attachmentService.upload("console-log.txt", new ByteArrayInputStream(consoleLog.getBytes(StandardCharsets.UTF_8)))
+        );
+        generate0(
+                Exchange.create(
+                        appId, userId,
+                        "Fix the following issue: " + bugReport,
+                        urls, false, false
+                ),
+                urls,
+                new GenerationListener() {
+                    @Override
+                    public void onThought(String thoughtChunk) {
+
+                    }
+
+                    @Override
+                    public void onContent(String contentChunk) {
+                    }
+
+                    @Override
+                    public void onProgress(ExchangeDTO exchange) {
+                    }
+                }
+        );
+    }
+
+    private PlaywrightActions.GeneratedAction autoTestStep(GenerationTask task) {
         return executeGen(() -> {
-            var task = autoTestTasks.get(request.exchangeId());
-            if (task == null)
-                task = startAutoTest(request.exchangeId());
-            var attachments = Utils.map(request.attachmentUrls(), this::readAttachment);
-            task.setAttachments(attachments);
-            var code = PatchReader.buildCode(pageCompiler.getSourceFiles(task.getApp().getKiwiAppId()));
-            var prompt = buildAutoTestPrompt(task.getGenConfig().autoTestPrompt(), task.getExch().getPrompt(), code, task.getActions());;
-            var chat = task.getModel().createChat(task.getGenConfig().outputThinking());
+            var code = PatchReader.buildCode(pageCompiler.getSourceFiles(task.app.getKiwiAppId()));
+            var prompt = buildAutoTestPrompt(task.genConfig.autoTestPrompt(), task.exchange.getPrompt(), code, task.getActions());
+//            log.debug("Auto test prompt:\n{}", prompt);
+            var chat = task.model.createChat(task.genConfig.outputThinking());
             var text = generateContent(chat, prompt, task);
-            var action = AutoTestActionParser.parse(text);
-            if (action.type() == AutoTestActionType.FAILED || action.type() == AutoTestActionType.PASSED)
-                autoTestTasks.remove(request.exchangeId());
+            var action = PlaywrightActions.parser.parse(text);
             task.addAction(action);
             return action;
         });
     }
 
-    private String buildAutoTestPrompt(String template, String prompt, String code, List<AutoTestAction> actions) {
+    private String buildAutoTestPrompt(String template, String prompt, String code, List<PlaywrightActions.GeneratedAction> actions) {
         return Format.format(
                 template,
                 prompt,
                 code,
-                actions.stream().map(AutoTestAction::toString).collect(Collectors.joining("\n"))
+                actions.stream().map(Utils::toPrettyJSONString).collect(Collectors.joining("\n"))
         );
     }
 
@@ -570,22 +662,30 @@ public class GenerationService {
         var kiwiCompiler = new DefaultKiwiCompiler(
                 java.nio.file.Path.of(Constants.KIWI_WORKDIR),
                 new DeployClient(host, httpClient));
+        var userClient = Utils.createKiwiFeignClient(
+                host,
+                UserClient.class,
+                CHAT_APP_ID
+        );
+        var appService = new AppService(host, CHAT_APP_ID, userClient);
         var service = new GenerationService(
                 List.of(new GeminiModel("gemini-2.5-pro", apikey)),
                 kiwiCompiler,
                 new DefaultPageCompiler(java.nio.file.Path.of(PAGE_WORKDIR)),
                 createFeignClient(ExchangeClient.class, CHAT_APP_ID),
-                new AppService(host, CHAT_APP_ID, Utils.createKiwiFeignClient(
-                        host,
-                        UserClient.class,
-                        CHAT_APP_ID
-                )),
+                appService,
                 createFeignClient(UserClient.class, CHAT_APP_ID),
-                "http://{}.metavm.test",
+                "https://{}.metavm.test",
                 "http://localhost:5173/app/{}",
                 "https://admin.metavm.test/source-{}.zip",
                 Utils.createKiwiFeignClient(host, GenerationConfigClient.class, CHAT_APP_ID),
-                new UrlFetcher("https://1000061024.metavm.test"), new SyncTaskExecutor());
+                new UrlFetcher("https://1000061024.metavm.test"), new SyncTaskExecutor(), new PlaywrightBrowser(),
+                new AttachmentServiceImpl(
+                        CHAT_APP_ID,
+                        new FileService(Path.of("/Users/leen/develop/uploads")),
+                        Path.of("/Users/leen/develop/sourcemap"),
+                        appService
+                ));
 //        System.out.println(kiwiCompiler.generateApi(TEST_APP_ID));
         testNewApp(service);
 //        testUpdateApp(service);
@@ -608,7 +708,7 @@ public class GenerationService {
     @SneakyThrows
     private static void testNewApp(GenerationService service) {
         service.generate(
-                GenerationRequest.create(null, "Create a stock trading system"),
+                GenerationRequest.create(null, "Create a todo list app"),
                 USER_ID,
                 printListener
         );
@@ -633,7 +733,7 @@ public class GenerationService {
         }
 
         @Override
-        public void onProgress(Exchange exchange) {
+        public void onProgress(ExchangeDTO exchange) {
 
         }
     };

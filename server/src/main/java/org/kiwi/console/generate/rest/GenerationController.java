@@ -91,7 +91,7 @@ public class GenerationController {
     }
 
     @PostMapping("/history")
-    public SearchResult<Exchange> search(@AuthenticationPrincipal String userId, @RequestBody HistoryRequest request) {
+    public SearchResult<ExchangeDTO> search(@AuthenticationPrincipal String userId, @RequestBody HistoryRequest request) {
         if (request.appId() == null)
             throw new BusinessException(ErrorCode.BAD_REQUEST);
         var app = appClient.get(request.appId());
@@ -107,11 +107,10 @@ public class GenerationController {
         );
         var r = exchangeClient.search(innerReq);
         return new SearchResult<>(
-                Utils.map(r.items(), Exchange::clearDetails),
+                Utils.map(r.items(), Exchange::toDTO),
                 r.total()
         );
     }
-
 
     private void ensureExchangeAuthorized(String userId, String exchangeId) {
         var exchange = exchangeClient.get(exchangeId);
@@ -137,7 +136,7 @@ public class GenerationController {
 
         @SneakyThrows
         @Override
-        public void onProgress(Exchange exchange) {
+        public void onProgress(ExchangeDTO exchange) {
             try {
                 sseEmitter.send(SseEmitter.event().name("generation").data(exchange));
             }

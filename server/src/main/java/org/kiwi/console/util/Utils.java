@@ -327,4 +327,28 @@ public class Utils {
             return resourceUrl.getPath(); // Fallback, might not work if 'deploy' strictly needs a file system path
         }
     }
+
+    public static String escapeJavaString(String input) {
+        if (input == null) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder(input.length());
+        for (int i = 0; i < input.length(); i++) {
+            char c = input.charAt(i);
+            switch (c) {
+                case '"':  sb.append("\\\""); break;
+                case '\\': sb.append("\\\\"); break;
+                case '\b': sb.append("\\b");  break;
+                case '\f': sb.append("\\f");  break;
+                case '\n': sb.append("\\n");  break;
+                case '\r': sb.append("\\r");  break;
+                case '\t': sb.append("\\t");  break;
+                // You can add other cases here if needed, for example for non-printable characters.
+                default:
+                    sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
 }

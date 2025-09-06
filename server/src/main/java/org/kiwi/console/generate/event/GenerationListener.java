@@ -1,6 +1,6 @@
 package org.kiwi.console.generate.event;
 
-import org.kiwi.console.kiwi.Exchange;
+import org.kiwi.console.generate.rest.ExchangeDTO;
 
 public interface GenerationListener {
 
@@ -8,7 +8,7 @@ public interface GenerationListener {
 
     void onContent(String contentChunk);
 
-    void onProgress(Exchange exchange);
+    void onProgress(ExchangeDTO exchange);
 
     default void close() {
     }

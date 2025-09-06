@@ -4,4 +4,5 @@ public enum AttemptStatus {
     RUNNING,
     SUCCESSFUL,
     FAILED,
+    REJECTED
 }

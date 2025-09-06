@@ -6,7 +6,7 @@ class Session(
 
     val token = uuid()
 
-    var expiry = now() + 24 * 60 * 60 * 1000
+    var expiry = now() + 30l * 24 * 60 * 60 * 1000
 
     static val tokenIdx = Index<string, Session>(true, s -> s.token)
 
