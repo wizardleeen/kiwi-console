@@ -51,6 +51,9 @@ public class MockPromptParser {
             case "page_commit_msg" -> {
                 return new Prompt(PromptKind.PAGE_COMMIT_MSG, null, null, null, null);
             }
+            case "auto-test" -> {
+                return new Prompt(PromptKind.AUTO_TEST, null, null, null, null);
+            }
             default -> throw invalidPrompt(text);
         }
     }

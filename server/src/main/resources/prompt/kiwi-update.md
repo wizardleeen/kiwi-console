@@ -59,6 +59,22 @@ class CustomerService {
 
 }
 
+@@ src/service/init.kiwi @@
+import domain.Customer
+import domain.Product
+import domain.Money
+import domain.Currency
+import domain.Category
+
+@Bean
+class Init {
+
+    {
+        Customer("leen", "leen@kiwi.com", "123456")
+        Product("MacBook Pro", Money(14000, Currency.YUAN), 100, Category.ELECTRONICS)
+    }
+
+}
 @@ src/service/order_service.kiwi @@
 package service
 
@@ -139,7 +155,7 @@ package service
 import domain.Session
 
 @Bean
-class TokenValidator: security.TokenValidator {
+internal class TokenValidator: security.TokenValidator {
 
     fn validate(token: string) -> any? {
         val s = Session.tokenIdx.getFirst(token)
@@ -263,7 +279,7 @@ class Session(
 
     val token = uuid()
 
-    var expiry = now() + 24 * 60 * 60 * 1000
+    var expiry = now() + 30l * 24 * 60 * 60 * 1000
 
     static val tokenIdx = Index<string, Session>(true, s -> s.token)
 
@@ -702,7 +718,7 @@ class OrderService {
     fn placeOrder(product: Product) -> Order {
         val order = Order(product.price
         order.Item(product, 1)
-        return order
+        return orde**r
     }
     
 }

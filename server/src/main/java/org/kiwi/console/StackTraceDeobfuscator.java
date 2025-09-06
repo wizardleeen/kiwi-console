@@ -67,7 +67,7 @@ public class StackTraceDeobfuscator {
                         // If no mapping found, keep the original
                         matcher.appendReplacement(lineBuffer, matcher.group(0));
                     }
-                } catch (NumberFormatException e) {
+                } catch (Exception e) {
                     // Should not happen with the regex, but good practice
                     matcher.appendReplacement(lineBuffer, matcher.group(0));
                 }

@@ -2,6 +2,7 @@ package org.kiwi.console.kiwi;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import org.kiwi.console.generate.rest.StageDTO;
 import org.kiwi.console.util.TextWriter;
 
 import java.util.ArrayList;
@@ -30,8 +31,8 @@ public class Stage {
         writer.deIndent();
     }
 
-    public Stage clearAttempts() {
-        return new Stage(id, type, status, List.of());
+    public StageDTO toDTO() {
+        return new StageDTO(id, type.name(), status.name());
     }
 
     public boolean isRunning() {

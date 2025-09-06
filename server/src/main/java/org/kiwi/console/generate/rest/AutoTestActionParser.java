@@ -21,7 +21,7 @@ public class AutoTestActionParser {
             }
         }
         if (reader.isEof())
-            throw new RuntimeException("Invalid action text: " + text);
+            return new AutoTestAction(Objects.requireNonNull(type), "", "");
         var desc = reader.readLine();
         var content = reader.readRemaining();
         return new AutoTestAction(Objects.requireNonNull(type), desc, content);

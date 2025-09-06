@@ -1,0 +1,15 @@
+import domain.Customer
+import domain.Product
+import domain.Money
+import domain.Currency
+import domain.Category
+
+@Bean
+class Init {
+
+    {
+        Customer("leen", "leen@kiwi.com", "123456")
+        Product("MacBook Pro", Money(14000, Currency.YUAN), 100, Category.ELECTRONICS)
+    }
+
+}

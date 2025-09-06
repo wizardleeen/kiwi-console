@@ -5,7 +5,6 @@ import lombok.SneakyThrows;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.UUID;
 
 public class FileService {
 

@@ -2,6 +2,7 @@ package org.kiwi.console.kiwi;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import org.kiwi.console.generate.rest.ExchangeDTO;
 import org.kiwi.console.util.TextWriter;
 import org.kiwi.console.util.Utils;
 
@@ -91,22 +92,23 @@ public class Exchange {
         }
     }
 
-    public Exchange clearDetails() {
-        return new Exchange(
+    public ExchangeDTO toDTO() {
+        return toDTO(null);
+    }
+
+    public ExchangeDTO toDTO(@Nullable String testPageId) {
+        return new ExchangeDTO(
                 id,
                 appId,
-                userId,
                 prompt,
-                attachmentUrls,
-                status,
-                Utils.map(stages, Stage::clearAttempts),
+                status.name(),
                 productURL,
                 managementURL,
                 sourceCodeURL,
-                null,
-                first,
-                skipPageGeneration,
-                lastHeartBeatAt
+                errorMessage,
+                attachmentUrls,
+                Utils.map(stages, Stage::toDTO),
+                testPageId
         );
     }
 

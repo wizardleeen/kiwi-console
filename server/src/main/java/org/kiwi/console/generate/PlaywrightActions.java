@@ -1,0 +1,176 @@
+package org.kiwi.console.generate;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonSubTypes;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import jakarta.annotation.Nullable;
+import lombok.Data;
+import lombok.SneakyThrows;
+import org.kiwi.console.util.Utils;
+
+import java.util.List;
+import java.util.Map;
+
+/**
+ * A container for all classes representing the AI model's output for Playwright automation.
+ * This version uses @Nullable annotations instead of Optional for optional fields.
+ */
+public final class PlaywrightActions {
+
+    // Prevent instantiation
+    private PlaywrightActions() {}
+
+
+
+        public interface GeneratedAction {
+
+            String getType();
+
+        }
+
+        @Data
+        public static class StepAction implements GeneratedAction {
+            private String description;
+            private List<PlaywrightCommand> commands;
+            private String reason;
+            private String bugReport;
+            private boolean successful;
+            private String errorMessage;
+
+            @Override
+            public String getType() {
+                return "STEP";
+            }
+        }
+
+        @Data
+        public static class RejectAction implements GeneratedAction {
+
+            private String bugReport;
+
+            @Override
+            public String getType() {
+                return "REJECT";
+            }
+        }
+
+        @Data
+        public static class AcceptAction implements GeneratedAction {
+
+            @Override
+            public String getType() {
+                return "ACCEPT";
+            }
+        }
+
+
+        @Data
+        public static class AbortAction implements GeneratedAction {
+            private String reason;
+
+            @Override
+            public String getType() {
+                return "ABORT";
+            }
+        }
+
+    public enum ActionType {
+        STEP, REJECT, ACCEPT, ABORT
+    }
+
+    // ------------------- Playwright Action Definitions -------------------
+
+    @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "action", visible = true)
+    @JsonSubTypes({
+        @JsonSubTypes.Type(value = Click.class, name = "click"),
+        @JsonSubTypes.Type(value = Fill.class, name = "fill"),
+        @JsonSubTypes.Type(value = Press.class, name = "press"),
+        @JsonSubTypes.Type(value = ExpectVisible.class, name = "expectVisible"),
+        @JsonSubTypes.Type(value = ExpectHidden.class, name = "expectHidden"),
+        @JsonSubTypes.Type(value = ExpectToContainText.class, name = "expectToContainText"),
+        @JsonSubTypes.Type(value = UploadFile.class, name = "uploadFile"),
+        @JsonSubTypes.Type(value = UploadGeneratedFile.class, name = "uploadGeneratedFile"),
+        @JsonSubTypes.Type(value = DragAndDrop.class, name = "dragAndDrop")
+    })
+    public sealed interface PlaywrightCommand {
+        String action();
+        String selector();
+    }
+
+    // --- Concrete Action Implementations as Records ---
+
+    public record Click(String action, String selector) implements PlaywrightCommand {}
+
+    public record Fill(String action, String selector, String value) implements PlaywrightCommand {}
+    
+    public record Press(String action, String selector, String value) implements PlaywrightCommand {}
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record ExpectVisible(String action, String selector, @Nullable Map<String, Object> options) implements PlaywrightCommand {}
+
+    public record ExpectHidden(String action, String selector) implements PlaywrightCommand {}
+
+    public record ExpectToContainText(String action, String selector, String value) implements PlaywrightCommand {}
+    
+    public record UploadFile(String action, String selector, String value) implements PlaywrightCommand {}
+
+    public record UploadGeneratedFile(String action, String selector, FileProperties fileProperties) implements PlaywrightCommand {}
+
+    public record DragAndDrop(String action, String selector, String targetSelector) implements PlaywrightCommand {}
+
+
+    // ------------------- File Properties Definitions -------------------
+
+    @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type", visible = true)
+    @JsonSubTypes({
+        @JsonSubTypes.Type(value = ImageFileProperties.class, name = "image"),
+        @JsonSubTypes.Type(value = TextFileProperties.class, name = "text")
+    })
+    public sealed interface FileProperties {
+        String type();
+        String fileName();
+        String mimeType();
+    }
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record ImageFileProperties(
+        String type,
+        String fileName,
+        String mimeType,
+        int width,
+        int height,
+        @Nullable String text,
+        @Nullable String backgroundColor,
+        @Nullable String textColor
+    ) implements FileProperties {}
+
+    public record TextFileProperties(
+        String type,
+        String fileName,
+        String mimeType,
+        String content
+    ) implements FileProperties {}
+
+
+    // ------------------- Parser Utility Class -------------------
+
+    public static class ActionParser {
+
+        @SneakyThrows
+        public GeneratedAction parse(String output) {
+            var parts = output.split("\n", 2);
+            var action = parts[0];
+            var json = parts[1];
+            return switch (action) {
+                case "STEP" -> Utils.readJSONString(json, StepAction.class);
+                case "REJECT" -> Utils.readJSONString(json, RejectAction.class);
+                case "ACCEPT" -> Utils.readJSONString(json, AcceptAction.class);
+                case "ABORT" -> Utils.readJSONString(json, AbortAction.class);
+                default -> throw new IllegalArgumentException("Unknown action type: " + action);
+            };
+        }
+    }
+
+    public static final ActionParser parser = new ActionParser();
+
+}

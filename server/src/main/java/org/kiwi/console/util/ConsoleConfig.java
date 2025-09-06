@@ -1,5 +1,7 @@
 package org.kiwi.console.util;
 
+import org.kiwi.console.browser.Browser;
+import org.kiwi.console.browser.PlaywrightBrowser;
 import org.kiwi.console.file.UrlFetcher;
 import org.kiwi.console.generate.*;
 import org.kiwi.console.generate.claude.ClaudeModel;
@@ -115,6 +117,11 @@ public class ConsoleConfig {
     }
 
     @Bean
+    public Browser browser() {
+        return new PlaywrightBrowser();
+    }
+
+    @Bean
     public GenerationService generationService(List<Model> models,
                                                KiwiCompiler kiwiCompiler,
                                                PageCompiler pageCompiler,
@@ -123,6 +130,8 @@ public class ConsoleConfig {
                                                ExchangeClient exchangeClient,
                                                GenerationConfigClient generationConfigClient,
                                                UrlFetcher urlFetcher,
+                                               Browser browser,
+                                               AttachmentService attachmentService,
                                                @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor) {
         return new GenerationService(
                 models,
@@ -135,7 +144,7 @@ public class ConsoleConfig {
                 urlTemplates.management,
                 urlTemplates.sourceCode,
                 generationConfigClient,
-                urlFetcher, taskExecutor);
+                urlFetcher, taskExecutor, browser, attachmentService);
     }
 
     @Bean

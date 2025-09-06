@@ -4,5 +4,6 @@ public enum StageStatus {
     GENERATING,
     COMMITTING,
     SUCCESSFUL,
-    FAILED
+    FAILED,
+    REJECTED
 }

@@ -30,9 +30,12 @@ public enum ErrorCode {
 
     UNSUPPORTED_ATTACHMENT(4008, "Attachment with content type '{}' is not supported by the underlying model"),
 
-    AUTHORIZATION_FAILED(4009, "Authorization failed: {}")
+    AUTHORIZATION_FAILED(4009, "Authorization failed: {}"),
 
-    ;
+    AUTO_TEST_ACTIONS_EXCEEDED(4010, "Auto test actions exceeded"),
+
+    INVALID_TEST_SESSION(4011,  "Invalid test session"),
+    AUTO_TEST_ALREADY_STARTED(4012, "Auto test already started"),;
 
 
 

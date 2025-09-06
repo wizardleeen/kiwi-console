@@ -102,6 +102,11 @@ class MockCompiler implements KiwiCompiler, PageCompiler {
         return getWorkdir(appId).get(path);
     }
 
+    @Override
+    public @Nullable Path getSourceMapPath(long appId) {
+        return null;
+    }
+
     private record Commit(Map<String, String> map, String message) {}
 
 }
