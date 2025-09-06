@@ -22,7 +22,7 @@ class MockChat implements Chat {
             case PAGE_CREATE -> "@@  src/App.tsx @@\n// " + prompt.appName() + prompt.prompt();
             case PAGE_UPDATE -> "@@  src/App.tsx @@\n" + prompt.prompt();
             case PAGE_COMMIT_MSG -> "commit front";
-            case AUTO_TEST -> "PASSED";
+            case AUTO_TEST -> "ACCEPT\n{}";
             case FIX -> requireNonNull(lastCode).replace("Error", "Fixed");
             case COMMIT_MSG -> "commit";
         };
