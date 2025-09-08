@@ -27,13 +27,15 @@ public class Exchange {
     private boolean first;
     private boolean skipPageGeneration;
     private long lastHeartBeatAt;
+    private int chainDepth;
 
     public static Exchange create(String appId,
                                   String userId,
                                   String prompt,
                                   List<String> attachmentUrls,
                                   boolean first,
-                                  boolean skipPageGeneration) {
+                                  boolean skipPageGeneration,
+                                  int chainDepth) {
         return new Exchange(null,
                 appId,
                 userId,
@@ -47,7 +49,8 @@ public class Exchange {
                 null,
                 first,
                 skipPageGeneration,
-                0
+                0,
+                chainDepth
         );
     }
 

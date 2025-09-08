@@ -45,6 +45,8 @@ public class GenerationService {
 
     private static final int MAX_AUTO_TEST_ACTIONS = 100;
 
+    private static final int MAX_AUTO_FIXES = 3;
+
     private static final Set<String> allowedMimeTypes = Set.of(
             "application/pdf",
             "application/json",
@@ -114,7 +116,7 @@ public class GenerationService {
             creating = true;
         }
         List<String> attachmentUrls = Objects.requireNonNullElse(request.attachmentUrls(), List.of());
-        var exchange = Exchange.create(appId, userId, request.prompt(), attachmentUrls, creating, request.skipPageGeneration());
+        var exchange = Exchange.create(appId, userId, request.prompt(), attachmentUrls, creating, request.skipPageGeneration(), 0);
         generate0(exchange, attachmentUrls, listener);
         return appId;
     }
@@ -559,7 +561,7 @@ public class GenerationService {
             }
             if (action instanceof PlaywrightActions.RejectAction rejectAction) {
                 task.finishTest(1);
-                startFix(task.app.getId(), task.getUser().getId(), rejectAction.getBugReport(), screenshot, dom, consoleLogs);
+                startFix(task, rejectAction.getBugReport(), screenshot, dom, consoleLogs);
                 break;
             }
             if (action instanceof PlaywrightActions.AbortAction) {
@@ -583,7 +585,11 @@ public class GenerationService {
         task.setPage(null);
     }
 
-    private void startFix(String appId, String userId, String bugReport, byte[] screenshot, String dom, String consoleLog) {
+    private void startFix(GenerationTask task, String bugReport, byte[] screenshot, String dom, String consoleLog) {
+        if (task.exchange.getChainDepth() >= MAX_AUTO_FIXES) {
+            log.info("Reached max auto fix limit. appId: {}, exchangeId: {}", task.app.getId(), task.exchange.getId());
+            return;
+        }
         var urls = List.of(
                 attachmentService.upload("index.html", new ByteArrayInputStream(dom.getBytes(StandardCharsets.UTF_8))),
                 attachmentService.upload("screenshot.png", new ByteArrayInputStream(screenshot)),
@@ -591,9 +597,10 @@ public class GenerationService {
         );
         generate0(
                 Exchange.create(
-                        appId, userId,
+                        task.app.getId(), task.getUser().getId(),
                         "Fix the following issue: " + bugReport,
-                        urls, false, false
+                        urls, false, false,
+                        task.exchange.getChainDepth() + 1
                 ),
                 urls,
                 new GenerationListener() {

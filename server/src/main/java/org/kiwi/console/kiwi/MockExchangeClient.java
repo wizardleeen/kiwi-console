@@ -51,7 +51,8 @@ public class MockExchangeClient implements ExchangeClient {
                 exchange.getErrorMessage(),
                 exchange.isFirst(),
                 exchange.isSkipPageGeneration(),
-                exchange.getLastHeartBeatAt()
+                exchange.getLastHeartBeatAt(),
+                exchange.getChainDepth()
         );
     }
 
