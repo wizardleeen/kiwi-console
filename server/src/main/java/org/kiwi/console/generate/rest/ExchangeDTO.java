@@ -15,6 +15,7 @@ public record ExchangeDTO(
         @Nullable String errorMessage,
         List<String> attachmentUrls,
         List<StageDTO> stages,
-        String testPageId
+        String testPageId,
+        int chainDepth
 ) {
 }

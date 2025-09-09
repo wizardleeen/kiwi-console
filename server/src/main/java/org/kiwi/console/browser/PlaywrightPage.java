@@ -30,13 +30,46 @@ public class PlaywrightPage implements Page {
 
     private final BrowserContext context;
     private final com.microsoft.playwright.Page page;
-    private final List<ConsoleMessage> consoleMessages = new ArrayList<>();
+    private final List<String> consoleMessages = new ArrayList<>();
     private @Nullable String targetId;
 
     public PlaywrightPage(BrowserContext context) {
         this.context = context;
         this.page = context.newPage();
-        page.onConsoleMessage(consoleMessages::add);
+
+        page.onConsoleMessage(message -> {
+            String logEntry = message.args().stream()
+                    .map(arg -> {
+                        try {
+                            Object value = arg.evaluate("obj => {" +
+                                    "  if (obj instanceof Error) {" +
+                                    "    return obj.stack;" +
+                                    "  }" +
+                                    "  const cache = new Set();" +
+                                    "  try {" +
+                                    "    return JSON.stringify(obj, (key, value) => {" +
+                                    "      if (typeof value === 'object' && value !== null) {" +
+                                    "        if (cache.has(value)) {" +
+                                    "          return '[Circular]';" +
+                                    "        }" +
+                                    "        cache.add(value);" +
+                                    "      }" +
+                                    "      return value;" +
+                                    "    });" +
+                                    "  } catch (e) {" +
+                                    "    return String(obj);" +
+                                    "  }" +
+                                    "}");
+                            return String.valueOf(value);
+                        } finally {
+                            arg.dispose();
+                        }
+                    })
+                    .collect(Collectors.joining(" "));
+
+            consoleMessages.add(logEntry);
+        });
+
         page.exposeFunction("fail", args -> {
             page.evaluate(String.format("console.error(\"%s\")", Utils.escapeJavaString(Objects.toString(args[0]))));
             return null;
@@ -85,9 +118,7 @@ public class PlaywrightPage implements Page {
 
     @Override
     public String getConsoleLogs() {
-        return consoleMessages.stream()
-                .map(ConsoleMessage::text)
-                .collect(Collectors.joining("\n"));
+        return String.join("\n", consoleMessages);
     }
 
     @Override

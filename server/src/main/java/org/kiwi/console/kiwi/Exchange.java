@@ -27,7 +27,9 @@ public class Exchange {
     private boolean first;
     private boolean skipPageGeneration;
     private long lastHeartBeatAt;
+    private @Nullable String parentExchangeId;
     private int chainDepth;
+    private boolean testOnly;
 
     public static Exchange create(String appId,
                                   String userId,
@@ -35,7 +37,9 @@ public class Exchange {
                                   List<String> attachmentUrls,
                                   boolean first,
                                   boolean skipPageGeneration,
-                                  int chainDepth) {
+                                  @Nullable String parentExchangeId,
+                                  int chainDepth,
+                                  boolean testOnly) {
         return new Exchange(null,
                 appId,
                 userId,
@@ -50,7 +54,9 @@ public class Exchange {
                 first,
                 skipPageGeneration,
                 0,
-                chainDepth
+                parentExchangeId,
+                chainDepth,
+                testOnly
         );
     }
 
@@ -111,7 +117,8 @@ public class Exchange {
                 errorMessage,
                 attachmentUrls,
                 Utils.map(stages, Stage::toDTO),
-                testPageId
+                testPageId,
+                chainDepth
         );
     }
 
