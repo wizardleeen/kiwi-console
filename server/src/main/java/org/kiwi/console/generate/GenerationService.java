@@ -59,6 +59,23 @@ public class GenerationService {
             "video/mp4"
     );
 
+    private static final GenerationListener emptyListener = new GenerationListener() {
+        @Override
+        public void onThought(String thoughtChunk) {
+
+        }
+
+        @Override
+        public void onContent(String contentChunk) {
+
+        }
+
+        @Override
+        public void onProgress(ExchangeDTO exchange) {
+
+        }
+    };
+
     private final Map<String, Model> models;
     private final KiwiCompiler kiwiCompiler;
     private final PageCompiler pageCompiler;
@@ -74,6 +91,7 @@ public class GenerationService {
     private final TaskExecutor taskExecutor;
     private final Browser browser;
     private final AttachmentService attachmentService;
+    private final Path testEnvDir;
 
     public GenerationService(
             List<Model> models,
@@ -86,7 +104,10 @@ public class GenerationService {
             String sourceCodeUrlTempl,
             GenerationConfigClient generationConfigClient,
             UrlFetcher urlFetcher,
-            TaskExecutor taskExecutor, Browser browser, AttachmentService attachmentService
+            TaskExecutor taskExecutor,
+            Browser browser,
+            AttachmentService attachmentService,
+            Path testEnvDir
     ) {
         this.models = models.stream().collect(Collectors.toUnmodifiableMap(Model::getName, Function.identity()));
         this.kiwiCompiler = kiwiCompiler;
@@ -102,6 +123,7 @@ public class GenerationService {
         this.taskExecutor = taskExecutor;
         this.browser = browser;
         this.attachmentService = attachmentService;
+        this.testEnvDir = testEnvDir;
     }
 
     public String generate(GenerationRequest request, String userId, GenerationListener listener) {
@@ -116,13 +138,21 @@ public class GenerationService {
             creating = true;
         }
         List<String> attachmentUrls = Objects.requireNonNullElse(request.attachmentUrls(), List.of());
-        var exchange = Exchange.create(appId, userId, request.prompt(), attachmentUrls, creating, request.skipPageGeneration(), 0);
-        generate0(exchange, attachmentUrls, listener);
+        var exchange = Exchange.create(appId,
+                userId,
+                request.prompt(),
+                attachmentUrls,
+                creating,
+                request.skipPageGeneration(),
+                null,
+                0,
+                false);
+        generate0(exchange, listener);
         return appId;
     }
 
-    private void generate0(Exchange exchange, List<String> attachmentUrls, GenerationListener listener) {
-        var attachments = Utils.map(attachmentUrls, this::readAttachment);
+    private void generate0(Exchange exchange, GenerationListener listener) {
+        var attachments = Utils.map(exchange.getAttachmentUrls(), this::readAttachment);
         var app = appClient.get(exchange.getAppId());
         var user = userClient.get(exchange.getUserId());
         var genConfig = generationConfigClient.get(app.getGenConfigId());
@@ -132,7 +162,6 @@ public class GenerationService {
                 attachments, listener, getModel(genConfig.model()));
         task.sendProgress();
         taskExecutor.execute(() -> runTask(task));
-
     }
 
     private GenerationTask createGenerationTask(Exchange exch, App app, User user, GenerationConfig genConfig,
@@ -186,12 +215,14 @@ public class GenerationService {
                     var apiSource = kiwiCompiler.generateApi(kiwiAppId);
                     executeGen(() -> generatePages(apiSource, task, plan.suggestion));
                 }
-                var url = Format.format(productUrlTempl, kiwiAppId);
                 var sourceCodeUrl = task.getUser().isAllowSourceCodeDownload() ?
                         Format.format(sourceCodeUrlTempl, kiwiAppId) : null;
-                task.finishGeneration(url, sourceCodeUrl);
+                task.finishGeneration(getProductUrl(kiwiAppId), sourceCodeUrl);
             }
-            runAutoTest(task);
+            if (runAutoTest(task)) {
+                if (task.exchange.getParentExchangeId() != null)
+                    startTestIfNeeded(task.exchange.getParentExchangeId());
+            }
             log.info("Generation Completed. Application: {}", task.exchange.getProductURL());
         } catch (Exception e) {
             log.error("Failed to generate code for app {}", task.exchange.getAppId(), e);
@@ -200,6 +231,20 @@ public class GenerationService {
         }  finally {
             task.destroy();
             runningTasks.remove(task.exchange.getId());
+        }
+    }
+
+    private String getProductUrl(long kiwiAppId) {
+        return Format.format(productUrlTempl, kiwiAppId);
+    }
+
+    private void startTestIfNeeded(String exchangeId) {
+        var exch = exchClient.get(exchangeId);
+        if (!exch.getStages().isEmpty()) {
+            var lastStage = exch.getStages().getLast();
+            if (lastStage.getType() == StageType.TEST && lastStage.getStatus() == StageStatus.REJECTED) {
+                startTest(exch);
+            }
         }
     }
 
@@ -529,11 +574,12 @@ public class GenerationService {
     }
 
     @SneakyThrows
-    private void runAutoTest(GenerationTask task) {
+    private boolean runAutoTest(GenerationTask task) {
         var page = browser.createPage();
-        page.navigate(task.exchange.getProductURL());
+        page.navigate(getProductUrl(task.app.getKiwiAppId()));
         task.setPage(page);
         task.enterStageAndAttempt(StageType.TEST);
+        boolean successful = false;
         for (var i = 0; i < MAX_AUTO_TEST_ACTIONS; i++) {
             if (task.isCancelled())
                 break;
@@ -555,8 +601,13 @@ public class GenerationService {
 //            log.debug("Console Logs\n{}", consoleLogs);
 //            Files.write(Path.of("/tmp/screenshot.png"), screenshot);
             var action = autoTestStep(task);
+            if (action instanceof PlaywrightActions.FinalAction finalAction) {
+                if (finalAction.getUpdatedTestAccounts() != null)
+                    updateTestAccounts(task.app.getKiwiAppId(), finalAction.getUpdatedTestAccounts());
+            }
             if (action instanceof PlaywrightActions.AcceptAction) {
                 task.finishTest(0);
+                successful = true;
                 break;
             }
             if (action instanceof PlaywrightActions.RejectAction rejectAction) {
@@ -568,6 +619,7 @@ public class GenerationService {
                 task.finishTest(2);
                 break;
             }
+            assert action instanceof PlaywrightActions.StepAction;
             var stepAction = (PlaywrightActions.StepAction) action;
             out: {
                 for (var cmd : stepAction.getCommands()) {
@@ -583,6 +635,27 @@ public class GenerationService {
         }
         page.close();
         task.setPage(null);
+        return successful;
+    }
+
+    @SneakyThrows
+    private String getTestAccounts(long appId) {
+        var filePath = getTestAccountFilePath(appId);
+        if (Files.exists(filePath)) {
+            return Files.readString(filePath);
+        } else
+            return "No test account. Create new accounts if needed.";
+    }
+
+    @SneakyThrows
+    private void updateTestAccounts(long appId, String updatedTestAccount) {
+        var path = getTestAccountFilePath(appId);
+        Files.createDirectories(path.getParent());
+        Files.writeString(path, updatedTestAccount);
+    }
+
+    private Path getTestAccountFilePath(long appId) {
+        return testEnvDir.resolve(Long.toString(appId)).resolve("test-accounts.txt");
     }
 
     private void startFix(GenerationTask task, String bugReport, byte[] screenshot, String dom, String consoleLog) {
@@ -600,31 +673,33 @@ public class GenerationService {
                         task.app.getId(), task.getUser().getId(),
                         "Fix the following issue: " + bugReport,
                         urls, false, false,
-                        task.exchange.getChainDepth() + 1
+                        task.exchange.getId(),
+                        task.exchange.getChainDepth() + 1,
+                        false
                 ),
-                urls,
-                new GenerationListener() {
-                    @Override
-                    public void onThought(String thoughtChunk) {
+                emptyListener);
+    }
 
-                    }
-
-                    @Override
-                    public void onContent(String contentChunk) {
-                    }
-
-                    @Override
-                    public void onProgress(ExchangeDTO exchange) {
-                    }
-                }
+    private void startTest(Exchange exchange) {
+        var testExch = Exchange.create(
+                exchange.getAppId(),
+                exchange.getUserId(),
+                exchange.getPrompt(),
+                exchange.getAttachmentUrls(),
+                false,
+                false,
+                exchange.getParentExchangeId(),
+                exchange.getChainDepth(),
+                true
         );
+        generate0(testExch, emptyListener);
     }
 
     private PlaywrightActions.GeneratedAction autoTestStep(GenerationTask task) {
         return executeGen(() -> {
+            var testAccounts = getTestAccounts(task.app.getKiwiAppId());
             var code = PatchReader.buildCode(pageCompiler.getSourceFiles(task.app.getKiwiAppId()));
-            var prompt = buildAutoTestPrompt(task.genConfig.autoTestPrompt(), task.exchange.getPrompt(), code, task.getActions());
-//            log.debug("Auto test prompt:\n{}", prompt);
+            var prompt = buildAutoTestPrompt(task.genConfig.autoTestPrompt(), task.exchange.getPrompt(), code, testAccounts, task.getActions());
             var chat = task.model.createChat(task.genConfig.outputThinking());
             var text = generateContent(chat, prompt, task);
             var action = PlaywrightActions.parser.parse(text);
@@ -633,11 +708,12 @@ public class GenerationService {
         });
     }
 
-    private String buildAutoTestPrompt(String template, String prompt, String code, List<PlaywrightActions.GeneratedAction> actions) {
+    private String buildAutoTestPrompt(String template, String prompt, String code, String testAccounts, List<PlaywrightActions.GeneratedAction> actions) {
         return Format.format(
                 template,
                 prompt,
                 code,
+                testAccounts,
                 actions.stream().map(Utils::toPrettyJSONString).collect(Collectors.joining("\n"))
         );
     }
@@ -692,7 +768,9 @@ public class GenerationService {
                         new FileService(Path.of("/Users/leen/develop/uploads")),
                         Path.of("/Users/leen/develop/sourcemap"),
                         appService
-                ));
+                ),
+                Path.of("/Users/leen/develop/test-env")
+            );
 //        System.out.println(kiwiCompiler.generateApi(TEST_APP_ID));
         testNewApp(service);
 //        testUpdateApp(service);

@@ -208,7 +208,7 @@ class GenerationTask implements Task {
     }
 
     public boolean isTesting() {
-        return exchange.isRunning() && !exchange.getStages().isEmpty() &&
+        return exchange.isTestOnly() || exchange.isRunning() && !exchange.getStages().isEmpty() &&
                 exchange.getStages().getLast().getType() == StageType.TEST;
     }
 

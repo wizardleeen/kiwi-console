@@ -28,6 +28,8 @@ import static org.kiwi.console.util.Constants.MAIN_KIWI;
 @Slf4j
 public class GenerationServiceTest extends TestCase {
 
+    private static final Path testEnvDir = Path.of("/tmp/test-env");
+
     private MockCompiler kiwiCompiler;
     private MockPageCompiler pageCompiler;
     private AppClient appClient;
@@ -67,7 +69,7 @@ public class GenerationServiceTest extends TestCase {
                 "http://localhost:8080",
                 "https://admin.metavm.test/source-{}.zip",
                 genConfigClient,
-                urlFetcher, new SyncTaskExecutor(), new MockBrowser(), attachmentService);
+                urlFetcher, new SyncTaskExecutor(), new MockBrowser(), attachmentService, testEnvDir);
         var prompt = """
                 class Foo {}
                 """;
@@ -144,7 +146,7 @@ public class GenerationServiceTest extends TestCase {
                 "http://localhost:8080",
                 "https://admin.metavm.test/source-{}.zip",
                 genConfigClient,
-                urlFetcher, taskExecutor, new MockBrowser(), attachmentService);
+                urlFetcher, taskExecutor, new MockBrowser(), attachmentService, testEnvDir);
         generationService.generate(GenerationRequest.create(null, "class Foo{}"), userId, discardListener);
         var exch = exchangeClient.getFirst();
         generationService.cancel(new CancelRequest(exch.getId()));
@@ -167,7 +169,7 @@ public class GenerationServiceTest extends TestCase {
                 "http://localhost:8080",
                 "https://admin.metavm.test/source-{}.zip",
                 genConfigClient,
-                urlFetcher, new SyncTaskExecutor(), new MockBrowser(), attachmentService);
+                urlFetcher, new SyncTaskExecutor(), new MockBrowser(), attachmentService, testEnvDir);
         var exchanges = new ArrayList<ExchangeDTO>();
         genService.generate(GenerationRequest.create(null, "class Foo {}"), userId, new GenerationListener() {
             @Override
@@ -207,7 +209,7 @@ public class GenerationServiceTest extends TestCase {
                 "http://localhost:8080",
                 "https://admin.metavm.test/source-{}.zip",
                 genConfigClient,
-                urlFetcher, new SyncTaskExecutor(), new MockBrowser(), attachmentService);
+                urlFetcher, new SyncTaskExecutor(), new MockBrowser(), attachmentService, testEnvDir);
         try {
             generationService.generate(GenerationRequest.create(null, "class Foo{}"), userId, discardListener);
             fail();
@@ -230,7 +232,7 @@ public class GenerationServiceTest extends TestCase {
                 "http://localhost:8080",
                 "https://admin.metavm.test/source-{}.zip",
                 genConfigClient,
-                urlFetcher, t -> {}, new MockBrowser(), attachmentService);
+                urlFetcher, t -> {}, new MockBrowser(), attachmentService, testEnvDir);
         var appId = genService.generate(GenerationRequest.create(null, "class Foo {}"), userId, discardListener);
         try {
             genService.generate(GenerationRequest.create(appId, "class Foo {}"), userId, discardListener);
@@ -249,7 +251,7 @@ public class GenerationServiceTest extends TestCase {
                 "http://localhost:8080",
                 "https://admin.metavm.test/source-{}.zip",
                 genConfigClient,
-                urlFetcher, t -> {}, new MockBrowser(), attachmentService);
+                urlFetcher, t -> {}, new MockBrowser(), attachmentService, testEnvDir);
         genService.generate(GenerationRequest.create(null, "class Foo {}"), userId, discardListener);
         var exch = exchangeClient.getFirst();
         assertTrue(exch.isRunning());
@@ -269,7 +271,7 @@ public class GenerationServiceTest extends TestCase {
                 "http://localhost:8080",
                 "https://admin.metavm.test/source-{}.zip",
                 genConfigClient,
-                urlFetcher, t -> {}, new MockBrowser(), attachmentService);
+                urlFetcher, t -> {}, new MockBrowser(), attachmentService, testEnvDir);
         genService.generate(GenerationRequest.create(null, "class Foo {}"), userId, discardListener);
         var exch = exchangeClient.getFirst();
         genService.discardTask(exch.getId());
@@ -293,7 +295,7 @@ public class GenerationServiceTest extends TestCase {
                 "http://localhost:8080",
                 "https://admin.metavm.test/source-{}.zip",
                 genConfigClient,
-                urlFetcher, new SyncTaskExecutor(), new MockBrowser(), attachmentService);
+                urlFetcher, new SyncTaskExecutor(), new MockBrowser(), attachmentService, testEnvDir);
         var appId = generationService.generate(GenerationRequest.create(null, "class Foo{}"), userId, discardListener);
         var exch = exchangeClient.getFirst();
         var app = appClient.get(appId);

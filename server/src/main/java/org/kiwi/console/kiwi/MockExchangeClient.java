@@ -52,7 +52,9 @@ public class MockExchangeClient implements ExchangeClient {
                 exchange.isFirst(),
                 exchange.isSkipPageGeneration(),
                 exchange.getLastHeartBeatAt(),
-                exchange.getChainDepth()
+                exchange.getParentExchangeId(),
+                exchange.getChainDepth(),
+                exchange.isTestOnly()
         );
     }
 

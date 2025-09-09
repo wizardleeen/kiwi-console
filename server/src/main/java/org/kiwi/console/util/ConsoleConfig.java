@@ -39,7 +39,7 @@ public class ConsoleConfig {
     private final PageConfig pageConfig;
     private final UrlTemplates urlTemplates;
     private final UploadConfig uploadConfig;
-
+    private final TestConfig testConfig;
 
     public ConsoleConfig() {
         var config = getConfig();
@@ -49,7 +49,12 @@ public class ConsoleConfig {
         pageConfig = buildPageConfig(config);
         urlTemplates = buildUrlTemplates(config);
         uploadConfig = buildUploadConfig(config);
+        testConfig = buildTestConfig(config);
         configProxy(config);
+    }
+
+    private TestConfig buildTestConfig(YmlConfig config) {
+        return new TestConfig(config.getString("test", "env-dir"));
     }
 
     private UploadConfig buildUploadConfig(YmlConfig config) {
@@ -144,7 +149,9 @@ public class ConsoleConfig {
                 urlTemplates.management,
                 urlTemplates.sourceCode,
                 generationConfigClient,
-                urlFetcher, taskExecutor, browser, attachmentService);
+                urlFetcher, taskExecutor, browser, attachmentService,
+                Path.of(testConfig.envDir)
+                );
     }
 
     @Bean
@@ -270,6 +277,10 @@ public class ConsoleConfig {
     private record UploadConfig(
         String dir,
         String sourcemapDir
+    ) {}
+
+    private record TestConfig(
+        String envDir
     ) {}
 
 }
