@@ -129,7 +129,8 @@ public final class PlaywrightActions {
     @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type", visible = true)
     @JsonSubTypes({
             @JsonSubTypes.Type(value = ImageFileProperties.class, name = "image"),
-            @JsonSubTypes.Type(value = TextFileProperties.class, name = "text")
+            @JsonSubTypes.Type(value = TextFileProperties.class, name = "text"),
+            @JsonSubTypes.Type(value = ExcelFileProperties.class, name = "excel")
     })
     public sealed interface FileProperties {
         String type();
@@ -154,6 +155,13 @@ public final class PlaywrightActions {
             String fileName,
             String mimeType,
             String content
+    ) implements FileProperties {}
+
+    public record ExcelFileProperties(
+            String type,
+            String fileName,
+            String mimeType,
+            String csvContent
     ) implements FileProperties {}
 
 

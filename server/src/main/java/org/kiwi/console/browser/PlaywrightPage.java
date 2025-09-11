@@ -6,6 +6,11 @@ import com.microsoft.playwright.assertions.LocatorAssertions;
 import com.microsoft.playwright.options.FilePayload;
 import com.microsoft.playwright.options.ScreenshotType;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.kiwi.console.generate.PlaywrightActions;
 import org.kiwi.console.util.Utils;
 
@@ -13,6 +18,7 @@ import javax.annotation.Nullable;
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -201,6 +207,7 @@ public class PlaywrightPage implements Page {
                     switch (upload.fileProperties()) {
                         case PlaywrightActions.ImageFileProperties imgProps -> generateAndUploadImage(upload.selector(), imgProps);
                         case PlaywrightActions.TextFileProperties txtProps -> generateAndUploadTextFile(upload.selector(), txtProps);
+                        case PlaywrightActions.ExcelFileProperties excelProps -> generateAndUploadExcelFile(upload.selector(), excelProps);
                     }
                 }
 
@@ -220,6 +227,40 @@ public class PlaywrightPage implements Page {
         } catch (IOException e) {
             // Re-throw IOExceptions from file generation as a fatal error
             throw new RuntimeException("Failed during file generation for upload", e);
+        }
+    }
+
+    /**
+     * Generates an Excel file from CSV content in memory and uploads it using Playwright.
+     * This requires the Apache POI library (poi-ooxml) to be on the classpath.
+     *
+     * @param selector The selector for the file input element.
+     * @param props The properties of the Excel file to generate.
+     * @throws IOException If there's an error writing the Excel bytes.
+     */
+    private void generateAndUploadExcelFile(String selector, PlaywrightActions.ExcelFileProperties props) throws IOException {
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Sheet1");
+
+            String[] rows = props.csvContent().split("\n");
+            for (int i = 0; i < rows.length; i++) {
+                Row row = sheet.createRow(i);
+                String[] cells = rows[i].split(","); // Simple CSV parsing
+                for (int j = 0; j < cells.length; j++) {
+                    Cell cell = row.createCell(j);
+                    cell.setCellValue(cells[j]);
+                }
+            }
+
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            workbook.write(baos);
+            byte[] excelBytes = baos.toByteArray();
+
+            page.locator(selector).setInputFiles(new FilePayload(
+                    props.fileName(),
+                    props.mimeType(),
+                    excelBytes
+            ));
         }
     }
 
