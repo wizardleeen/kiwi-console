@@ -43,38 +43,7 @@ public class PlaywrightPage implements Page {
         this.context = context;
         this.page = context.newPage();
 
-        page.onConsoleMessage(message -> {
-            String logEntry = message.args().stream()
-                    .map(arg -> {
-                        try {
-                            Object value = arg.evaluate("obj => {" +
-                                    "  if (obj instanceof Error) {" +
-                                    "    return obj.stack;" +
-                                    "  }" +
-                                    "  const cache = new Set();" +
-                                    "  try {" +
-                                    "    return JSON.stringify(obj, (key, value) => {" +
-                                    "      if (typeof value === 'object' && value !== null) {" +
-                                    "        if (cache.has(value)) {" +
-                                    "          return '[Circular]';" +
-                                    "        }" +
-                                    "        cache.add(value);" +
-                                    "      }" +
-                                    "      return value;" +
-                                    "    });" +
-                                    "  } catch (e) {" +
-                                    "    return String(obj);" +
-                                    "  }" +
-                                    "}");
-                            return String.valueOf(value);
-                        } finally {
-                            arg.dispose();
-                        }
-                    })
-                    .collect(Collectors.joining(" "));
-
-            consoleMessages.add(logEntry);
-        });
+        page.onConsoleMessage(message -> consoleMessages.add(message.text()));
 
         page.exposeFunction("fail", args -> {
             page.evaluate(String.format("console.error(\"%s\")", Utils.escapeJavaString(Objects.toString(args[0]))));
