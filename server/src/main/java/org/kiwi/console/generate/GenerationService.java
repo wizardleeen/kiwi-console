@@ -395,8 +395,8 @@ public class GenerationService {
 
     @SneakyThrows
     private <R> R executeGen(Supplier<R> run) {
-        var wait = 20;
-        for (var i = 0; i < 5; i++) {
+        var wait = 1000;
+        for (var i = 0; i < 6; i++) {
             try {
                 return run.get();
             } catch (AgentException e) {

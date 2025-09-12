@@ -17,17 +17,10 @@ public class GeminiModel implements Model {
 
     public final String model;
 
-    private final Client client;
+    private final Client client = new Client();
 
     public GeminiModel(String model, String apiKey) {
         this.model = model;
-        if (apiKey != null) {
-            client = Client.builder()
-                    .apiKey(apiKey)
-                    .build();
-        }
-        else
-            client = null;
     }
 
     @Override
@@ -61,7 +54,8 @@ public class GeminiModel implements Model {
             var contents = new ArrayList<Content>();
             contents.add(Content.fromParts(Part.fromText(text)));
             for (File file : attachments) {
-                contents.add(Content.fromParts(Part.fromBytes(file.bytes(), convertMimeType(file.mimeType()))));
+                if (file.bytes().length > 0)
+                    contents.add(Content.fromParts(Part.fromBytes(file.bytes(), convertMimeType(file.mimeType()))));
             }
             try (var stream = chat.sendMessageStream(contents)) {
                 for (var resp : stream) {
