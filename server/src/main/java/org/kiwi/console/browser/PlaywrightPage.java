@@ -1,7 +1,10 @@
 package org.kiwi.console.browser;
 
 import com.google.gson.JsonObject;
-import com.microsoft.playwright.*;
+import com.microsoft.playwright.BrowserContext;
+import com.microsoft.playwright.CDPSession;
+import com.microsoft.playwright.Locator;
+import com.microsoft.playwright.PlaywrightException;
 import com.microsoft.playwright.assertions.LocatorAssertions;
 import com.microsoft.playwright.options.FilePayload;
 import com.microsoft.playwright.options.ScreenshotType;
@@ -27,7 +30,6 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 
@@ -112,29 +114,26 @@ public class PlaywrightPage implements Page {
     public ExecuteResult execute(PlaywrightActions.PlaywrightCommand action) {
         try {
             switch (action) {
-                case PlaywrightActions.Click click -> page.locator(click.selector()).click();
+                case PlaywrightActions.Click click -> {
+                    if (!isVisible(click.selector()))
+                        return ExecuteResult.failed("Element not visible for selector: " + click.selector());
+                    page.locator(click.selector()).click();
+                }
 
-                case PlaywrightActions.Fill fill -> page.locator(fill.selector()).fill(fill.value());
+                case PlaywrightActions.Fill fill -> {
+                    if (!isVisible(fill.selector()))
+                        return ExecuteResult.failed("Element not visible for selector: " + fill.selector());
+                    page.locator(fill.selector()).fill(fill.value());
+                }
 
                 case PlaywrightActions.Press press -> page.locator(press.selector()).press(press.value());
 
                 case PlaywrightActions.ExpectVisible expect -> {
-                    // We use try-catch to leverage the powerful auto-waiting of the assertion library
-                    // without crashing the execution flow on failure.
-                    try {
-                        Locator locator = page.locator(expect.selector());
-                        // Check if a custom timeout is provided in the options
-                        if (expect.options() != null && expect.options().get("timeout") instanceof Number n) {
-                            // If a timeout is specified, use it
-                            double timeout = n.doubleValue();
-                            assertThat(locator).isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(timeout));
-                        } else {
-                            // Otherwise, use the default assertion timeout
-                            assertThat(locator).isVisible();
-                        }
-                    } catch (AssertionError e) {
-                        String errorMessage = String.format("ExpectVisible failed for selector '%s'. Reason: %s",
-                                Utils.escapeJavaString(expect.selector()), Utils.escapeJavaString(e.getMessage()));
+                    Double timeout = expect.options() != null && expect.options().get("timeout") instanceof Number n ?
+                            n.doubleValue() : null;
+                    if (!isVisible(expect.selector(), timeout)) {
+                        String errorMessage = String.format("ExpectVisible failed for selector %s",
+                                expect.selector());
                         return ExecuteResult.failed(errorMessage);
                     }
                 }
@@ -146,8 +145,8 @@ public class PlaywrightPage implements Page {
                         // Using the default timeout from the assertion library.
                         assertThat(page.locator(expect.selector())).isHidden();
                     } catch (AssertionError e) {
-                        String errorMessage = String.format("ExpectHidden failed for selector '%s'. Reason: %s",
-                                Utils.escapeJavaString(expect.selector()), Utils.escapeJavaString(e.getMessage()));
+                        String errorMessage = String.format("ExpectHidden failed for selector %s. Reason: %s",
+                                expect.selector(), e.getMessage());
                         return ExecuteResult.failed(errorMessage);
                     }
                 }
@@ -158,8 +157,8 @@ public class PlaywrightPage implements Page {
                     try {
                         assertThat(page.locator(expect.selector())).containsText(expect.value());
                     } catch (AssertionError e) {
-                        String errorMessage = String.format("ExpectToContainText failed for selector '%s'. Reason: %s",
-                                Utils.escapeJavaString(expect.selector()), Utils.escapeJavaString(e.getMessage()));
+                        String errorMessage = String.format("ExpectToContainText failed for selector %s. Reason: %s",
+                                expect.selector(), e.getMessage());
                         return ExecuteResult.failed(errorMessage);
                     }
                 }
@@ -181,6 +180,10 @@ public class PlaywrightPage implements Page {
                 }
 
                 case PlaywrightActions.DragAndDrop dragAndDrop -> {
+                    if (!isVisible(dragAndDrop.selector()))
+                        return ExecuteResult.failed("Element not visible for selector: " + dragAndDrop.selector());
+                    if (!isVisible(dragAndDrop.targetSelector()))
+                        return ExecuteResult.failed("Element not visible for selector: " + dragAndDrop.targetSelector());
                     Locator source = page.locator(dragAndDrop.selector());
                     Locator target = page.locator(dragAndDrop.targetSelector());
                     source.dragTo(target);
@@ -196,6 +199,27 @@ public class PlaywrightPage implements Page {
         } catch (IOException e) {
             // Re-throw IOExceptions from file generation as a fatal error
             throw new RuntimeException("Failed during file generation for upload", e);
+        }
+    }
+
+    private boolean isVisible(String selector) {
+        return isVisible(selector, null);
+    }
+
+    private boolean isVisible(String selector, Double timeout) {
+        try {
+            Locator locator = page.locator(selector);
+            // Check if a custom timeout is provided in the options
+            if (timeout != null) {
+                // If a timeout is specified, use it
+                assertThat(locator).isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(timeout));
+            } else {
+                // Otherwise, use the default assertion timeout
+                assertThat(locator).isVisible();
+            }
+            return true;
+        } catch (AssertionError e) {
+            return false;
         }
     }
 
