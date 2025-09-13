@@ -85,12 +85,9 @@ public class Utils {
         return OBJECT_MAPPER;
     }
 
+    @SneakyThrows
     public static <T> T readJSONString(String jsonStr, Class<T> type) {
-        try {
-            return OBJECT_MAPPER.readValue(jsonStr, type);
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException("Failed to read JSON string, JSON string: " + jsonStr, e);
-        }
+        return OBJECT_MAPPER.readValue(jsonStr, type);
     }
 
     public static String toJSONString(Object object) {
