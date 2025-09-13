@@ -174,13 +174,17 @@ public final class PlaywrightActions {
             var parts = output.split("\n", 2);
             var action = parts[0];
             var json = parts[1];
-            return switch (action) {
-                case "STEP" -> Utils.readJSONString(json, StepAction.class);
-                case "REJECT" -> Utils.readJSONString(json, RejectAction.class);
-                case "ACCEPT" -> Utils.readJSONString(json, AcceptAction.class);
-                case "ABORT" -> Utils.readJSONString(json, AbortAction.class);
-                default -> throw new IllegalArgumentException("Unknown action type: " + action);
-            };
+            try {
+                return switch (action) {
+                    case "STEP" -> Utils.readJSONString(json, StepAction.class);
+                    case "REJECT" -> Utils.readJSONString(json, RejectAction.class);
+                    case "ACCEPT" -> Utils.readJSONString(json, AcceptAction.class);
+                    case "ABORT" -> Utils.readJSONString(json, AbortAction.class);
+                    default -> throw new IllegalArgumentException("Unknown action type: " + action);
+                };
+            } catch (Exception e) {
+                throw new AgentException("Invalid action: " + output, e);
+            }
         }
     }
 

@@ -1,10 +1,7 @@
 package org.kiwi.console.browser;
 
 import com.google.gson.JsonObject;
-import com.microsoft.playwright.BrowserContext;
-import com.microsoft.playwright.CDPSession;
-import com.microsoft.playwright.Locator;
-import com.microsoft.playwright.PlaywrightException;
+import com.microsoft.playwright.*;
 import com.microsoft.playwright.assertions.LocatorAssertions;
 import com.microsoft.playwright.options.FilePayload;
 import com.microsoft.playwright.options.ScreenshotType;
@@ -44,7 +41,8 @@ public class PlaywrightPage implements Page {
     public PlaywrightPage(BrowserContext context) {
         this.context = context;
         this.page = context.newPage();
-
+        page.setDefaultTimeout(10_000);
+        page.setDefaultNavigationTimeout(10_000);
         page.onConsoleMessage(message -> consoleMessages.add(message.text()));
 
         page.exposeFunction("fail", args -> {
