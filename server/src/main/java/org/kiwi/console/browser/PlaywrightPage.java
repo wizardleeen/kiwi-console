@@ -30,7 +30,6 @@ public class PlaywrightPage implements Page {
         this.context = context;
         this.page = context.newPage();
         page.setDefaultTimeout(10_000);
-        page.setDefaultNavigationTimeout(10_000);
         page.onConsoleMessage(message -> consoleMessages.add(message.text()));
 
         page.exposeFunction("fail", args -> {
