@@ -1,6 +1,6 @@
 package org.kiwi.console.browser;
 
-import org.kiwi.console.generate.PlaywrightActions;
+import org.kiwi.console.file.File;
 
 import java.util.UUID;
 
@@ -36,9 +36,65 @@ public class MockPage implements Page {
     }
 
     @Override
-    public ExecuteResult execute(PlaywrightActions.PlaywrightCommand action) {
-        return ExecuteResult.success();
+    public void hover(String selector) {
+
     }
+
+    @Override
+    public void mouseDown() {
+
+    }
+
+    @Override
+    public void mouseUp() {
+
+    }
+
+    @Override
+    public void click(String selector) {
+
+    }
+
+    @Override
+    public void fill(String selector, String value) {
+
+    }
+
+    @Override
+    public void clear(String selector) {
+
+    }
+
+    @Override
+    public void press(String selector, String key) {
+
+    }
+
+    @Override
+    public void setInputFile(String selector, File file) {
+
+    }
+
+    @Override
+    public void dragAndDrop(String selector, String targetSelector) {
+
+    }
+
+    @Override
+    public boolean isVisible(String selector) {
+        return true;
+    }
+
+    @Override
+    public boolean isHidden(String selector) {
+        return false;
+    }
+
+    @Override
+    public boolean containText(String selector, String text) {
+        return false;
+    }
+
 
     @Override
     public void close() {

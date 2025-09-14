@@ -1,6 +1,6 @@
 package org.kiwi.console.browser;
 
-import org.kiwi.console.generate.PlaywrightActions;
+import org.kiwi.console.file.File;
 
 public interface Page {
     String getTargetId();
@@ -15,7 +15,29 @@ public interface Page {
 
     String getDOM();
 
-    ExecuteResult execute(PlaywrightActions.PlaywrightCommand action);
+    void hover(String selector);
+
+    void mouseDown();
+
+    void mouseUp();
+
+    void click(String selector);
+
+    void fill(String selector, String value);
+
+    void clear(String selector);
+
+    void press(String selector, String key);
+
+    void setInputFile(String selector, File file);
+
+    void dragAndDrop(String selector, String targetSelector);
+
+    boolean isVisible(String selector);
+
+    boolean isHidden(String selector);
+
+    boolean containText(String selector, String text);
 
     void close();
 }

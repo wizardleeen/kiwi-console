@@ -127,6 +127,11 @@ public class ConsoleConfig {
     }
 
     @Bean
+    public TestAgent testAgent(PageCompiler pageCompiler) {
+        return new TestAgentImpl(pageCompiler, Path.of(testConfig.envDir));
+    }
+
+    @Bean
     public GenerationService generationService(List<Model> models,
                                                KiwiCompiler kiwiCompiler,
                                                PageCompiler pageCompiler,
@@ -137,6 +142,7 @@ public class ConsoleConfig {
                                                UrlFetcher urlFetcher,
                                                Browser browser,
                                                AttachmentService attachmentService,
+                                               TestAgent testAgent,
                                                @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor) {
         return new GenerationService(
                 models,
@@ -150,7 +156,7 @@ public class ConsoleConfig {
                 urlTemplates.sourceCode,
                 generationConfigClient,
                 urlFetcher, taskExecutor, browser, attachmentService,
-                Path.of(testConfig.envDir)
+                testAgent
                 );
     }
 

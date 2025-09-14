@@ -1,11 +1,8 @@
 package org.kiwi.console.browser;
 
 import lombok.SneakyThrows;
-import org.kiwi.console.generate.PlaywrightActions;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 
 public class AgentRunner {
 
@@ -40,15 +37,15 @@ public class AgentRunner {
 
     @SneakyThrows
     public static void main(String[] args) throws IOException {
-        var browser = new PlaywrightBrowser();
-        var page = browser.createPage();
-        page.navigate("https://1000211657.metavm.test/");
-        var action = (PlaywrightActions.StepAction) PlaywrightActions.parser.parse(text);
-        for (PlaywrightActions.PlaywrightCommand a : action.getCommands()) {
-            page.execute(a);
-        }
-        System.out.println("Console logs: " + page.getConsoleLogs());
-        Files.write(Path.of("/tmp/test.png"), page.getScreenshot());
+//        var browser = new PlaywrightBrowser();
+//        var page = browser.createPage();
+//        page.navigate("https://1000211657.metavm.test/");
+//        var action = (PlaywrightActions.StepAction) PlaywrightActions.parser.parse(text);
+//        for (PlaywrightActions.PlaywrightCommand a : action.getCommands()) {
+//            page.execute(a);
+//        }
+//        System.out.println("Console logs: " + page.getConsoleLogs());
+//        Files.write(Path.of("/tmp/test.png"), page.getScreenshot());
 //        System.out.println("target ID: " + page.getTargetId());
 //        System.out.println("Console logs\n" + page.getConsoleLogs());
 //        Files.write(Path.of("/tmp/test.png"), page.getScreenshot());
