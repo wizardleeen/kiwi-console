@@ -119,6 +119,7 @@ public class TestAgentImpl implements TestAgent {
                 testAccounts,
                 actions.stream().map(Utils::toPrettyJSONString).collect(Collectors.joining("\n"))
         );
+        var wait = 1000;
         for (var i = 0; i < 5; i++) {
             String actionText = null;
             try {
@@ -136,6 +137,8 @@ public class TestAgentImpl implements TestAgent {
                 return parseAction(actionText);
             } catch (Exception e) {
                 log.warn("Failed to parse action: {}", actionText, e);
+                Thread.sleep(wait);
+                wait *= 2;
             }
         }
         throw new AgentException("Failed to generate action after 5 attempts");
