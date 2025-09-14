@@ -11,13 +11,11 @@ import org.kiwi.console.util.Utils;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 @Slf4j
-class GenerationTask implements Task {
+class GenerationTask implements Task, AbortController {
     private final List<GenerationListener> listeners = new CopyOnWriteArrayList<>();
     Exchange exchange;
     final App app;
@@ -28,7 +26,6 @@ class GenerationTask implements Task {
     final List<File> attachments;
     private final ExchangeClient exchClient;
     private final User user;
-    private final List<PlaywrightActions.GeneratedAction> actions = new ArrayList<>();
     private Page page;
 
     public GenerationTask(ExchangeClient exchClient, Exchange exchange, App app, User user, boolean showAttempts, GenerationConfig genConfig, List<File> attachments, @Nonnull GenerationListener listener, Model model) {
@@ -199,14 +196,6 @@ class GenerationTask implements Task {
             throw new BusinessException(ErrorCode.TASK_CANCELLED);
     }
 
-    public List<PlaywrightActions.GeneratedAction> getActions() {
-        return Collections.unmodifiableList(actions);
-    }
-
-    public void addAction(PlaywrightActions.GeneratedAction action) {
-        actions.add(action);
-    }
-
     public boolean isTesting() {
         return exchange.isTestOnly() || exchange.isRunning() && !exchange.getStages().isEmpty() &&
                 exchange.getStages().getLast().getType() == StageType.TEST;
@@ -226,5 +215,10 @@ class GenerationTask implements Task {
 
     public void setPage(Page page) {
         this.page = page;
+    }
+
+    @Override
+    public boolean isAborted() {
+        return isCancelled();
     }
 }

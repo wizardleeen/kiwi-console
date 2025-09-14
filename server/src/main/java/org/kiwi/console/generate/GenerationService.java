@@ -6,14 +6,16 @@ import feign.gson.GsonDecoder;
 import feign.gson.GsonEncoder;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import org.kiwi.console.StackTraceDeobfuscator;
 import org.kiwi.console.browser.Browser;
 import org.kiwi.console.browser.PlaywrightBrowser;
 import org.kiwi.console.file.File;
 import org.kiwi.console.file.FileService;
 import org.kiwi.console.file.UrlFetcher;
 import org.kiwi.console.generate.event.GenerationListener;
-import org.kiwi.console.generate.rest.*;
+import org.kiwi.console.generate.rest.CancelRequest;
+import org.kiwi.console.generate.rest.ExchangeDTO;
+import org.kiwi.console.generate.rest.GenerationRequest;
+import org.kiwi.console.generate.rest.RetryRequest;
 import org.kiwi.console.kiwi.*;
 import org.kiwi.console.patch.PatchReader;
 import org.kiwi.console.util.BusinessException;
@@ -30,7 +32,10 @@ import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -42,8 +47,6 @@ import static org.kiwi.console.util.Constants.*;
 public class GenerationService {
 
     public static final String NEW_APP_NAME = "New Application";
-
-    private static final int MAX_AUTO_TEST_ACTIONS = 100;
 
     private static final int MAX_AUTO_FIXES = 3;
 
@@ -91,7 +94,7 @@ public class GenerationService {
     private final TaskExecutor taskExecutor;
     private final Browser browser;
     private final AttachmentService attachmentService;
-    private final Path testEnvDir;
+    private final TestAgent testAgent;
 
     public GenerationService(
             List<Model> models,
@@ -107,7 +110,7 @@ public class GenerationService {
             TaskExecutor taskExecutor,
             Browser browser,
             AttachmentService attachmentService,
-            Path testEnvDir
+            TestAgent testAgent
     ) {
         this.models = models.stream().collect(Collectors.toUnmodifiableMap(Model::getName, Function.identity()));
         this.kiwiCompiler = kiwiCompiler;
@@ -123,7 +126,7 @@ public class GenerationService {
         this.taskExecutor = taskExecutor;
         this.browser = browser;
         this.attachmentService = attachmentService;
-        this.testEnvDir = testEnvDir;
+        this.testAgent = testAgent;
     }
 
     public String generate(GenerationRequest request, String userId, GenerationListener listener) {
@@ -349,7 +352,7 @@ public class GenerationService {
         var chat = task.model.createChat(task.genConfig.outputThinking());
         var planPrompt = createPlanPrompt(exch, kiwiCode, pageCode, task);
         log.info("Plan prompt:\n{}", planPrompt);
-        var text = generateContent(chat, planPrompt, task);
+        var text = Models.generateContent(chat, planPrompt, task.attachments, task);
         var reader = new BufferedReader(new StringReader(text));
         int r;
         try {
@@ -448,57 +451,13 @@ public class GenerationService {
 
     private DeployResult generateCode(Chat chat, String prompt, GenerationTask task, Compiler compiler) {
         try {
-            var patch = new PatchReader(generateContent(chat, prompt, task)).read();
+            var patch = new PatchReader(Models.generateContent(chat, prompt, task.attachments, task)).read();
             return runCompiler(compiler, task.app.getKiwiAppId(), patch.addedFiles(), patch.removedFiles(), task.getUser().isAllowSourceCodeDownload());
         } catch (MalformedHunkException e) {
             return new DeployResult(false, e.getMessage());
         }
     }
 
-    private String generateContent(Chat chat, String prompt, Task task) {
-        var buf = new StringBuilder();
-        send(chat, prompt, task, buf);
-        int endPos;
-        while ((endPos = getEndPosition(buf)) == -1) {
-            log.info("Continue generation");
-            send(chat, "Continue generation", task, buf);
-        }
-        return buf.substring(0, endPos);
-    }
-
-    private void send(Chat chat, String text, Task task, StringBuilder buf) {
-        chat.send(text, task.getAttachments(), new ChatStreamListener() {
-            @Override
-            public void onThought(String thoughtChunk) {
-                task.onThought(thoughtChunk);
-            }
-
-            @Override
-            public void onContent(String contentChunk) {
-                task.onContent(contentChunk);
-                buf.append(contentChunk);
-            }
-        }, task::isCancelled);
-
-    }
-
-    private int getEndPosition(CharSequence output) {
-        var i = output.length() - 1;
-        loop: while (i >= 0) {
-            var c = output.charAt(i);
-            switch (c) {
-                case '\n', '\r', ' ', '\t' -> i--;
-                default -> {
-                    break loop;
-                }
-            }
-        }
-        if (i >= 3 && output.charAt(i) == '@' && output.charAt(i - 1) == '@' &&
-                output.charAt(i - 2) == '@' && output.charAt(i - 3) == '@')
-            return i - 3;
-        else
-            return -1;
-    }
 
     private String createApp(String name, String userId) {
         return appClient.save(App.create(name, userId));
@@ -579,83 +538,23 @@ public class GenerationService {
         page.navigate(getProductUrl(task.app.getKiwiAppId()));
         task.setPage(page);
         task.enterStageAndAttempt(StageType.TEST);
-        boolean successful = false;
-        for (var i = 0; i < MAX_AUTO_TEST_ACTIONS; i++) {
-            if (task.isCancelled())
-                break;
-            var consoleLogs = page.getConsoleLogs();
-            var sourceMapPath = pageCompiler.getSourceMapPath(task.app.getKiwiAppId());
-            if (sourceMapPath != null) {
-                consoleLogs = StackTraceDeobfuscator.deobfuscate(
-                        Files.readString(sourceMapPath),
-                        consoleLogs
-                );
-            }
-            var screenshot = page.getScreenshot();
-            var dom = page.getDOM();
-            task.setAttachments(List.of(
-                    new File(consoleLogs.getBytes(StandardCharsets.UTF_8), "text/plain"),
-                    new File(dom.getBytes(StandardCharsets.UTF_8), "text/html"),
-                    new File(screenshot, "image/png")
-            ));
-//            log.debug("Console Logs\n{}", consoleLogs);
-//            Files.write(Path.of("/tmp/screenshot.png"), screenshot);
-            var action = autoTestStep(task);
-            if (action instanceof PlaywrightActions.FinalAction finalAction) {
-                if (finalAction.getUpdatedTestAccounts() != null)
-                    updateTestAccounts(task.app.getKiwiAppId(), finalAction.getUpdatedTestAccounts());
-            }
-            if (action instanceof PlaywrightActions.AcceptAction) {
-                task.finishTest(0);
-                successful = true;
-                break;
-            }
-            if (action instanceof PlaywrightActions.RejectAction rejectAction) {
-                task.finishTest(1);
-                startFix(task, rejectAction.getBugReport(), screenshot, dom, consoleLogs);
-                break;
-            }
-            if (action instanceof PlaywrightActions.AbortAction) {
-                task.finishTest(2);
-                break;
-            }
-            assert action instanceof PlaywrightActions.StepAction;
-            var stepAction = (PlaywrightActions.StepAction) action;
-            out: {
-                for (var cmd : stepAction.getCommands()) {
-                    var r = page.execute(cmd);
-                    if (!r.successful()) {
-                        stepAction.setErrorMessage(Objects.requireNonNull(r.errorMessage()));
-                        break out;
-                    }
-                }
-                stepAction.setSuccessful(true);
-            }
-//            log.debug("Last action:\n{}", Utils.toPrettyJSONString(action));
+        var r = testAgent.runTest(
+                task.app.getKiwiAppId(),
+                page,
+                getModel(task.genConfig.autoTestModel()),
+                task.genConfig.autoTestPrompt(),
+                task.exchange.getPrompt(),
+                task
+        );
+        if (r.aborted())
+            task.finishTest(0);
+        else if (r.accepted())
+            task.finishTest(0);
+        else {
+            task.finishTest(2);
+            startFix(task, r.bugReport(), r.screenshot(), r.dom(), r.consoleLogs());
         }
-        page.close();
-        task.setPage(null);
-        return successful;
-    }
-
-    @SneakyThrows
-    private String getTestAccounts(long appId) {
-        var filePath = getTestAccountFilePath(appId);
-        if (Files.exists(filePath)) {
-            return Files.readString(filePath);
-        } else
-            return "No test account. Create new accounts if needed.";
-    }
-
-    @SneakyThrows
-    private void updateTestAccounts(long appId, String updatedTestAccount) {
-        var path = getTestAccountFilePath(appId);
-        Files.createDirectories(path.getParent());
-        Files.writeString(path, updatedTestAccount);
-    }
-
-    private Path getTestAccountFilePath(long appId) {
-        return testEnvDir.resolve(Long.toString(appId)).resolve("test-accounts.txt");
+        return r.accepted();
     }
 
     private void startFix(GenerationTask task, String bugReport, byte[] screenshot, String dom, String consoleLog) {
@@ -693,29 +592,6 @@ public class GenerationService {
                 true
         );
         generate0(testExch, emptyListener);
-    }
-
-    private PlaywrightActions.GeneratedAction autoTestStep(GenerationTask task) {
-        return executeGen(() -> {
-            var testAccounts = getTestAccounts(task.app.getKiwiAppId());
-            var code = PatchReader.buildCode(pageCompiler.getSourceFiles(task.app.getKiwiAppId()));
-            var prompt = buildAutoTestPrompt(task.genConfig.autoTestPrompt(), task.exchange.getPrompt(), code, testAccounts, task.getActions());
-            var chat = task.model.createChat(task.genConfig.outputThinking());
-            var text = generateContent(chat, prompt, task);
-            var action = PlaywrightActions.parser.parse(text);
-            task.addAction(action);
-            return action;
-        });
-    }
-
-    private String buildAutoTestPrompt(String template, String prompt, String code, String testAccounts, List<PlaywrightActions.GeneratedAction> actions) {
-        return Format.format(
-                template,
-                prompt,
-                code,
-                testAccounts,
-                actions.stream().map(Utils::toPrettyJSONString).collect(Collectors.joining("\n"))
-        );
     }
 
     private String buildPageUpdatePrompt(GenerationTask task, String existingCode, String apiSource, String suggestion) {
@@ -769,7 +645,7 @@ public class GenerationService {
                         Path.of("/Users/leen/develop/sourcemap"),
                         appService
                 ),
-                Path.of("/Users/leen/develop/test-env")
+                new MockTestAgent()
             );
 //        System.out.println(kiwiCompiler.generateApi(TEST_APP_ID));
         testNewApp(service);
