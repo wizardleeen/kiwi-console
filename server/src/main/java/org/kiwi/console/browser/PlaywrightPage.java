@@ -29,7 +29,6 @@ public class PlaywrightPage implements Page {
     public PlaywrightPage(BrowserContext context) {
         this.context = context;
         this.page = context.newPage();
-        page.setDefaultTimeout(10_000);
         page.onConsoleMessage(message -> consoleMessages.add(message.text()));
 
         page.exposeFunction("fail", args -> {
@@ -105,7 +104,7 @@ public class PlaywrightPage implements Page {
 
     @Override
     public void click(String selector) {
-        page.locator(selector).click();
+        page.locator(selector).click(new Locator.ClickOptions().setTimeout(10_000));
     }
 
     @Override
