@@ -133,7 +133,6 @@ public class TestAgentImpl implements TestAgent {
                         ),
                         abortController
                 );
-                System.out.println(actionText);
                 return parseAction(actionText);
             } catch (Exception e) {
                 log.warn("Failed to parse action: {}", actionText, e);

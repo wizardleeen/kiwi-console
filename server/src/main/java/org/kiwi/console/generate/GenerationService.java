@@ -547,11 +547,11 @@ public class GenerationService {
                 task
         );
         if (r.aborted())
-            task.finishTest(0);
+            task.finishTest(2);
         else if (r.accepted())
             task.finishTest(0);
         else {
-            task.finishTest(2);
+            task.finishTest(1);
             startFix(task, r.bugReport(), r.screenshot(), r.dom(), r.consoleLogs());
         }
         return r.accepted();
