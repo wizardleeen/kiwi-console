@@ -34,6 +34,7 @@ public class Models {
 
             @Override
             public void onContent(String contentChunk) {
+                System.out.print(contentChunk);
                 buf.append(contentChunk);
             }
         }, abortController::isAborted);
