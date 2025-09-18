@@ -4,7 +4,7 @@ import java.io.InputStream;
 
 public class MockDeployService implements DeployService {
     @Override
-    public String deploy(long appId, InputStream input) {
+    public String deploy(long appId, boolean noBackup, InputStream input) {
         return null;
     }
 

@@ -30,6 +30,10 @@ public interface AppClient {
     @Headers("Content-Type: application/json")
     void delete(DeleteAppRequest request);
 
+    @RequestLine(("POST /api/application-service/create-app"))
+    @Headers("Content-Type: application/json")
+    String create(CreateAppRequest request);
+
     static void main(String[] args) {
         var client = Utils.createKiwiFeignClient(
                 "http://localhost:8080",
@@ -38,7 +42,7 @@ public interface AppClient {
         );
         var id = "0192fbdab90700";
         for (int i = 0; i < 10; i++) {
-            var id1 = client.save(new App(id, "test" + i, Constants.USER_ID, 0, List.of(), ""));
+            var id1 = client.save(new App(id, "test" + i, Constants.USER_ID, 0, List.of(), "", List.of()));
             System.out.println("Saved successfully. ID: " + id1);
 
         }

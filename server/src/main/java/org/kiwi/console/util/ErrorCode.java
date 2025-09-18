@@ -35,7 +35,10 @@ public enum ErrorCode {
     AUTO_TEST_ACTIONS_EXCEEDED(4010, "Auto test actions exceeded"),
 
     INVALID_TEST_SESSION(4011,  "Invalid test session"),
-    AUTO_TEST_ALREADY_STARTED(4012, "Auto test already started"),;
+    AUTO_TEST_ALREADY_STARTED(4012, "Auto test already started"),
+    OBJECT_NOT_FOUND(4013, "{} {} not found"),
+    DEPENDENCY_CIRCLE(4014, "Dependency circle detected"),
+    INTERNAL_SERVER_ERROR(5000, "An unexpected internal error occurred.");
 
 
 

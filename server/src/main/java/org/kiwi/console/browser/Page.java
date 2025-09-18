@@ -7,6 +7,8 @@ public interface Page {
 
     void navigate(String url);
 
+    void reload();
+
     void log(String log);
 
     byte[] getScreenshot();

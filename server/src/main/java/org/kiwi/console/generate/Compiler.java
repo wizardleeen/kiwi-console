@@ -5,20 +5,20 @@ import java.util.List;
 
 public interface Compiler {
 
-    DeployResult run(long appId, List<SourceFile> sourceFiles, List<Path> removedFiles, boolean deploySource);
+    DeployResult run(long appId, String projectName, List<SourceFile> sourceFiles, List<Path> removedFiles, boolean deploySource, boolean noBackup);
 
-    List<SourceFile> getSourceFiles(long appId);
+    List<SourceFile> getSourceFiles(String projectName);
 
-    void addFile(long appId, SourceFile file);
+    void addFile(String projectName, SourceFile file);
 
-    DeployResult deploy(long appId, boolean deploySource);
+    DeployResult deploy(long appId, String projectName, boolean deploySource, boolean noBackup);
 
-    void commit(long appId, String message);
+    void commit(String projectName, String message);
 
-    void reset(long appId, String templateRepo, String branch);
+    void reset(String projectName, String templateRepo, String branch);
 
-    void delete(long appId);
+    void delete(String projectName);
 
-    void revert(long appId, boolean deploySource);
+    void revert(long appId, String projectName, boolean deploySource);
 
 }

@@ -18,12 +18,12 @@ public class Models {
     public static String generateContent(Chat chat, String prompt, List<File> attachments, AbortController abortController) {
         var buf = new StringBuilder();
         send(chat, prompt, attachments, abortController, buf);
-        int endPos;
-        while ((endPos = getEndPosition(buf)) == -1) {
-            log.info("Continue generation");
-            send(chat, "Continue generation", attachments, abortController, buf);
-        }
-        return buf.substring(0, endPos);
+        int endPos = getEndPosition(buf);
+//        while ((endPos = getEndPosition(buf)) == -1) {
+//            log.info("Continue generation");
+//            send(chat, "Continue generation", attachments, abortController, buf);
+//        }
+        return endPos == -1 ? buf.toString() : buf.substring(0, endPos);
     }
 
     private static void send(Chat chat, String text, List<File> attachments, AbortController abortController, StringBuilder buf) {

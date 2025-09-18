@@ -10,12 +10,12 @@ import java.util.Objects;
 
 public class MockUserClient implements UserClient {
 
-    private final MockGenerationConfigClient genConfigClient;
+    private final MockAppConfigClient appConfigClient;
 
     private final Map<String, User> userMap = new HashMap<>();
 
-    public MockUserClient(MockGenerationConfigClient genConfigClient) {
-        this.genConfigClient = genConfigClient;
+    public MockUserClient(MockAppConfigClient appConfigClient) {
+        this.appConfigClient = appConfigClient;
     }
 
     @Override
@@ -40,7 +40,7 @@ public class MockUserClient implements UserClient {
 
     @Override
     public String register(RegisterRequest request) {
-        var user = new User(System.currentTimeMillis() + "", request.userName(), request.kiwiUserId(), List.of(), genConfigClient.getPresetId(), false);
+        var user = new User(System.currentTimeMillis() + "", request.userName(), request.kiwiUserId(), List.of(), appConfigClient.getPresetId(), false);
         userMap.put(user.getId(), user);
         return user.getId();
     }

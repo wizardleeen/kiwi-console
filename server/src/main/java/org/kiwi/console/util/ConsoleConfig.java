@@ -54,7 +54,11 @@ public class ConsoleConfig {
     }
 
     private TestConfig buildTestConfig(YmlConfig config) {
-        return new TestConfig(config.getString("test", "env-dir"));
+        return new TestConfig(
+                config.getString("test", "env-dir"),
+                config.getBooleanOrDefault("test", "log-on", false),
+                config.tryGetString("test", "log-dir")
+        );
     }
 
     private UploadConfig buildUploadConfig(YmlConfig config) {
@@ -127,37 +131,68 @@ public class ConsoleConfig {
     }
 
     @Bean
-    public TestAgent testAgent(PageCompiler pageCompiler) {
-        return new TestAgentImpl(pageCompiler, Path.of(testConfig.envDir));
+    public WebTestTaskFactory webTestRunnerFactory(Browser browser, PageCompiler pageCompiler) {
+        return new WebTestTaskFactory(browser, pageCompiler, Path.of(testConfig.envDir), Path.of(testConfig.logDir), testConfig.logOn());
+    }
+
+    @Bean
+    public PlanAgent planAgent() {
+        return new PlanAgent();
+    }
+
+    @Bean
+    public KiwiAgent kiwiAgent(KiwiCompiler kiwiCompiler) {
+        return new KiwiAgent(kiwiCompiler);
+    }
+
+    @Bean
+    public WebAgent webAgent(PageCompiler pageCompiler) {
+        return new WebAgent(pageCompiler);
+    }
+
+    @Bean
+    public ModuleTypeClient moduleTypeClient() {
+        return Utils.createKiwiFeignClient(kiwiConfig.host, ModuleTypeClient.class, kiwiConfig.chatAppId);
+    }
+
+    @Bean
+    public PlanConfigClient planConfigClient() {
+        return Utils.createKiwiFeignClient(kiwiConfig.host, PlanConfigClient.class, kiwiConfig.chatAppId);
+    }
+
+    @Bean
+    public AppConfigClient appConfigClient() {
+        return Utils.createKiwiFeignClient(kiwiConfig.host, AppConfigClient.class, kiwiConfig.chatAppId);
     }
 
     @Bean
     public GenerationService generationService(List<Model> models,
-                                               KiwiCompiler kiwiCompiler,
-                                               PageCompiler pageCompiler,
+                                               PlanAgent planAgent,
+                                               List<CodeAgent> codeAgents,
+                                               List<TestTaskFactory> testRunnerFactories,
                                                AppClient appClient,
                                                UserClient userClient,
                                                ExchangeClient exchangeClient,
-                                               GenerationConfigClient generationConfigClient,
+                                               ModuleTypeClient moduleTypeClient,
+                                               AppConfigClient appConfigClient,
+                                               PlanConfigClient planConfigClient,
                                                UrlFetcher urlFetcher,
-                                               Browser browser,
-                                               AttachmentService attachmentService,
-                                               TestAgent testAgent,
                                                @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor) {
         return new GenerationService(
                 models,
-                kiwiCompiler,
-                pageCompiler,
+                planAgent,
+                codeAgents,
+                testRunnerFactories,
                 exchangeClient,
                 appClient,
+                appConfigClient,
                 userClient,
+                moduleTypeClient,
+                planConfigClient,
                 urlTemplates.product,
                 urlTemplates.management,
-                urlTemplates.sourceCode,
-                generationConfigClient,
-                urlFetcher, taskExecutor, browser, attachmentService,
-                testAgent
-                );
+                urlTemplates.sourceCode, urlFetcher,
+                taskExecutor);
     }
 
     @Bean
@@ -286,7 +321,9 @@ public class ConsoleConfig {
     ) {}
 
     private record TestConfig(
-        String envDir
+        String envDir,
+        boolean logOn,
+        String logDir
     ) {}
 
 }

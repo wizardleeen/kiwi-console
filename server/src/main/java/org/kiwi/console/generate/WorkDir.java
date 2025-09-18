@@ -10,8 +10,8 @@ import java.util.List;
 
 public record WorkDir(Path root) {
 
-    public static WorkDir from(Path baseDir, long appId) {
-        return new WorkDir(baseDir.resolve(Long.toString(appId)));
+    public static WorkDir from(Path baseDir, String projectName) {
+        return new WorkDir(baseDir.resolve(projectName));
     }
 
     Path getSrcPath() {

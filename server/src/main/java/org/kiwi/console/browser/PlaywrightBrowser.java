@@ -11,6 +11,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.HashMap;
 import java.util.List;
 
 public class PlaywrightBrowser implements Browser {
@@ -28,8 +29,14 @@ public class PlaywrightBrowser implements Browser {
 
     @Override
     public Page createPage(String baseUrl) {
+        var noCacheHeaders = new HashMap<String, String>();
+        noCacheHeaders.put("Cache-Control", "no-cache");
+        noCacheHeaders.put("Pragma", "no-cache");
+        noCacheHeaders.put("Expires", "0");
+
         return new PlaywrightPage(
-                browser.newContext(new com.microsoft.playwright.Browser.NewContextOptions().setBaseURL(baseUrl))
+                browser.newContext(new com.microsoft.playwright.Browser.NewContextOptions()
+                        .setExtraHTTPHeaders(noCacheHeaders).setBaseURL(baseUrl))
         );
     }
 

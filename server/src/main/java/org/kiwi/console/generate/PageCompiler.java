@@ -5,6 +5,6 @@ import java.nio.file.Path;
 
 public interface PageCompiler extends Compiler {
 
-    @Nullable Path getSourceMapPath(long appId);
+    @Nullable Path getSourceMapPath(String projectName);
 
 }

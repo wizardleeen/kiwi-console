@@ -3,6 +3,7 @@ package org.kiwi.console.browser;
 import com.google.gson.JsonObject;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.CDPSession;
+import com.microsoft.playwright.JSHandle;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.assertions.LocatorAssertions;
 import com.microsoft.playwright.options.FilePayload;
@@ -29,7 +30,20 @@ public class PlaywrightPage implements Page {
     public PlaywrightPage(BrowserContext context) {
         this.context = context;
         this.page = context.newPage();
-        page.onConsoleMessage(message -> consoleMessages.add(message.text()));
+        page.onConsoleMessage(message -> {
+            List<String> argStrings = new ArrayList<>();
+            for (JSHandle argHandle : message.args()) {
+                try {
+                    Object jsonValue = argHandle.jsonValue();
+                    argStrings.add(Utils.toPrettyJSONString(jsonValue));
+                } catch (Exception e) {
+                    argStrings.add(argHandle.toString());
+                } finally {
+                    argHandle.dispose();
+                }
+            }
+            consoleMessages.add(String.join(" ", argStrings));
+        });
 
         page.exposeFunction("fail", args -> {
             page.evaluate(String.format("console.error(\"%s\")", Utils.escapeJavaString(Objects.toString(args[0]))));
@@ -61,6 +75,11 @@ public class PlaywrightPage implements Page {
     @Override
     public void navigate(String url) {
         page.navigate(url);
+    }
+
+    @Override
+    public void reload() {
+        page.reload();
     }
 
     @Override
