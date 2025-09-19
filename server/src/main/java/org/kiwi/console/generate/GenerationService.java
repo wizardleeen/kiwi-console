@@ -534,8 +534,9 @@ public class GenerationService {
 
     @SneakyThrows
     private boolean runAutoTest(GenerationTask task) {
-        var page = browser.createPage();
-        page.navigate(getProductUrl(task.app.getKiwiAppId()));
+        var url = getProductUrl(task.app.getKiwiAppId());
+        var page = browser.createPage(url);
+        page.navigate(url);
         task.setPage(page);
         task.enterStageAndAttempt(StageType.TEST);
         var r = testAgent.runTest(
