@@ -27,8 +27,10 @@ public class PlaywrightBrowser implements Browser {
     }
 
     @Override
-    public Page createPage() {
-        return new PlaywrightPage(browser.newContext());
+    public Page createPage(String baseUrl) {
+        return new PlaywrightPage(
+                browser.newContext(new com.microsoft.playwright.Browser.NewContextOptions().setBaseURL(baseUrl))
+        );
     }
 
     private static String getBrowserWsEndpoint(String host, int port) throws Exception {

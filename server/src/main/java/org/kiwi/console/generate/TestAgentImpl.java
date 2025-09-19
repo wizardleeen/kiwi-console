@@ -237,6 +237,10 @@ public class TestAgentImpl implements TestAgent {
                     page.mouseUp();
                     return ExecuteResult.success();
                 }
+                case Navigate navigate -> {
+                    page.navigate(navigate.url);
+                    return ExecuteResult.success();
+                }
             }
         } catch (Exception e) {
             return new ExecuteResult(false, e.getMessage());
@@ -397,7 +401,8 @@ public class TestAgentImpl implements TestAgent {
             @JsonSubTypes.Type(value = Clear.class, name = "clear"),
             @JsonSubTypes.Type(value = Hover.class, name = "hover"),
             @JsonSubTypes.Type(value = MouseUp.class, name = "mouseUp"),
-            @JsonSubTypes.Type(value = MouseDown.class, name = "mouseDown")
+            @JsonSubTypes.Type(value = MouseDown.class, name = "mouseDown"),
+            @JsonSubTypes.Type(value = Navigate.class, name = "navigate")
     })
     public sealed interface Command {
         @SuppressWarnings("unused")
@@ -493,6 +498,14 @@ public class TestAgentImpl implements TestAgent {
         @Override
         public String getAction() {
             return "dragAndDrop";
+        }
+    }
+
+    public record Navigate(String url) implements Command {
+
+        @Override
+        public String getAction() {
+            return "navigate";
         }
     }
 
