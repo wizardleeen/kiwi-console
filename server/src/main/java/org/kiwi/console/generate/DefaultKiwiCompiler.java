@@ -28,9 +28,9 @@ public class DefaultKiwiCompiler extends AbstractCompiler implements KiwiCompile
     }
 
     @Override
-    public DeployResult deploy(long appId, boolean deploySource) {
+    public DeployResult deploy(long appId, String projectName, boolean deploySource, boolean noBackup) {
         try {
-            var deployId = deploy(appId, getWorkDir(appId));
+            var deployId = deploy(appId, noBackup, getWorkDir(projectName));
             waitForDeployFinish(appId, deployId);
             return new DeployResult(true, null);
         }
@@ -51,15 +51,14 @@ public class DefaultKiwiCompiler extends AbstractCompiler implements KiwiCompile
         }
     }
 
-    @Override
-    public void revert(long appId, boolean deploySource) {
-        super.revert(appId, deploySource);
+    public void revert(long appId, String projectName, boolean deploySource) {
+        super.revert(appId, projectName, deploySource);
         deployService.revert(appId);
     }
 
     @SneakyThrows
-    public String generateApi(long appId) {
-        var wd = WorkDir.from(baseDir, appId);
+    public String generateApi(String projectName) {
+        var wd = WorkDir.from(baseDir, projectName);
         var version = getVersion(wd);
         var r = Utils.executeCommand(wd.root(), "kiwi", "gen-api", "--version", Long.toString(version));
         if (r.exitCode() != 0)
@@ -86,9 +85,9 @@ public class DefaultKiwiCompiler extends AbstractCompiler implements KiwiCompile
         return Files.exists(versionPath) ? Integer.parseInt(Files.readAllLines(versionPath).getFirst()) : 0;
     }
 
-    private String deploy(long appId, WorkDir workDir) {
+    private String deploy(long appId, boolean noBackup, WorkDir workDir) {
         try (var pkgInput = workDir.openTargetInput()) {
-            return deployService.deploy(appId, pkgInput);
+            return deployService.deploy(appId, noBackup, pkgInput);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -97,8 +96,8 @@ public class DefaultKiwiCompiler extends AbstractCompiler implements KiwiCompile
     public static void main(String[] args) {
         var compiler = new DefaultKiwiCompiler(Path.of("/tmp/kiwi-works"), new MockDeployService());
         var code = "class Foo(var name: string)";
-        compiler.deploy(1000037184L, false);
-        var deployedCode = compiler.getCode(1000037184L, Constants.MAIN_KIWI);
+        compiler.deploy(1000037184L, "1000037184", false, false);
+        var deployedCode = compiler.getCode("1000037184", Constants.MAIN_KIWI);
         Utils.require(code.equals(deployedCode));
     }
 

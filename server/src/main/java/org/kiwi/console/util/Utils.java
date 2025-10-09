@@ -40,6 +40,8 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
 @Slf4j
@@ -346,6 +348,60 @@ public class Utils {
             }
         }
         return sb.toString();
+    }
+
+    public static <T> int count(Iterable<T> it, Predicate<T> filter) {
+        var cnt = 0;
+        for (T t : it) {
+            if (filter.test(t))
+                cnt++;
+        }
+        return cnt;
+    }
+
+    public static <T> @Nullable T find(Iterable<T> it, Predicate<T> filter) {
+        for (T t : it) {
+            if (filter.test(t))
+                return t;
+        }
+        return null;
+    }
+
+    public static <T> T findRequired(Iterable<T> it, Predicate<T> filter) {
+        return findRequired(it, filter, NoSuchElementException::new);
+    }
+
+    public static <T> T findRequired(Iterable<T> it, Predicate<T> filter, Supplier<? extends RuntimeException> exceptionSupplier) {
+        for (T t : it) {
+            if (filter.test(t))
+                return t;
+        }
+        throw exceptionSupplier.get();
+    }
+
+    public static <T, K> Map<K, T> toMap(Iterable<T> it, Function<T, K> keyMapper) {
+        return toMap(it, keyMapper, Function.identity());
+    }
+
+    public static <T, K, V> Map<K, V> toMap(Iterable<T> it, Function<T, K> keyMapper, Function<T, V> valueMapper) {
+        var map = new LinkedHashMap<K, V>();
+        for (T t : it) {
+            if (map.put(keyMapper.apply(t), valueMapper.apply(t)) != null)
+                throw new IllegalStateException("Duplicate key");
+        }
+        return map;
+    }
+
+    public static <K, V> Map<K, V> toMap(Collection<K> keys, Iterable<V> values) {
+        var map = new LinkedHashMap<K, V>();
+        var it1 = keys.iterator();
+        var it2 = values.iterator();
+        while (it1.hasNext() && it2.hasNext()) {
+            map.put(it1.next(), it2.next());
+        }
+        if (it1.hasNext() || it2.hasNext())
+            throw new IllegalStateException("Keys and values have different sizes");
+        return map;
     }
 
 }

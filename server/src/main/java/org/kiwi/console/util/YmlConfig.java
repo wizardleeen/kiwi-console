@@ -46,6 +46,29 @@ public record YmlConfig(Map<String, Object> config) {
             throw new ConfigException("Invalid configuration for: " + key1 + "." + key2 + ", expected String");
     }
 
+    public boolean getBooleanOrDefault(String key1, String key2, boolean defaultValue) {
+        var value = tryGet(key1, key2);
+        if (value != null) {
+            if (value instanceof Boolean b)
+                return b;
+            else
+                throw new ConfigException("Invalid configuration for: " + key1 + "." + key2 + ", expected Boolean");
+        }
+        else
+            return defaultValue;
+    }
+
+    public  boolean getBoolean(String key1, String key2) {
+        var value = tryGet(key1, key2);
+        if (value != null) {
+            if (value instanceof Boolean b)
+                return b;
+            else
+                throw new ConfigException("Invalid configuration for: " + key1 + "." + key2 + ", expected Boolean");
+        }
+        else
+            throw new ConfigException("Cannot find configuration for: " + key1 + "." + key2);
+    }
 
     public Object get(String key1, String key2, String key3) {
         Object value = config.get(key1);

@@ -45,9 +45,9 @@ public class AigcService {
     }
 
     public void generate(GenerateRequest request) {
-        compiler.reset(request.appId(), Constants.KIWI_TEMPLATE_REPO, "main");
+        compiler.reset(request.appId() + "", Constants.KIWI_TEMPLATE_REPO, "main");
         var chat = model.createChat(false);
-        var existingCode = compiler.getSourceFiles(request.appId());
+        var existingCode = compiler.getSourceFiles(request.appId() + "");
         String text;
         if (!existingCode.isEmpty())
             text = buildUpdateText(request.prompt(), PatchReader.buildCode(existingCode));
@@ -76,9 +76,9 @@ public class AigcService {
     }
 
     private DeployResult deploy(long appId, String code) {
-        var r = compiler.run(appId, new PatchReader(code).read().addedFiles(), List.of(), false);
+        var r = compiler.run(appId, appId + "", new PatchReader(code).read().addedFiles(), List.of(), false, false);
         if (r.successful())
-            compiler.commit(appId, "commit");
+            compiler.commit(appId + "", "commit");
         return r;
     }
 

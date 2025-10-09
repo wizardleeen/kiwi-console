@@ -137,12 +137,7 @@ public class GenerationController {
         @SneakyThrows
         @Override
         public void onProgress(ExchangeDTO exchange) {
-            try {
-                sseEmitter.send(SseEmitter.event().name("generation").data(exchange));
-            }
-            catch (Exception e) {
-                log.error("Error sending SSE event", e);
-            }
+            sseEmitter.send(SseEmitter.event().name("generation").data(exchange));
         }
 
         @Override

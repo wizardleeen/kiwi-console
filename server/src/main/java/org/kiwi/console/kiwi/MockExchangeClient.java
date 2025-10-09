@@ -27,10 +27,15 @@ public class MockExchangeClient implements ExchangeClient {
     @Override
     public String save(Exchange exchange) {
         exchange = copy(exchange);
-        if (exchange.getId() == null) {
-            // random ID
-            var id = String.valueOf(System.currentTimeMillis());
-            exchange.setId(id);
+        if (exchange.getId() == null)
+            exchange.setId(UUID.randomUUID().toString());
+        for (ExchangeTask task : exchange.getTasks()) {
+            if (task.getId() == null)
+                task.setId(UUID.randomUUID().toString());
+            for (Attempt attempt : task.getAttempts()) {
+                if (attempt.getId() == null)
+                    attempt.setId(UUID.randomUUID().toString());
+            }
         }
         exchanges.put(exchange.getId(), exchange);
         return exchange.getId();
@@ -44,7 +49,6 @@ public class MockExchangeClient implements ExchangeClient {
                 exchange.getPrompt(),
                 exchange.getAttachmentUrls(),
                 exchange.getStatus(),
-                Utils.map(exchange.getStages(), this::copyStage),
                 exchange.getProductURL(),
                 exchange.getManagementURL(),
                 exchange.getSourceCodeURL(),
@@ -54,7 +58,19 @@ public class MockExchangeClient implements ExchangeClient {
                 exchange.getLastHeartBeatAt(),
                 exchange.getParentExchangeId(),
                 exchange.getChainDepth(),
-                exchange.isTestOnly()
+                exchange.isTestOnly(),
+                Utils.map(exchange.getTasks(), this::copyTask)
+        );
+    }
+
+    private ExchangeTask copyTask(ExchangeTask exchangeTask) {
+        return new ExchangeTask(
+                exchangeTask.getId(),
+                exchangeTask.getModuleId(),
+                exchangeTask.getModuleName(),
+                exchangeTask.getStatus(),
+                exchangeTask.getErrorMessage(),
+                Utils.map(exchangeTask.getAttempts(), this::copyAttempt)
         );
     }
 
@@ -97,7 +113,7 @@ public class MockExchangeClient implements ExchangeClient {
     @Override
     public void revert(ExchangeIdRequest request) {
         var exch = exchanges.get(request.exchangeId());
-        if (!exch.hasSuccessfulStages()) {
+        if (!exch.hasSuccessfulTasks()) {
             throw new RuntimeException("Cannot revert an exchange with no successful stages");
         }
         var appExchanges = exchanges.values().stream()
@@ -107,7 +123,7 @@ public class MockExchangeClient implements ExchangeClient {
         for (Exchange appExchange : appExchanges) {
             if (appExchange == exch)
                 break;
-            if (appExchange.hasSuccessfulStages())
+            if (appExchange.hasSuccessfulTasks())
                 throw new RuntimeException("Reversion is only applicable to the last exchange with successful stages");
         }
         exch.setStatus(ExchangeStatus.REVERTED);

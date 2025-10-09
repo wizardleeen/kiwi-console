@@ -19,7 +19,6 @@ public class Exchange {
     private String prompt;
     private List<String> attachmentUrls;
     private ExchangeStatus status;
-    private List<Stage> stages;
     private @Nullable String productURL;
     private @Nullable String managementURL;
     private @Nullable String sourceCodeURL;
@@ -30,6 +29,7 @@ public class Exchange {
     private @Nullable String parentExchangeId;
     private int chainDepth;
     private boolean testOnly;
+    private List<ExchangeTask> tasks;
 
     public static Exchange create(String appId,
                                   String userId,
@@ -46,7 +46,6 @@ public class Exchange {
                 prompt,
                 attachmentUrls,
                 ExchangeStatus.PLANNING,
-                new ArrayList<>(),
                 null,
                 null,
                 null,
@@ -56,12 +55,13 @@ public class Exchange {
                 0,
                 parentExchangeId,
                 chainDepth,
-                testOnly
+                testOnly,
+                new ArrayList<>()
         );
     }
 
-    public void addStage(Stage stage) {
-        stages.add(stage);
+    public void addTask(ExchangeTask exchangeTask) {
+        tasks.add(exchangeTask);
     }
 
     public boolean isRunning() {
@@ -79,8 +79,8 @@ public class Exchange {
         if (productURL != null)
             writer.writeln("Product URL: " + productURL);
         writer.indent();
-        for (Stage stage : stages) {
-            stage.write(writer);
+        for (var task : tasks) {
+            task.write(writer);
         }
         writer.deIndent();
     }
@@ -90,10 +90,10 @@ public class Exchange {
             throw new IllegalStateException("Exchange is not running");
         this.status = ExchangeStatus.FAILED;
         this.errorMessage = errorMessage;
-        for (Stage stage : stages) {
-            if(stage.isRunning()) {
-                stage.setStatus(StageStatus.FAILED);
-                for (Attempt attempt : stage.getAttempts()) {
+        for (var task : tasks) {
+            if(task.isRunning()) {
+                task.setStatus(ExchangeTaskStatus.FAILED);
+                for (Attempt attempt : task.getAttempts()) {
                     if (attempt.isRunning())
                         attempt.setStatus(AttemptStatus.FAILED);
                 }
@@ -116,22 +116,23 @@ public class Exchange {
                 sourceCodeURL,
                 errorMessage,
                 attachmentUrls,
-                Utils.map(stages, Stage::toDTO),
+                Utils.map(tasks, ExchangeTask::toDTO),
                 testPageId,
                 chainDepth
         );
     }
 
-    public boolean isStageSuccessful(StageType stageType) {
-        for (Stage stage : stages) {
-            if (stage.getType() == stageType && stage.getStatus() == StageStatus.SUCCESSFUL)
-                return true;
-        }
-        return false;
+    public boolean isModuleSuccessful(String moduleId) {
+        var found = Utils.find(tasks, t -> t.getModuleId().equals(moduleId));
+        return found != null && found.getStatus() == ExchangeTaskStatus.SUCCESSFUL;
     }
 
-    public boolean hasSuccessfulStages() {
-        return stages.stream().anyMatch(s -> s.getStatus() == StageStatus.SUCCESSFUL);
+    public boolean hasSuccessfulTasks() {
+        return tasks.stream().anyMatch(s -> s.getStatus() == ExchangeTaskStatus.SUCCESSFUL);
+    }
+
+    public ExchangeTask getTaskByModuleId(String moduleId) {
+        return Utils.findRequired(tasks, t -> t.getModuleId().equals(moduleId));
     }
 
 }

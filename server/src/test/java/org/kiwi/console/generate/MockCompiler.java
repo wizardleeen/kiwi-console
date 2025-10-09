@@ -9,12 +9,12 @@ import java.util.Map;
 
 class MockCompiler implements KiwiCompiler, PageCompiler {
 
-    private Map<Long, Map<String, String>> working = new HashMap<>();
+    private Map<String, Map<String, String>> working = new HashMap<>();
     private final List<Commit> commits = new ArrayList<>();
 
     @Override
-    public DeployResult run(long appId, List<SourceFile> sourceFiles, List<Path> removedFiles, boolean deploySource) {
-        var files = getWorkdir(appId);
+    public DeployResult run(long appId, String projectName, List<SourceFile> sourceFiles, List<Path> removedFiles, boolean deploySource, boolean noBackup) {
+        var files = getWorkdir(projectName);
         sourceFiles.forEach(f -> files.put(f.path().toString(), f.content()));
         for (Path removedFile : removedFiles) {
             files.remove(removedFile.toString());
@@ -25,11 +25,11 @@ class MockCompiler implements KiwiCompiler, PageCompiler {
             return new DeployResult(true, null);
     }
 
-    private Map<String, String> getWorkdir(long appId) {
-        var wd = working.get(appId);
+    private Map<String, String> getWorkdir(String projectName) {
+        var wd = working.get(projectName);
         if (wd == null) {
             wd = new HashMap<>();
-            working.put(appId, wd);
+            working.put(projectName, wd);
             initWorkdir(wd);
         }
         return wd;
@@ -39,26 +39,26 @@ class MockCompiler implements KiwiCompiler, PageCompiler {
     }
 
     @Override
-    public List<SourceFile> getSourceFiles(long appId) {
-        var files = getWorkdir(appId);
+    public List<SourceFile> getSourceFiles(String projectName) {
+        var files = getWorkdir(projectName);
         var sourceFiles = new ArrayList<SourceFile>();
         files.forEach((path, content) -> sourceFiles.add(new SourceFile(Path.of(path), content)));
         return sourceFiles;
     }
 
     @Override
-    public void addFile(long appId, SourceFile file) {
-        getWorkdir(appId).put(file.path().toString(), file.content());
+    public void addFile(String projectName, SourceFile file) {
+        getWorkdir(projectName).put(file.path().toString(), file.content());
     }
 
     @Override
-    public DeployResult deploy(long appId, boolean deploySource) {
+    public DeployResult deploy(long appId, String projectName, boolean deploySource, boolean noBackup) {
         return new DeployResult(true, "");
     }
 
     @Override
-    public void commit(long appId, String message) {
-        commits.add(new Commit(copyMap(working.get(appId)), message));
+    public void commit(String projectName, String message) {
+        commits.add(new Commit(copyMap(working.get(projectName)), message));
     }
 
     @Nullable
@@ -67,11 +67,15 @@ class MockCompiler implements KiwiCompiler, PageCompiler {
     }
 
     @Override
-    public void reset(long appId, String templateRepo, String branch) {
+    public void reset(String projectName, String templateRepo, String branch) {
         if (commits.isEmpty())
             working = new HashMap<>();
         else
-            working.put(appId, copyMap(commits.getLast().map()));
+            working.put(projectName, copyMap(commits.getLast().map()));
+    }
+
+    boolean isEmpty() {
+        return commits.isEmpty();
     }
 
     private Map<String, String> copyMap(Map<String, String> map) {
@@ -79,31 +83,31 @@ class MockCompiler implements KiwiCompiler, PageCompiler {
     }
 
     @Override
-    public void delete(long appId) {
-        working.remove(appId);
+    public void delete(String projectName) {
+        working.remove(projectName);
     }
 
     @Override
-    public void revert(long appId, boolean deploySource) {
+    public void revert(long appId, String projectName, boolean deploySource) {
         if (commits.isEmpty())
             throw new IllegalStateException("No commits to revert to.");
         if (commits.size() == 1)
-            working.remove(appId);
+            working.remove(projectName);
         else
-            working.put(appId, copyMap(commits.get(commits.size() - 2).map()));
+            working.put(projectName, copyMap(commits.get(commits.size() - 2).map()));
     }
 
     @Override
-    public String generateApi(long appId) {
+    public String generateApi(String projectName) {
         return "api";
     }
 
-    public String getCode(long appId, String path) {
-        return getWorkdir(appId).get(path);
+    public String getCode(String projectName, String path) {
+        return getWorkdir(projectName).get(path);
     }
 
     @Override
-    public @Nullable Path getSourceMapPath(long appId) {
+    public @Nullable Path getSourceMapPath(String projectName) {
         return null;
     }
 

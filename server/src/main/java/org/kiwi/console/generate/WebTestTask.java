@@ -12,8 +12,10 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.kiwi.console.StackTraceDeobfuscator;
+import org.kiwi.console.browser.Browser;
 import org.kiwi.console.browser.Page;
 import org.kiwi.console.file.File;
+import org.kiwi.console.kiwi.Tech;
 import org.kiwi.console.patch.PatchReader;
 import org.kiwi.console.util.Utils;
 
@@ -24,43 +26,86 @@ import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 @Slf4j
-public class TestAgentImpl implements TestAgent {
+public class WebTestTask implements TestTask {
 
     private static final int MAX_AUTO_TEST_ACTIONS = 100;
+    private static final DateFormat DF = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
     private final PageCompiler pageCompiler;
     private final Path testEnvDir;
+    private final Path testLogDir;
+    private final boolean logOn;
+    private final long appId;
+    private final String projectName;
+    private final Model model;
+    private final String promptTemplate;
+    private final String requirement;
+    private final ModuleRT module;
+    private final AbortController abortController;
+    private final Consumer<String> setTargetId;
+    private final String testId;
+    private final Page page;
+    private int step;
+    private final List<Action> actions = new ArrayList<>();
 
-    public TestAgentImpl(PageCompiler pageCompiler, Path testEnvDir) {
+    public WebTestTask(Browser browser,
+                       PageCompiler pageCompiler,
+                       Path testEnvDir,
+                       @javax.annotation.Nullable Path testLogDir,
+                       boolean logOn,
+                       long appId,
+                       String projectName,
+                       String url,
+                       Model model,
+                       String promptTemplate,
+                       String requirement,
+                       ModuleRT module,
+                       AbortController abortController,
+                       Consumer<String> setTargetId
+    ) {
+        if (logOn && testLogDir == null)
+            throw new IllegalArgumentException("testLogDir cannot be null when logOn is true");
         this.pageCompiler = pageCompiler;
         this.testEnvDir = testEnvDir;
+        this.testLogDir = testLogDir;
+        this.logOn = logOn;
+        this.appId = appId;
+        this.projectName = projectName;
+        this.model = model;
+        this.promptTemplate = promptTemplate;
+        this.requirement = requirement;
+        this.module = module;
+        this.abortController = abortController;
+        this.setTargetId = setTargetId;
+        page = browser.createPage(url);
+        testId = getTestId();
     }
 
     @Override
     @SneakyThrows
-    public TestResult runTest(
-            long appId,
-            Page page,
-            Model model,
-            String promptTemplate,
-            String requirement,
-            AbortController abortController
-    ) {
-        var actions = new ArrayList<Action>();
-        for (var i = 0; i < MAX_AUTO_TEST_ACTIONS; i++) {
+    public TestResult runTest() {
+        if (step == 0)
+            page.navigate("/");
+        else {
+            page.reload();
+            actions.add(new FixAction());
+        }
+        for (; step < MAX_AUTO_TEST_ACTIONS; step++) {
+            setTargetId.accept(page.getTargetId());
             if (abortController.isAborted())
                 break;
 //            log.debug("Console Logs\n{}", consoleLogs);
 //            Files.write(Path.of("/tmp/screenshot.png"), screenshot);
             var consoleLogs = page.getConsoleLogs();
-            var sourceMapPath = pageCompiler.getSourceMapPath(appId);
+            var sourceMapPath = pageCompiler.getSourceMapPath(projectName);
             if (sourceMapPath != null) {
                 consoleLogs = StackTraceDeobfuscator.deobfuscate(
                         Files.readString(sourceMapPath),
@@ -69,7 +114,8 @@ public class TestAgentImpl implements TestAgent {
             }
             var screenshot = page.getScreenshot();
             var dom = page.getDOM();
-            var action = nextAction(model, appId, promptTemplate, requirement, screenshot, dom, consoleLogs, actions, abortController);
+            logTestInfo(testId, step, consoleLogs, dom, screenshot);
+            var action = nextAction(model, appId, projectName, promptTemplate, requirement, screenshot, dom, consoleLogs, actions, abortController);
             actions.add(action);
             if (action instanceof AcceptAction acceptAction) {
                 updateTestAccounts(appId, acceptAction.getUpdatedTestAccounts());
@@ -77,14 +123,15 @@ public class TestAgentImpl implements TestAgent {
             }
             if (action instanceof RejectAction rejectAction) {
                 updateTestAccounts(appId, rejectAction.getUpdatedTestAccounts());
-                return TestResult.reject(rejectAction.bugReport, screenshot, dom, consoleLogs);
+                return TestResult.reject(rejectAction.bugReport, screenshot, dom, consoleLogs, module.name());
             }
             if (action instanceof AbortAction abortAction) {
                 return TestResult.abort(abortAction.reason);
             }
             assert action instanceof StepAction;
             var stepAction = (StepAction) action;
-            out: {
+            out:
+            {
                 for (var cmd : stepAction.getCommands()) {
                     var r = executeCommand(page, cmd);
                     if (!r.successful()) {
@@ -96,13 +143,23 @@ public class TestAgentImpl implements TestAgent {
             }
 //            log.debug("Last action:\n{}", Utils.toPrettyJSONString(action));
         }
-        page.close();
         return TestResult.abort("Test not finished in " + MAX_AUTO_TEST_ACTIONS + "steps");
+    }
+
+    @Override
+    public Tech getTech() {
+        return Tech.WEB;
+    }
+
+    @Override
+    public void close() {
+        page.close();
     }
 
     @SneakyThrows
     private Action nextAction(Model model,
                               long appId,
+                              String projectName,
                               String promptTemplate,
                               String requirement,
                               byte[] screenshot,
@@ -111,7 +168,7 @@ public class TestAgentImpl implements TestAgent {
                               List<Action> actions,
                               AbortController abortController) {
         var testAccounts = getTestAccounts(appId);
-        var code = PatchReader.buildCode(pageCompiler.getSourceFiles(appId));
+        var code = PatchReader.buildCode(pageCompiler.getSourceFiles(projectName));
         var prompt = Format.format(
                 promptTemplate,
                 requirement,
@@ -119,6 +176,8 @@ public class TestAgentImpl implements TestAgent {
                 testAccounts,
                 actions.stream().map(Utils::toPrettyJSONString).collect(Collectors.joining("\n"))
         );
+        if (actions.isEmpty())
+            log.info("\n{}", prompt);
         var wait = 1000;
         for (var i = 0; i < 5; i++) {
             String actionText = null;
@@ -386,6 +445,14 @@ public class TestAgentImpl implements TestAgent {
         }
     }
 
+    public static class FixAction implements Action {
+
+        @Override
+        public String getType() {
+            return "FIX";
+        }
+    }
+
     // ------------------- Playwright Action Definitions -------------------
 
     @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "action", include = JsonTypeInfo.As.EXISTING_PROPERTY)
@@ -566,6 +633,21 @@ public class TestAgentImpl implements TestAgent {
             case "ABORT" -> Utils.readJSONString(json, AbortAction.class);
             default -> throw new IllegalArgumentException("Unknown action type: " + action);
         };
+    }
+
+    @SneakyThrows
+    private void logTestInfo(String testId, int epoch, String consoleLogs, String dom, byte[] screenshot) {
+        if (!logOn)
+            return;
+        var dir = Objects.requireNonNull(testLogDir).resolve(testId).resolve(Integer.toString(epoch));
+        Files.createDirectories(dir);
+        Files.writeString(dir.resolve("console-logs.txt"), consoleLogs);
+        Files.writeString(dir.resolve("index.html"), dom);
+        Files.write(dir.resolve("screenshot.png"), screenshot);
+    }
+
+    private String getTestId() {
+        return DF.format(new Date());
     }
 
     public record ExecuteResult(

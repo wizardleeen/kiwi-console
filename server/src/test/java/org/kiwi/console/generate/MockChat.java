@@ -16,8 +16,26 @@ class MockChat implements Chat {
     public void send(String text, @Nullable List<File> attachments, ChatStreamListener listener, ChatController ctrl) {
         var prompt = MockPromptParser.parse(text);
         lastCode = switch (prompt.kind()) {
-            case CREATE_ANALYZE -> "3\nTest App";
-            case UPDATE_ANALYZE -> "3";
+            case CREATE_ANALYZE -> """
+                    3
+                    Test App
+                    """;
+            case UPDATE_ANALYZE -> """
+                    {
+                        "modulePlans": [
+                            {
+                                "moduleName": "Kiwi",
+                                "operation": "MODIFY_AND_TEST",
+                                "suggestion": "change"
+                            },
+                            {
+                                "moduleName": "Web",
+                                "operation": "MODIFY_AND_TEST",
+                                "suggestion": "change"
+                            }
+                        ]
+                    }
+                    """;
             case CREATE, UPDATE -> "@@ src/main.kiwi @@\n" + prompt.prompt();
             case PAGE_CREATE -> "@@  src/App.tsx @@\n// " + prompt.appName() + prompt.prompt();
             case PAGE_UPDATE -> "@@  src/App.tsx @@\n" + prompt.prompt();

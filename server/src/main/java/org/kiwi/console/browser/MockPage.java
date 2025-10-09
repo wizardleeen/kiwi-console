@@ -16,6 +16,11 @@ public class MockPage implements Page {
     }
 
     @Override
+    public void reload() {
+
+    }
+
+    @Override
     public void log(String log) {
 
     }

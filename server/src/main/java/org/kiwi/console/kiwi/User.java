@@ -12,6 +12,6 @@ public class User {
     private String name;
     private String kiwiUserId;
     private List<App> apps;
-    private String genConfigId;
+    private String appConfigId;
     private boolean allowSourceCodeDownload;
 }

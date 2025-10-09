@@ -24,8 +24,8 @@ public class DeployClient implements DeployService {
 
     @SneakyThrows
     @Override
-    public String deploy(long appId, InputStream input) {
-        var uri = new URI(host + "/internal-api/deploy/" + appId);
+    public String deploy(long appId, boolean noBackup, InputStream input) {
+        var uri = new URI(host + "/internal-api/deploy/" + appId + "?no-backup=" + noBackup);
         HttpRequest httpRequest = HttpRequest.newBuilder()
                 .uri(uri)
                 .header("Accept", "application/json")

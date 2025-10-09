@@ -41,7 +41,8 @@ public class AppService implements AppClient {
                 app.getOwnerId(),
                 kiwiAppId,
                 app.getMemberIds(),
-                app.getGenConfigId()
+                app.getPlanConfigId(),
+                app.getModules()
         ));
     }
 
@@ -60,6 +61,13 @@ public class AppService implements AppClient {
         appClient.delete(request);
     }
 
+    @Override
+    public String create(CreateAppRequest request) {
+        var user = userClient.get(request.ownerId());
+        var kiwiAppId = kiwiAppClient.save(new SystemApp(null, request.name(), user.getKiwiUserId()));
+        return appClient.create(new CreateAppRequest(request.name(), kiwiAppId, request.ownerId()));
+    }
+
     public static void main(String[] args) {
         var appService = new AppService(
                 "http://localhost:8080",
@@ -71,30 +79,8 @@ public class AppService implements AppClient {
                 )
         );
 
-        var id = appService.save(App.create("test2", Constants.USER_ID));
-        System.out.println("Application saved with ID: " + id);
-
-//        appService.updateName(new UpdateNameRequest("01a49cdab90700", "Test Updated"));
-
-
-//        appService.delete(new DeleteAppRequest("01a49cdab90700"));
-
-        var searchResult = appService.search(new AppSearchRequest(
-                null,
-                "0182f5d7b90700",
-                1,
-                20,
-                null
-        ));
-        System.out.println("Search successful, found " + searchResult.total() + " applications.");
-        for (App item : searchResult.items()) {
-            System.out.println("Application ID: " + item.getId() + ", Name: " + item.getName() +
-                    ", Owner ID: " + item.getOwnerId() + ", System App ID: " + item.getKiwiAppId());
-        }
-
-//        var r = appService.get("01a49cdab90700");
-//        System.out.println("Application found: " + r.getName());
-
+        var app = appService.get("01e09ff3b90700");
+        System.out.println(Utils.toPrettyJSONString(app));
     }
 
 }
