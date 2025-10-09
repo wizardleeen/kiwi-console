@@ -84,7 +84,7 @@ public class GenerationServiceTest extends TestCase {
         assertEquals(
         String.format("""
                 Status: SUCCESSFUL
-                Product URL: http://%d.metavm.test
+                Product URL: https://%d.metavm.test
                     Task Kiwi: SUCCESSFUL
                         Attempt SUCCESSFUL
                     Task Web: SUCCESSFUL
@@ -99,7 +99,7 @@ public class GenerationServiceTest extends TestCase {
         assertEquals(
                 String.format("""
                         Status: SUCCESSFUL
-                        Product URL: http://%d.metavm.test
+                        Product URL: https://%d.metavm.test
                             Task Kiwi: SUCCESSFUL
                                 Attempt SUCCESSFUL
                             Task Web: SUCCESSFUL
@@ -115,7 +115,7 @@ public class GenerationServiceTest extends TestCase {
         assertEquals(
                 String.format("""
                         Status: SUCCESSFUL
-                        Product URL: http://%d.metavm.test
+                        Product URL: https://%d.metavm.test
                             Task Kiwi: SUCCESSFUL
                                 Attempt FAILED
                                     Compilation failed.
