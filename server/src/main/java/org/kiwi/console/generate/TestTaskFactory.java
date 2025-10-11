@@ -14,7 +14,7 @@ public interface TestTaskFactory {
             String promptTemplate,
             String requirement,
             ModuleRT module,
-            AbortController abortController,
+            CodeAgentListener listener, AbortController abortController,
             Consumer<String> setTargetId
     );
 

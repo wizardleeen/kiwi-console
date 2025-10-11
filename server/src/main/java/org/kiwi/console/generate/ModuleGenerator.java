@@ -1,9 +1,10 @@
 package org.kiwi.console.generate;
 
 import org.kiwi.console.file.File;
-import org.kiwi.console.kiwi.AttemptStatus;
-import org.kiwi.console.kiwi.ExchangeStatus;
-import org.kiwi.console.kiwi.ExchangeTaskStatus;
+import org.kiwi.console.generate.data.DataAgent;
+import org.kiwi.console.generate.data.DataManipulationRequest;
+import org.kiwi.console.kiwi.*;
+import org.kiwi.console.patch.PatchReader;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
@@ -26,6 +27,7 @@ public class ModuleGenerator {
     private final Model codeModel;
     private final @Nullable Model testModel;
     private final CodeAgent codeAgent;
+    private final DataAgent dataAgent;
     private final @Nullable TestTaskFactory testTaskFactory;
     private List<ModuleGenerator> dependencies;
     private final AppGenerator appGenerator;
@@ -34,10 +36,11 @@ public class ModuleGenerator {
                            boolean deploySource,
                            Model codeModel,
                            @Nullable Model testModel,
-                           CodeAgent codeAgent,
+                           CodeAgent codeAgent, DataAgent dataAgent,
                            @Nullable TestTaskFactory testTaskFactory,
                            AppGenerator appGenerator
     ) {
+        this.dataAgent = dataAgent;
         var modType = module.type();
         if (modType.isTestable()) {
             Objects.requireNonNull(modType.getTestPromptTemplate(), () -> "Test prompt template is required for testable module " + module.name());
@@ -70,7 +73,7 @@ public class ModuleGenerator {
     }
 
     void generate(String requirement, String suggestion, List<File> attachments, boolean noBackup) {
-        var task = appGenerator.startTask(module);
+        var task = appGenerator.createExchangeTask(module, ExchangeTaskType.GENERATION);
         try {
             var apiSources = new ArrayList<SourceFile>();
             for (ModuleGenerator dependency : dependencies) {
@@ -95,8 +98,7 @@ public class ModuleGenerator {
                     new AttemptListener(task)
             ));
             commit();
-            if (!isTestable())
-                task.setStatus(ExchangeTaskStatus.SUCCESSFUL);
+            task.setStatus(ExchangeTaskStatus.SUCCESSFUL);
         } catch (Exception e) {
             task.fail(e.getMessage());
             throw e;
@@ -119,6 +121,10 @@ public class ModuleGenerator {
         codeAgent.deploy(appGenerator.getAppId(), module.projectName(), deploySource, noBackup);
     }
 
+    public void delete() {
+        codeAgent.delete(module.projectName());
+    }
+
     public void setDependencies(List<ModuleGenerator> dependencies) {
         this.dependencies = dependencies;
     }
@@ -131,11 +137,7 @@ public class ModuleGenerator {
         return testable;
     }
 
-    public TestTask createTestTask(String requirement) {
-        var task = appGenerator.getExchange().findLastTaskByModule(module.id());
-        if (task == null)
-            task = appGenerator.startTask(module);
-        var taskF = task;
+    public TestTask createTestTask(String requirement, ExchangeTaskRT task) {
         return Objects.requireNonNull(testTaskFactory).createTestTask(
                 appGenerator.getAppId(),
                 module.projectName(),
@@ -144,11 +146,37 @@ public class ModuleGenerator {
                 testPromptTpl,
                 requirement,
                 module,
-                () -> appGenerator.getExchange().getStatus() == ExchangeStatus.CANCELLED,
-                pageId -> {
+                new AttemptListener(task),
+                () -> appGenerator.getExchange().getStatus() == ExchangeStatus.CANCELLED, pageId -> {
                     appGenerator.getExchange().setPageId(pageId);
-                    taskF.setStatus(ExchangeTaskStatus.TESTING);
+                    task.setStatus(ExchangeTaskStatus.GENERATING);
                 });
+    }
+
+    public void runDataTask(String requirement, Plan.DataTask dataTask) {
+        var exchTask = appGenerator.getExchange().startTask(module, ExchangeTaskType.DATA);
+        try {
+            dataAgent.run(
+                    new DataManipulationRequest(
+                            module.type().getDataPromptTemplate(),
+                            module.type().getDataPromptFixTemplate(),
+                            appGenerator.getAppId(),
+                            requirement,
+                            getCode(),
+                            new AttemptListener(exchTask),
+                            codeModel,
+                            appGenerator::isCancelled
+                    )
+            );
+            exchTask.setStatus(ExchangeTaskStatus.SUCCESSFUL);
+        } catch (Exception e) {
+            exchTask.fail(e.getMessage());
+            throw e;
+        }
+    }
+
+    private String getCode() {
+        return PatchReader.buildCode(codeAgent.getSourceFiles(module.projectName()));
     }
 
     private record AttemptListener(ExchangeTaskRT task) implements CodeAgentListener {

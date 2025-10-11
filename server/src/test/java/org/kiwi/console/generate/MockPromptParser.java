@@ -54,6 +54,12 @@ public class MockPromptParser {
             case "auto-test" -> {
                 return new Prompt(PromptKind.AUTO_TEST, null, null, null, null);
             }
+            case "data" -> {
+                return new Prompt(PromptKind.DATA, null, parts[3], null, parts[4]);
+            }
+            case "data-fix" -> {
+                return new Prompt(PromptKind.DATA_FIX, null, parts[1], null, null);
+            }
             default -> throw invalidPrompt(text);
         }
     }

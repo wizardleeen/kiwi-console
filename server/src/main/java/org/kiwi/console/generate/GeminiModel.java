@@ -19,7 +19,7 @@ public class GeminiModel implements Model {
 
     private final Client client = new Client();
 
-    public GeminiModel(String model, String apiKey) {
+    public GeminiModel(String model) {
         this.model = model;
     }
 

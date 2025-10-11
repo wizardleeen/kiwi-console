@@ -125,7 +125,7 @@ public class AigcService {
         var apikeyPath = "/Users/leen/develop/gemini/apikey";
         var apikey = Files.readString(Path.of(apikeyPath));
         var chatService = new AigcService(
-                new GeminiModel("gemini-2.5-pro", apikey),
+                new GeminiModel("gemini-2.5-pro"),
                 new DefaultKiwiCompiler(
                         Path.of("/tmp/kiwi-works"),
                         new DeployClient("http://localhost:8080", HttpClient.newBuilder()

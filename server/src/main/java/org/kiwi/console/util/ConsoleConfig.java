@@ -5,6 +5,8 @@ import org.kiwi.console.browser.PlaywrightBrowser;
 import org.kiwi.console.file.UrlFetcher;
 import org.kiwi.console.generate.*;
 import org.kiwi.console.generate.claude.ClaudeModel;
+import org.kiwi.console.generate.data.DataAgent;
+import org.kiwi.console.generate.data.DataAgentImpl;
 import org.kiwi.console.generate.k2.K2Model;
 import org.kiwi.console.generate.qwen.QwenModel;
 import org.kiwi.console.kiwi.*;
@@ -166,9 +168,15 @@ public class ConsoleConfig {
     }
 
     @Bean
+    public DataAgent dataAgent() {
+        return new DataAgentImpl(kiwiConfig.host);
+    }
+
+    @Bean
     public GenerationService generationService(List<Model> models,
                                                PlanAgent planAgent,
                                                List<CodeAgent> codeAgents,
+                                               DataAgent dataAgent,
                                                List<TestTaskFactory> testRunnerFactories,
                                                AppClient appClient,
                                                UserClient userClient,
@@ -182,6 +190,7 @@ public class ConsoleConfig {
                 models,
                 planAgent,
                 codeAgents,
+                dataAgent,
                 testRunnerFactories,
                 exchangeClient,
                 appClient,
@@ -190,9 +199,8 @@ public class ConsoleConfig {
                 moduleTypeClient,
                 planConfigClient,
                 urlTemplates.product,
-                urlTemplates.management,
-                urlTemplates.sourceCode, urlFetcher,
-                taskExecutor);
+                urlTemplates.management, urlTemplates.sourceCode,
+                urlFetcher, taskExecutor);
     }
 
     @Bean
@@ -213,12 +221,12 @@ public class ConsoleConfig {
     @Primary
     @Bean
     public GeminiModel gemini2_5_ProModel() {
-        return new GeminiModel("gemini-2.5-pro", apiKeys.gemini);
+        return new GeminiModel("gemini-2.5-pro");
     }
 
     @Bean
     public GeminiModel gemini2_5_FlashModel() {
-        return new GeminiModel("gemini-2.5-flash", apiKeys.gemini2);
+        return new GeminiModel("gemini-2.5-flash");
     }
 
     @Bean

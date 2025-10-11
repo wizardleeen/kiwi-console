@@ -23,7 +23,7 @@ public class WebTestTaskFactory implements TestTaskFactory {
     }
 
     @Override
-    public TestTask createTestTask(long appId, String projectName, String url, Model model, String promptTemplate, String requirement, ModuleRT module, AbortController abortController, Consumer<String> setTargetId) {
+    public TestTask createTestTask(long appId, String projectName, String url, Model model, String promptTemplate, String requirement, ModuleRT module, CodeAgentListener listener, AbortController abortController, Consumer<String> setTargetId) {
         return new WebTestTask(
                 browser,
                 pageCompiler,
@@ -32,6 +32,7 @@ public class WebTestTaskFactory implements TestTaskFactory {
                 logOn,
                 appId,
                 projectName,
+                listener,
                 url,
                 model,
                 promptTemplate,

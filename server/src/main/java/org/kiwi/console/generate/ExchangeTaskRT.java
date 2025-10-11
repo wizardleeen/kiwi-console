@@ -3,6 +3,7 @@ package org.kiwi.console.generate;
 import org.kiwi.console.kiwi.Attempt;
 import org.kiwi.console.kiwi.ExchangeTask;
 import org.kiwi.console.kiwi.ExchangeTaskStatus;
+import org.kiwi.console.kiwi.ExchangeTaskType;
 import org.kiwi.console.util.Utils;
 
 import javax.annotation.Nullable;
@@ -17,6 +18,7 @@ public class ExchangeTaskRT {
     private final String id;
     private String moduleId;
     private String moduleName;
+    private ExchangeTaskType type;
     private ExchangeTaskStatus status;
     private @Nullable String errorMessage;
     private final ExchangeRT exchange;
@@ -51,6 +53,10 @@ public class ExchangeTaskRT {
         exchange.onChange();
     }
 
+    public ExchangeTaskType getType() {
+        return type;
+    }
+
     public ExchangeTaskStatus getStatus() {
         return status;
     }
@@ -60,6 +66,7 @@ public class ExchangeTaskRT {
                 id,
                 moduleId,
                 moduleName,
+                type,
                 status,
                 errorMessage,
                 Utils.map(attempts, AttemptRT::build)
@@ -81,6 +88,7 @@ public class ExchangeTaskRT {
     public void update(ExchangeTask exchangeTask) {
         moduleId = exchangeTask.getModuleId();
         moduleName = exchangeTask.getModuleName();
+        type = exchangeTask.getType();
         status = exchangeTask.getStatus();
         errorMessage = exchangeTask.getErrorMessage();
         var attemptMap = attempts.stream().collect(Collectors.toUnmodifiableMap(AttemptRT::getId, Function.identity()));

@@ -3,6 +3,7 @@ package org.kiwi.console.generate;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.kiwi.console.file.File;
+import org.kiwi.console.generate.data.DataAgent;
 import org.kiwi.console.generate.event.GenerationListener;
 import org.kiwi.console.generate.rest.ExchangeDTO;
 import org.kiwi.console.kiwi.*;
@@ -26,6 +27,7 @@ public class AppGenerator implements Task, AbortController, CodeAgentListener {
     final String managementUrlTempl;
     final String productUrlTempl;
     Planner planner;
+    private final DataAgent dataAgent;
     private final List<ModuleGenerator> moduleGenerators = new ArrayList<>();
     final boolean showAttempts;
     final List<File> attachments;
@@ -43,7 +45,7 @@ public class AppGenerator implements Task, AbortController, CodeAgentListener {
                         @Nonnull GenerationListener listener,
                         String sourceCodeUrlTempl,
                         String productUrlTempl,
-                        String managementUrlTempl,
+                        String managementUrlTempl, DataAgent dataAgent,
                         Function<String, Model> getModel,
                         Function<Tech, CodeAgent> getCodeAgent,
                         Function<Tech, TestTaskFactory> getTestRunnerFactory
@@ -52,6 +54,7 @@ public class AppGenerator implements Task, AbortController, CodeAgentListener {
         this.sourceCodeUrlTempl = sourceCodeUrlTempl;
         this.productUrlTempl = productUrlTempl;
         this.managementUrlTempl = managementUrlTempl;
+        this.dataAgent = dataAgent;
         listeners.add(listener);
         this.app = app;
         this.user = user;
@@ -63,19 +66,19 @@ public class AppGenerator implements Task, AbortController, CodeAgentListener {
         exchange.setListener(this::onProgress);
     }
 
-    ExchangeTaskRT startTask(ModuleRT module) {
+    ExchangeTaskRT createExchangeTask(ModuleRT module, ExchangeTaskType type) {
         if (exchange.getStatus() == ExchangeStatus.PLANNING)
             exchange.setStatus(ExchangeStatus.GENERATING);
-        return exchange.startTask(module);
+        return exchange.startTask(module, type);
     }
 
-    public void runTask(boolean retry) {
+    public void run(boolean retry) {
         sendProgress();
         reset();
         var requirement = exchange.getRequirement();
         var attachments = this.attachments;
         try {
-            runTask(requirement, attachments, false, retry);
+            run(requirement, attachments, false, retry);
             exchange.setStatus(ExchangeStatus.SUCCESSFUL);
         } catch (Exception e) {
             if (!exchange.isCancelled())
@@ -121,41 +124,29 @@ public class AppGenerator implements Task, AbortController, CodeAgentListener {
         result.add(current);
     }
 
-    private boolean runTask(String requirement, List<File> attachments, boolean fix, boolean retry) {
+    private boolean run(String requirement, List<File> attachments, boolean fix, boolean retry) {
         var first = exchange.isFirst() && !fix && !retry;
         var plan = executeGen(() -> plan(requirement, attachments, first));
         if (plan.appName() != null)
             app.setName(plan.appName());
         log.info("{}", plan);
-        Map<String, ModulePlan> modPlans;
+        List<Plan.Task> plannedTasks;
         if (first) {
-            modPlans = Utils.toMap(moduleGenerators, modGen -> modGen.getModule().name(), modGen -> new ModulePlan(
-                    modGen.getModule().name(), Operation.MODIFY_AND_TEST, "", List.of(), modGen.getModule().tech(),  ""
+            plannedTasks = Utils.map(moduleGenerators, modGen -> new Plan.ModifyModuleTask(
+                    modGen.getModule().name(), ""
             ));
         } else {
-            modPlans = Utils.toMap(plan.modulePlans(), ModulePlan::moduleName);
+            plannedTasks = plan.tasks();
         }
-        if (!exchange.isTesting() || fix)
-            generate(requirement, attachments, modPlans, fix);
-        return testAndFix(requirement, modPlans);
+        return runTasks(requirement, attachments, plannedTasks, fix);
     }
 
-    private void generate(String requirement, List<File> attachments, Map<String, ModulePlan> modPlans, boolean noBackup) {
+    private boolean runTasks(String requirement, List<File> attachments, List<Plan.Task> tasks, boolean noBackup) {
         try {
             var kiwiAppId = app.getKiwiAppId();
-            for (var module : app.getModules()) {
-                var modPlan = modPlans.get(module.name());
-                if (modPlan != null && modPlan.generationRequired() && modPlan.operation() != Operation.CREATE_AND_TEST) {
-                    var modGen = getModuleGeneratorByName(modPlan.moduleName());
-                    executeGen(() -> modGen.generate(requirement, modPlan.suggestion(), attachments, noBackup));
-                }
-            }
-            for (var modPlan : modPlans.values()) {
-                if (modPlan.operation() == Operation.CREATE_AND_TEST) {
-                    var modGen = createModule(modPlan.moduleName(), modPlan.description(), modPlan.tech(), modPlan.dependencyNames());
-                    modGen.reset();
-                    executeGen(() -> modGen.generate(requirement, modPlan.suggestion(), attachments, noBackup));
-                }
+            for (Plan.Task task : tasks) {
+                if (!runTask(requirement, attachments, noBackup, task))
+                    return false;
             }
             var sourceCodeUrl = user.isAllowSourceCodeDownload() ?
                     Format.format(sourceCodeUrlTempl, kiwiAppId) : null;
@@ -165,6 +156,7 @@ public class AppGenerator implements Task, AbortController, CodeAgentListener {
                     sourceCodeUrl
             );
             log.info("Generation Completed. Application: {}", exchange.getProductURL());
+            return true;
         } catch (Exception e) {
             log.error("Failed to generate code for app {}", exchange.getAppId(), e);
             fail(e.getMessage());
@@ -174,6 +166,40 @@ public class AppGenerator implements Task, AbortController, CodeAgentListener {
         }
     }
 
+    private void runModifyModuleTask(String requirement, List<File> attachments, Plan.ModifyModuleTask task, boolean noBackup) {
+        var modGen = getModuleGeneratorByName(task.moduleName());
+        executeGen(() -> modGen.generate(requirement, task.suggestion(), attachments, noBackup));
+    }
+
+    private boolean runTask(String requirement, List<File> attachments, boolean noBackup, Plan.Task task) {
+        return switch (task) {
+            case Plan.CreateModuleTask createModuleTask -> {
+                runCreateModuleTask(requirement, attachments, createModuleTask);
+                yield true;
+            }
+            case Plan.ModifyModuleTask modifyModuleTask -> {
+                runModifyModuleTask(requirement, attachments, modifyModuleTask, noBackup);
+                yield true;
+            }
+            case Plan.DeleteModuleTask deleteModuleTask -> {
+                runDeleteModuleTask(deleteModuleTask);
+                yield true;
+            }
+            case Plan.DataTask dataTask -> {
+                runDataTask(requirement, dataTask);
+                yield true;
+            }
+            case Plan.TestTask testTask -> runTestTask(requirement, testTask);
+        };
+    }
+
+    private void runCreateModuleTask(String requirement, List<File> attachments, Plan.CreateModuleTask task) {
+        var modGen = createModule(task.moduleName(), task.description(), task.tech(), task.dependencyNames());
+        modGen.reset();
+        executeGen(() -> modGen.generate(requirement, task.suggestion(), attachments, false));
+    }
+
+
     private ModuleGenerator createModule(String name, String description, Tech tech, List<String> dependencyNames) {
         var deps = Utils.map(dependencyNames, app::getModuleByName);
         var mod = app.addModule(name, description, tech, deps);
@@ -182,34 +208,50 @@ public class AppGenerator implements Task, AbortController, CodeAgentListener {
                 getModel.apply(mod.type().getCodeModel()),
                 Utils.safeCall(mod.type().getTestModel(), getModel),
                 getCodeAgent.apply(mod.tech()),
+                dataAgent,
                 getTestRunnerFactory.apply(mod.tech()),
                 this
         );
     }
 
-    private boolean testAndFix(String requirement, Map<String, ModulePlan> modPlans) {
-        for (var modPlan : modPlans.values()) {
-            if (numTests >= MAX_AUTO_FIXES)
+    private boolean testAndFix(String requirement, List<Plan.Task> plannedTasks) {
+        for (var plannedTask : plannedTasks) {
+            if (plannedTask instanceof Plan.TestTask testTask && !runTestTask(requirement, testTask))
+                return false;
+        }
+        return true;
+    }
+
+    private boolean runTestTask(String requirement, Plan.TestTask plannedTask) {
+        if (numTests >= MAX_AUTO_FIXES)
+            return true;
+        var modGen = getModuleGeneratorByName(plannedTask.moduleName());
+        var exchTask = createExchangeTask(modGen.getModule(), ExchangeTaskType.TEST);
+        var task = modGen.createTestTask(requirement, exchTask);
+        while (numTests++ < MAX_AUTO_FIXES) {
+            var r = task.runTest();
+            if (r.rejected()) {
+                exchTask.setStatus(ExchangeTaskStatus.REJECTED);
+                if (!run(r.getFixRequirement(), r.getAttachments(), true, false))
+                    return false;
+            } else {
+                task.close();
+                exchTask.setStatus(r.accepted() ? ExchangeTaskStatus.SUCCESSFUL : ExchangeTaskStatus.FAILED);
                 break;
-            var modGen = getModuleGeneratorByName(modPlan.moduleName());
-            if (modGen.isTestable() && modPlan.testRequired()) {
-                var task = modGen.createTestTask(requirement);
-                while (numTests++ < MAX_AUTO_FIXES) {
-                    var r = task.runTest();
-                    var exchTask = Objects.requireNonNull(exchange.findLastTaskByModule(modGen.getModule().id()));
-                    if (r.rejected()) {
-                        exchTask.setStatus(ExchangeTaskStatus.REJECTED);
-                        if (!runTask(r.getFixRequirement(), r.getAttachments(), true, false))
-                            return false;
-                    } else {
-                        task.close();
-                        exchTask.setStatus(r.accepted() ? ExchangeTaskStatus.SUCCESSFUL : ExchangeTaskStatus.FAILED);
-                        break;
-                    }
-                }
             }
         }
         return true;
+    }
+
+    private void runDeleteModuleTask(Plan.DeleteModuleTask task) {
+        var modGen = getModuleGeneratorByName(task.moduleName());
+        modGen.delete();
+        moduleGenerators.remove(modGen);
+    }
+
+    private void runDataTask(String requirement, Plan.DataTask dataTask) {
+        var modGen = getModuleGeneratorByName(dataTask.moduleName());
+        modGen.runDataTask(requirement, dataTask);
     }
 
     @SneakyThrows

@@ -16,13 +16,15 @@ public class ExchangeTask {
     private String id;
     private final String moduleId;
     private String moduleName;
+    private final ExchangeTaskType type;
     private ExchangeTaskStatus status = ExchangeTaskStatus.GENERATING;
     private String errorMessage;
     private List<Attempt> attempts;
 
-    public ExchangeTask(String moduleId, String moduleName) {
+    public ExchangeTask(String moduleId, String moduleName, ExchangeTaskType type) {
         this.moduleId = moduleId;
         this.moduleName = moduleName;
+        this.type = type;
         attempts = new ArrayList<>();
     }
 
@@ -46,6 +48,10 @@ public class ExchangeTask {
         this.status = status;
     }
 
+    public ExchangeTaskType getType() {
+        return type;
+    }
+
     public void write(TextWriter writer) {
         writer.writeln("Task " + moduleName + ": " + status.name());
         writer.indent();
@@ -54,7 +60,7 @@ public class ExchangeTask {
     }
 
     public boolean isRunning() {
-        return status == ExchangeTaskStatus.GENERATING || status == ExchangeTaskStatus.TESTING;
+        return status == ExchangeTaskStatus.GENERATING;
     }
 
     public void fail(String errorMessage) {
@@ -62,6 +68,6 @@ public class ExchangeTask {
     }
 
     public ExchangeTaskDTO toDTO() {
-        return new ExchangeTaskDTO(id, moduleId, moduleName, status.name());
+        return new ExchangeTaskDTO(id, moduleId, moduleName, type.name(), status.name());
     }
 }

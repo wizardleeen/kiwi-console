@@ -22,17 +22,22 @@ class MockChat implements Chat {
                     """;
             case UPDATE_ANALYZE -> """
                     {
-                        "modulePlans": [
+                        "tasks": [
                             {
+                                "type": "MODIFY_MODULE",
                                 "moduleName": "Kiwi",
-                                "operation": "MODIFY_AND_TEST",
                                 "suggestion": "change"
                             },
                             {
+                                "type": "MODIFY_MODULE",
                                 "moduleName": "Web",
-                                "operation": "MODIFY_AND_TEST",
                                 "suggestion": "change"
+                            },
+                            {
+                                "type": "TEST_MODULE",
+                                "moduleName": "Web"
                             }
+
                         ]
                     }
                     """;
@@ -43,6 +48,8 @@ class MockChat implements Chat {
             case AUTO_TEST -> "ACCEPT\n{}";
             case FIX -> requireNonNull(lastCode).replace("Error", "Fixed");
             case COMMIT_MSG -> "commit";
+            case DATA -> "echo \"SUCCESSFUL\"";
+            case DATA_FIX -> "echo \"FIXED\"";
         };
         listener.onContent(lastCode + "@@@@");
     }

@@ -1,5 +1,7 @@
 package org.kiwi.console.generate;
 
+import com.fasterxml.jackson.annotation.JsonSubTypes;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import org.kiwi.console.kiwi.Tech;
 
 import javax.annotation.Nullable;
@@ -7,79 +9,88 @@ import java.util.List;
 
 public record Plan(
         @Nullable String appName,
-        List<ModulePlan> modulePlans
+        List<Task> tasks
 ) {
 
 
+    @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type", include = JsonTypeInfo.As.EXISTING_PROPERTY)
+    @JsonSubTypes({
+            @JsonSubTypes.Type(value = CreateModuleTask.class, name = "CREATE_MODULE"),
+            @JsonSubTypes.Type(value = ModifyModuleTask.class, name = "MODIFY_MODULE"),
+            @JsonSubTypes.Type(value = DeleteModuleTask.class, name = "DELETE_MODULE"),
+            @JsonSubTypes.Type(value = TestTask.class, name = "TEST_MODULE"),
+            @JsonSubTypes.Type(value = DataTask.class, name = "DATA"),
+    })
+    public sealed interface Task {
 
-}
+        String getType();
 
-record ModulePlan(
-        String moduleName,
-        Operation operation,
-        String description,
-        List<String> dependencyNames,
-        Tech tech,
-        String suggestion
-) {
+        String moduleName();
 
-    public static ModulePlan modifyAndTest(String moduleName, String suggestion) {
-        return new ModulePlan(moduleName, Operation.MODIFY_AND_TEST, null, null, null, suggestion);
     }
 
-    boolean generationRequired() {
-        return operation.generationRequired();
+    public sealed interface GenerateTask extends Task {
+
+        String suggestion();
+
     }
 
-    boolean testRequired() {
-        return operation.testRequired();
+    public record CreateModuleTask(
+            String moduleName,
+            String description,
+            List<String> dependencyNames,
+            Tech tech,
+            String suggestion
+    ) implements GenerateTask {
+
+        @Override
+        public String getType() {
+            return "CREATE_MODULE";
+        }
     }
 
-}
-
-
-enum Operation {
-    CREATE_AND_TEST {
-        @Override
-        public boolean testRequired() {
-            return true;
-        }
+    public record ModifyModuleTask(
+            String moduleName,
+            String suggestion
+    ) implements GenerateTask {
 
         @Override
-        public boolean generationRequired() {
-            return true;
+        public String getType() {
+            return "MODIFY_MODULE";
         }
-    },
-    MODIFY_AND_TEST {
-        @Override
-        public boolean testRequired() {
-            return true;
-        }
+    }
 
-        @Override
-        public boolean generationRequired() {
-            return true;
-        }
-    },
-    TEST {
-        @Override
-        public boolean testRequired() {
-            return true;
-        }
+    public record DeleteModuleTask(
+            String moduleName,
+            String suggestion
+    ) implements Task {
 
         @Override
-        public boolean generationRequired() {
-            return false;
+        public String getType() {
+            return "DELETE_MODULE";
         }
-    },
+    }
 
-    ;
+    public record TestTask(
+            String moduleName
+    ) implements Task {
 
-    public abstract boolean testRequired();
+        @Override
+        public String getType() {
+            return "TEST_MODULE";
+        }
+    }
 
-    public abstract boolean generationRequired();
+    public record DataTask(
+            String moduleName,
+            String suggestion
+    ) implements Task {
 
-
+        @Override
+        public String getType() {
+            return "DATA";
+        }
+    }
 
 
 }

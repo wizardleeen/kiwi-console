@@ -6,8 +6,16 @@ import java.util.UUID;
 
 public class MockTestTask implements TestTask {
 
+    private final CodeAgentListener listener;
+
+    public MockTestTask(CodeAgentListener listener) {
+        this.listener = listener;
+    }
+
     @Override
     public TestResult runTest() {
+        listener.onAttemptStart();
+        listener.onAttemptSuccess();
         return TestResult.ACCEPTED;
     }
 
