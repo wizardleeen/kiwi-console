@@ -24,7 +24,8 @@ public record SourceFile(Path path, String content) {
             Path.of("package-lock.json"),
             Path.of("pnpm-lock.yaml"),
             Path.of("public"),
-            Path.of("src/assets")
+            Path.of("src/assets"),
+            Path.of("apigen")
     );
 
     @SneakyThrows

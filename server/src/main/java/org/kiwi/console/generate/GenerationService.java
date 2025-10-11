@@ -8,6 +8,8 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.kiwi.console.file.File;
 import org.kiwi.console.file.UrlFetcher;
+import org.kiwi.console.generate.data.DataAgent;
+import org.kiwi.console.generate.data.DataAgentImpl;
 import org.kiwi.console.generate.event.GenerationListener;
 import org.kiwi.console.generate.rest.CancelRequest;
 import org.kiwi.console.generate.rest.ExchangeDTO;
@@ -56,6 +58,7 @@ public class GenerationService {
     private final Map<String, Model> models;
     private final PlanAgent planAgent;
     private final Map<Tech, CodeAgent> codeAgentMap;
+    private final DataAgent dataAgent;
     private final Map<Tech, TestTaskFactory> testRunnerFactoryMap;
     private final AppClient appClient;
     private final ModuleTypeClient moduleTypeClient;
@@ -73,7 +76,7 @@ public class GenerationService {
     public GenerationService(
             List<Model> models,
             PlanAgent planAgent,
-            List<CodeAgent> codeAgents,
+            List<CodeAgent> codeAgents, DataAgent dataAgent,
             List<TestTaskFactory> testAgents,
             ExchangeClient exchClient,
             AppClient appClient,
@@ -89,6 +92,7 @@ public class GenerationService {
         this.models = models.stream().collect(Collectors.toUnmodifiableMap(Model::getName, Function.identity()));
         this.planAgent = planAgent;
         this.codeAgentMap = Utils.toMap(codeAgents, CodeAgent::getTech, Function.identity());
+        this.dataAgent = dataAgent;
         this.testRunnerFactoryMap = Utils.toMap(testAgents, TestTaskFactory::getTech, Function.identity());
         this.appClient = appClient;
         this.appConfigClient = appConfigClient;
@@ -138,7 +142,7 @@ public class GenerationService {
         var task = createAppGenerator(exchange, app, user,
                 planConfig,
                 attachments, listener);
-        taskExecutor.execute(() -> runTask(task, false));
+        taskExecutor.execute(() -> run(task, false));
     }
 
     private AppGenerator createAppGenerator(Exchange exch, App app, User user, PlanConfig planConfig,
@@ -155,6 +159,7 @@ public class GenerationService {
                 sourceCodeUrlTempl,
                 productUrlTempl,
                 managementUrlTempl,
+                dataAgent,
                 this::getModel,
                 codeAgentMap::get,
                 testRunnerFactoryMap::get
@@ -174,6 +179,7 @@ public class GenerationService {
                     getModel(modType.getCodeModel()),
                     Utils.safeCall(modType.getTestModel(), this::getModel),
                     Objects.requireNonNull(codeAgentMap.get(module.tech()), () -> "Cannot find code agent for tech: " + module.tech()),
+                    dataAgent,
                     testRunnerFactoryMap.get(module.tech()),
                     gen
             );
@@ -205,9 +211,9 @@ public class GenerationService {
             throw new BusinessException(ErrorCode.GENERATION_ALREADY_RUNNING);
     }
 
-    private void runTask(AppGenerator gen, boolean retry) {
+    private void run(AppGenerator gen, boolean retry) {
         try {
-            gen.runTask(retry);
+            gen.run(retry);
         } finally {
             runningTasks.remove(gen.getExchange().getId());
         }
@@ -265,7 +271,7 @@ public class GenerationService {
         var task = createAppGenerator(exch, app, user,
                 planConfig,
                 attachments, listener);
-        taskExecutor.execute(() -> runTask(task, true));
+        taskExecutor.execute(() -> run(task, true));
     }
 
     public void revert(String exchangeId) {
@@ -304,12 +310,13 @@ public class GenerationService {
         );
         var appService = new AppService(host, CHAT_APP_ID, userClient);
         var service = new GenerationService(
-                List.of(new GeminiModel("gemini-2.5-pro", apikey)),
+                List.of(new GeminiModel("gemini-2.5-pro")),
                 new PlanAgent(),
                 List.of(
                     new KiwiAgent(kiwiCompiler),
                     new WebAgent(new DefaultPageCompiler(java.nio.file.Path.of(PAGE_WORKDIR)))
                 ),
+                new DataAgentImpl("http://localhost:8080"),
                 List.of(new MockTestTaskFactory()),
                 createFeignClient(ExchangeClient.class, CHAT_APP_ID),
                 appService,
@@ -320,8 +327,7 @@ public class GenerationService {
                 "https://{}.metavm.test",
                 "https://metavm.test/{}",
                 "https://admin.metavm.test/source-{}.zip",
-                new UrlFetcher("https://1000061024.metavm.test"),
-                new SyncTaskExecutor());
+                new UrlFetcher("https://1000061024.metavm.test"), new SyncTaskExecutor());
 //        System.out.println(kiwiCompiler.generateApi(TEST_APP_ID));
         testNewApp(service);
 //        testUpdateApp(service);

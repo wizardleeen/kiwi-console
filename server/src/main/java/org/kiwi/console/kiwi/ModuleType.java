@@ -18,6 +18,8 @@ public class ModuleType {
     private String updatePromptTemplate;
     private String fixPromptTemplate;
     private @Nullable String testPromptTemplate;
+    private @Nullable String dataPromptTemplate;
+    private @Nullable String dataPromptFixTemplate;
     private String templateRepository;
     private String templateBranch;
     private boolean testable;

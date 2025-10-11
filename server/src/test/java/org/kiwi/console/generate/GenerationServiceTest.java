@@ -4,6 +4,8 @@ import junit.framework.TestCase;
 import lombok.extern.slf4j.Slf4j;
 import org.kiwi.console.file.UrlFetcher;
 import org.kiwi.console.file.UrlResource;
+import org.kiwi.console.generate.data.DataAgent;
+import org.kiwi.console.generate.data.DataManipulationRequest;
 import org.kiwi.console.generate.event.GenerationListener;
 import org.kiwi.console.generate.rest.CancelRequest;
 import org.kiwi.console.generate.rest.ExchangeDTO;
@@ -32,6 +34,7 @@ public class GenerationServiceTest extends TestCase {
     private PlanAgent planAgent;
     private KiwiAgent kiwiAgent;
     private WebAgent webAgent;
+    private DataAgent dataAgent;
     private TestTaskFactory testTaskFactory;
     private AppClient appClient;
     private MockExchangeClient exchangeClient;
@@ -49,6 +52,7 @@ public class GenerationServiceTest extends TestCase {
         planAgent = new PlanAgent();
         kiwiAgent = new KiwiAgent(new MockCompiler());
         webAgent = new WebAgent(new MockPageCompiler());
+        dataAgent = new MockDataAgent();
         testTaskFactory = new MockTestTaskFactory();
         exchangeClient = new MockExchangeClient();
         planConfigClient = new MockPlanConfigClient();
@@ -104,6 +108,8 @@ public class GenerationServiceTest extends TestCase {
                                 Attempt SUCCESSFUL
                             Task Web: SUCCESSFUL
                                 Attempt SUCCESSFUL
+                            Task Web: SUCCESSFUL
+                                Attempt SUCCESSFUL
                         """, kiwiAppId),
                 exchangeClient.getLast().toString()
         );
@@ -123,6 +129,8 @@ public class GenerationServiceTest extends TestCase {
                             Task Web: SUCCESSFUL
                                 Attempt FAILED
                                     Compilation failed.
+                                Attempt SUCCESSFUL
+                            Task Web: SUCCESSFUL
                                 Attempt SUCCESSFUL
                         """, kiwiAppId),
                 exchangeClient.getLast().toString()
@@ -182,6 +190,20 @@ public class GenerationServiceTest extends TestCase {
         var ref = new Object() {
             boolean retrying;
         };
+        planAgent = new PlanAgent() {
+
+            int runs;
+
+            @Override
+            public Plan plan(PlanRequest request) {
+                if (runs++ == 0)
+                    return super.plan(request);
+                else
+                    return new Plan(null, List.of(
+                            new Plan.TestTask("Web")
+                    ));
+            }
+        };
         kiwiAgent = new KiwiAgent(new MockCompiler() {
 
             @Override
@@ -195,8 +217,8 @@ public class GenerationServiceTest extends TestCase {
         testTaskFactory = new MockTestTaskFactory() {
 
             @Override
-            public TestTask createTestTask(long appId, String projectName, String url, Model model, String promptTemplate, String requirement, ModuleRT module, AbortController abortController, Consumer<String> setTargetId) {
-                return new MockTestTask() {
+            public TestTask createTestTask(long appId, String projectName, String url, Model model, String promptTemplate, String requirement, ModuleRT module, CodeAgentListener listener, AbortController abortController, Consumer<String> setTargetId) {
+                return new MockTestTask(listener) {
 
                     @Override
                     public TestResult runTest() {
@@ -211,12 +233,13 @@ public class GenerationServiceTest extends TestCase {
 
         };
         var service = createGenerationService();
+        var appId = service.generate(GenerationRequest.create(null, "class Foo{}"), userId, discardListener);
         try {
-            service.generate(GenerationRequest.create(null, "class Foo{}"), userId, discardListener);
+            service.generate(GenerationRequest.create(appId, "class Foo{}"), userId, discardListener);
             fail("Should have failed");
         } catch (AgentException ignored) {
         }
-        var exch = exchangeClient.getFirst();
+        var exch = exchangeClient.getLast();
         log.debug("\n{}", exch.toString());
         assertEquals(ExchangeStatus.FAILED, exch.getStatus());
         for (ExchangeTask task : exch.getTasks()) {
@@ -235,8 +258,8 @@ public class GenerationServiceTest extends TestCase {
         testTaskFactory = new MockTestTaskFactory() {
 
             @Override
-            public TestTask createTestTask(long appId, String projectName, String url, Model model, String promptTemplate, String requirement, ModuleRT module, AbortController abortController, Consumer<String> setTargetId) {
-                return new MockTestTask() {
+            public TestTask createTestTask(long appId, String projectName, String url, Model model, String promptTemplate, String requirement, ModuleRT module, CodeAgentListener listener, AbortController abortController, Consumer<String> setTargetId) {
+                return new MockTestTask(listener) {
 
                     @Override
                     public TestResult runTest() {
@@ -248,7 +271,8 @@ public class GenerationServiceTest extends TestCase {
             }
         };
         var service = createGenerationService();
-        service.generate(GenerationRequest.create(null, "class Foo {}"), userId, discardListener);
+        var appId = service.generate(GenerationRequest.create(null, "class Foo {}"), userId, discardListener);
+        service.generate(GenerationRequest.create(appId, "class Foo {}"), userId, discardListener);
         assertEquals(3, ref.runs);
     }
 
@@ -310,6 +334,7 @@ public class GenerationServiceTest extends TestCase {
         return new GenerationService(List.of(model),
                 planAgent,
                 List.of(kiwiAgent, webAgent),
+                dataAgent,
                 List.of(testTaskFactory),
                 exchangeClient,
                 appClient,
@@ -318,10 +343,9 @@ public class GenerationServiceTest extends TestCase {
                 moduleTypeClient,
                 planConfigClient,
                 "https://{}.metavm.test",
-                "https://metavm.test/{}",
-                "https://admin.metavm.test/source-{}.zip", urlFetcher,
-                taskExecutor
-        );
+                "https://metavm.test/{}", "https://admin.metavm.test/source-{}.zip",
+                urlFetcher,
+                taskExecutor);
 
     }
 
@@ -364,8 +388,8 @@ public class GenerationServiceTest extends TestCase {
         testTaskFactory = new MockTestTaskFactory() {
 
             @Override
-            public TestTask createTestTask(long appId, String projectName, String url, Model model, String promptTemplate, String requirement, ModuleRT module, AbortController abortController, Consumer<String> setTargetId) {
-                return new MockTestTask() {
+            public TestTask createTestTask(long appId, String projectName, String url, Model model, String promptTemplate, String requirement, ModuleRT module, CodeAgentListener listener, AbortController abortController, Consumer<String> setTargetId) {
+                return new MockTestTask(listener) {
                     int trials;
 
                     @Override
@@ -379,6 +403,7 @@ public class GenerationServiceTest extends TestCase {
         };
         var generationService = createGenerationService();
         var appId = generationService.generate(GenerationRequest.create(null, "class Foo{}"), userId, discardListener);
+        generationService.generate(GenerationRequest.create(appId, "class Foo{}"), userId, discardListener);
         var app = appClient.get(appId);
         var projName = app.getKiwiAppId() + "";
         var code = webAgent.getCode(projName, "src/App.tsx");
@@ -398,7 +423,7 @@ public class GenerationServiceTest extends TestCase {
             @Override
             public Plan plan(PlanRequest request) {
                 return ref.trials++ == 0 ? super.plan(request) : new Plan(null, List.of(
-                        ModulePlan.modifyAndTest("Kiwi", "update")
+                        new Plan.ModifyModuleTask("Kiwi", "update")
                 ));
             }
         };
@@ -417,9 +442,8 @@ public class GenerationServiceTest extends TestCase {
                 if (trails++ == 0)
                     return super.plan(request);
                 else {
-                    return new Plan(null, List.of(new ModulePlan(
+                    return new Plan(null, List.of(new Plan.CreateModuleTask(
                             "admin-web",
-                            Operation.CREATE_AND_TEST,
                             "admin",
                             List.of("Kiwi"),
                             Tech.WEB,
@@ -462,8 +486,8 @@ public class GenerationServiceTest extends TestCase {
         testTaskFactory = new MockTestTaskFactory() {
 
             @Override
-            public TestTask createTestTask(long appId, String projectName, String url, Model model, String promptTemplate, String requirement, ModuleRT module, AbortController abortController, Consumer<String> setTargetId) {
-                return new MockTestTask() {
+            public TestTask createTestTask(long appId, String projectName, String url, Model model, String promptTemplate, String requirement, ModuleRT module, CodeAgentListener listener, AbortController abortController, Consumer<String> setTargetId) {
+                return new MockTestTask(listener) {
 
                     final String pageId = Integer.toString(ref.nextId++);
 
@@ -478,7 +502,8 @@ public class GenerationServiceTest extends TestCase {
 
         var service = createGenerationService();
         var targetIds = new ArrayList<String>();
-        service.generate(GenerationRequest.create(null, "class Foo{}"), userId, new ProgressListener() {
+        var appId = service.generate(GenerationRequest.create(null, "class Foo{}"), userId, discardListener);
+        service.generate(GenerationRequest.create(appId, "class Foo{}"), userId, new ProgressListener() {
 
             @Override
             public void onProgress(ExchangeDTO exchange) {
@@ -508,8 +533,11 @@ public class GenerationServiceTest extends TestCase {
                     return super.plan(request);
                 else {
                     return new Plan(null, List.of(
-                            ModulePlan.modifyAndTest("Web", "modify"),
-                            ModulePlan.modifyAndTest("Admin-Web", "modify")
+                            new Plan.ModifyModuleTask("Web", "modify"),
+                            new Plan.ModifyModuleTask("Admin-Web", "modify"),
+                            new Plan.TestTask("Web"),
+                            new Plan.TestTask("Admin-Web")
+
                     ));
                 }
             }
@@ -517,8 +545,8 @@ public class GenerationServiceTest extends TestCase {
         testTaskFactory = new MockTestTaskFactory() {
 
             @Override
-            public TestTask createTestTask(long appId, String projectName, String url, Model model, String promptTemplate, String requirement, ModuleRT module, AbortController abortController, Consumer<String> setTargetId) {
-                return new MockTestTask() {
+            public TestTask createTestTask(long appId, String projectName, String url, Model model, String promptTemplate, String requirement, ModuleRT module, CodeAgentListener listener, AbortController abortController, Consumer<String> setTargetId) {
+                return new MockTestTask(listener) {
 
                     @Override
                     public TestResult runTest() {
@@ -542,6 +570,41 @@ public class GenerationServiceTest extends TestCase {
         ref.testRuns = 0;
         service.generate(GenerationRequest.create(appId, "class Foo{}"), userId, discardListener);
         assertEquals(2, ref.testRuns);
+    }
+
+    public void testDataTask() {
+        var ref = new Object() {
+          int dataTaskRuns;
+        };
+        dataAgent = new MockDataAgent() {
+
+            @Override
+            public void run(DataManipulationRequest request) {
+                ref.dataTaskRuns++;
+            }
+        };
+        planAgent = new PlanAgent() {
+
+            @Override
+            public Plan plan(PlanRequest request) {
+                var plan = super.plan(request);
+                if (plan.appName() != null)
+                    return plan;
+                return new Plan(null, List.of(
+                        new Plan.DataTask("Kiwi", "Manipulate data")
+                ));
+            }
+        };
+        var service = createGenerationService();
+        var appId = service.generate(GenerationRequest.create(null, "class Foo{}"), userId, discardListener);
+        service.generate(GenerationRequest.create(appId, "class Foo{}"), userId, discardListener);
+        assertEquals(1, ref.dataTaskRuns);
+        var exch = exchangeClient.getLast();
+        assertSame(ExchangeStatus.SUCCESSFUL, exch.getStatus());
+        assertEquals(1, exch.getTasks().size());
+        var task = exch.getTasks().getLast();
+        assertSame(ExchangeTaskType.DATA, task.getType());
+        assertSame(ExchangeTaskStatus.SUCCESSFUL, task.getStatus());
     }
 
     private TestResult reject(String moduleName) {

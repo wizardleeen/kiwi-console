@@ -68,6 +68,7 @@ public class MockExchangeClient implements ExchangeClient {
                 exchangeTask.getId(),
                 exchangeTask.getModuleId(),
                 exchangeTask.getModuleName(),
+                exchangeTask.getType(),
                 exchangeTask.getStatus(),
                 exchangeTask.getErrorMessage(),
                 Utils.map(exchangeTask.getAttempts(), this::copyAttempt)

@@ -50,6 +50,7 @@ public class WebTestTask implements TestTask {
     private final String requirement;
     private final ModuleRT module;
     private final AbortController abortController;
+    private final CodeAgentListener listener;
     private final Consumer<String> setTargetId;
     private final String testId;
     private final Page page;
@@ -62,7 +63,7 @@ public class WebTestTask implements TestTask {
                        @javax.annotation.Nullable Path testLogDir,
                        boolean logOn,
                        long appId,
-                       String projectName,
+                       String projectName, CodeAgentListener listener,
                        String url,
                        Model model,
                        String promptTemplate,
@@ -71,6 +72,7 @@ public class WebTestTask implements TestTask {
                        AbortController abortController,
                        Consumer<String> setTargetId
     ) {
+        this.listener = listener;
         if (logOn && testLogDir == null)
             throw new IllegalArgumentException("testLogDir cannot be null when logOn is true");
         this.pageCompiler = pageCompiler;
@@ -92,6 +94,7 @@ public class WebTestTask implements TestTask {
     @Override
     @SneakyThrows
     public TestResult runTest() {
+        listener.onAttemptStart();
         if (step == 0)
             page.navigate("/");
         else {
@@ -119,13 +122,16 @@ public class WebTestTask implements TestTask {
             actions.add(action);
             if (action instanceof AcceptAction acceptAction) {
                 updateTestAccounts(appId, acceptAction.getUpdatedTestAccounts());
+                listener.onAttemptSuccess();
                 return TestResult.ACCEPTED;
             }
             if (action instanceof RejectAction rejectAction) {
                 updateTestAccounts(appId, rejectAction.getUpdatedTestAccounts());
+                listener.onAttemptFailure("Rejected: " + rejectAction.bugReport);
                 return TestResult.reject(rejectAction.bugReport, screenshot, dom, consoleLogs, module.name());
             }
             if (action instanceof AbortAction abortAction) {
+                listener.onAttemptFailure(abortAction.reason);
                 return TestResult.abort(abortAction.reason);
             }
             assert action instanceof StepAction;
@@ -143,6 +149,7 @@ public class WebTestTask implements TestTask {
             }
 //            log.debug("Last action:\n{}", Utils.toPrettyJSONString(action));
         }
+        listener.onAttemptFailure("Max steps reached");
         return TestResult.abort("Test not finished in " + MAX_AUTO_TEST_ACTIONS + "steps");
     }
 

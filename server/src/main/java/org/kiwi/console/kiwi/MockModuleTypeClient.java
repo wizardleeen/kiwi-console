@@ -47,6 +47,8 @@ public class MockModuleTypeClient implements ModuleTypeClient {
                 config.getTestPromptTemplate(),
                 config.getTemplateRepository(),
                 config.getTemplateBranch(),
+                config.getDataPromptTemplate(),
+                config.getDataPromptFixTemplate(),
                 config.isTestable(),
                 config.isOutputThinking()
         );

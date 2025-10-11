@@ -109,9 +109,9 @@ public class ExchangeRT {
         return found;
     }
 
-    public ExchangeTaskRT startTask(ModuleRT module) {
+    public ExchangeTaskRT startTask(ModuleRT module, ExchangeTaskType type) {
         var exch = build();
-        exch.addTask(new ExchangeTask(module.id(), module.name()));
+        exch.addTask(new ExchangeTask(module.id(), module.name(), type));
         exch = saveExchange(exch);
         update(exch);
         onChange();
@@ -140,7 +140,7 @@ public class ExchangeRT {
         for (ExchangeTaskRT task : tasks) {
             var mod = app.getModule(task.getModuleId());
             if (mod.type().isTestable() &&
-                    (task.getStatus() == ExchangeTaskStatus.TESTING || task.getStatus() == ExchangeTaskStatus.SUCCESSFUL)) {
+                    (task.getType() == ExchangeTaskType.TEST || task.getStatus() == ExchangeTaskStatus.SUCCESSFUL)) {
                 return true;
             }
         }
