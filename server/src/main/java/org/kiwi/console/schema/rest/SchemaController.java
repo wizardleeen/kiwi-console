@@ -28,7 +28,7 @@ public class SchemaController {
     public SchemaResponse get(
             @AuthenticationPrincipal String userId,
             @RequestHeader("X-App-Id") String appId) {
-        var app =ensureAuthorized(userId, appId);
+        var app = ensureAuthorized(userId, appId);
         return schemaClient.get(app.getKiwiAppId());
     }
 

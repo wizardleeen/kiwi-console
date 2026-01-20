@@ -4,6 +4,8 @@ import org.kiwi.console.util.Constants;
 import org.kiwi.console.util.SearchResult;
 import org.kiwi.console.util.Utils;
 
+import java.util.UUID;
+
 public class AppService implements AppClient {
 
     private final AppClient appClient;
@@ -48,9 +50,6 @@ public class AppService implements AppClient {
 
     @Override
     public void updateName(UpdateNameRequest request) {
-        var app = get(request.applicationId());
-        var user = userClient.get(app.getOwnerId());
-        kiwiAppClient.save(new SystemApp(app.getKiwiAppId(), request.name(), user.getKiwiUserId()));
         appClient.updateName(request);
     }
 
@@ -64,7 +63,8 @@ public class AppService implements AppClient {
     @Override
     public String create(CreateAppRequest request) {
         var user = userClient.get(request.ownerId());
-        var kiwiAppId = kiwiAppClient.save(new SystemApp(null, request.name(), user.getKiwiUserId()));
+        var kiwiAppId = kiwiAppClient.save(new SystemApp(null, UUID.randomUUID().toString(), user.getKiwiUserId()));
+        kiwiAppClient.updateName(new UpdateAppNameRequest(kiwiAppId, Long.toString(kiwiAppId)));
         return appClient.create(new CreateAppRequest(request.name(), kiwiAppId, request.ownerId()));
     }
 

@@ -250,8 +250,10 @@ public class Utils {
 
     public static <T> T createKiwiFeignClient(String url, Class<T> type, long appId) {
         return createFeignClient(url, type, rt -> {
-            rt.header("X-App-ID", Long.toString(appId));
-            rt.header("X-Refresh-Policy", "none");
+            assert rt.path().startsWith("/api/");
+            var path = rt.path();
+            var newPath = "/api/" + appId + path.substring(4);
+            rt.uri(newPath);
         });
     }
 

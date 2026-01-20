@@ -60,7 +60,7 @@ public class DefaultKiwiCompiler extends AbstractCompiler implements KiwiCompile
     public String generateApi(String projectName) {
         var wd = WorkDir.from(baseDir, projectName);
         var version = getVersion(wd);
-        var r = Utils.executeCommand(wd.root(), "kiwi", "gen-api", "--version", Long.toString(version));
+        var r = Utils.executeCommand(wd.root(), "manul", "gen-api", "--version", Long.toString(version));
         if (r.exitCode() != 0)
             throw new RuntimeException("Failed to generate API: " + r.output());
         return Files.readString(wd.root().resolve("apigen").resolve("api.ts"));
@@ -69,7 +69,7 @@ public class DefaultKiwiCompiler extends AbstractCompiler implements KiwiCompile
     @SneakyThrows
     protected BuildResult build(WorkDir workDir) {
         var version = getVersion(workDir);
-        var command = new ArrayList<>(List.of("kiwi", "build"));
+        var command = new ArrayList<>(List.of("manul", "build"));
         if (version > 1)
             command.add("--sense-lint");
         var r = Utils.executeCommand(workDir.root(), command);
