@@ -10,6 +10,10 @@ public interface KiwiAppClient {
     @Headers("Content-Type: application/json")
     long save(SystemApp app);
 
+    @RequestLine("POST /internal-api/app/update-name")
+    @Headers("Content-Type: application/json")
+    void updateName(UpdateAppNameRequest req);
+
     @RequestLine("DELETE /internal-api/app/delete/{id}")
     void delete(@Param("id") long id);
 
