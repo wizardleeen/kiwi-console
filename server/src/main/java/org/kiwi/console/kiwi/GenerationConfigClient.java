@@ -7,7 +7,7 @@ import org.kiwi.console.util.Utils;
 
 public interface GenerationConfigClient {
 
-    @RequestLine("GET /api/generation-config/{id}")
+    @RequestLine("GET /generation-configs/{id}")
     GenerationConfig get(@Param("id") String id);
 
     static void main(String[] args) {

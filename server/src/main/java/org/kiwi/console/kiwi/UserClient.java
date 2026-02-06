@@ -8,34 +8,34 @@ import org.kiwi.console.auth.LogoutRequest;
 
 public interface UserClient {
 
-    @RequestLine("GET /api/user/{id}")
+    @RequestLine("GET /users/{id}")
     User get(@Param("id") String id);
 
-    @RequestLine("POST /api/user-service/authenticate")
+    @RequestLine("POST /user-service/authenticate")
     @Headers("Content-Type: application/json")
     String authenticate(AuthenticateRequest request);
 
-    @RequestLine("POST /api/user-service/login")
+    @RequestLine("POST /user-service/login")
     @Headers("Content-Type: application/json")
     LoginResponse login(LoginRequest request);
 
-    @RequestLine("POST /api/user-service/logout")
+    @RequestLine("POST /user-service/logout")
     @Headers("Content-Type: application/json")
     void logout(LogoutRequest request);
 
-    @RequestLine("POST /api/user-service/register")
+    @RequestLine("POST /user-service/register")
     @Headers("Content-Type: application/json")
     String register(RegisterRequest request);
 
-    @RequestLine("POST /api/user-service/get-by-kiwi-user-id")
+    @RequestLine("POST /user-service/get-by-kiwi-user-id")
     @Headers("Content-Type: application/json")
     String getByKiwiUserId(GetByKiwiUserIdRequest request);
 
-    @RequestLine("POST /api/user-service/generate-sso-code")
+    @RequestLine("POST /user-service/generate-sso-code")
     @Headers("Content-Type: application/json")
     String generateSsoCode(UserIdRequest request);
 
-    @RequestLine("POST /api/user-service/login-with-sso-code")
+    @RequestLine("POST /user-service/login-with-sso-code")
     @Headers("Content-Type: application/json")
     String loginWithSsoCode(LoginWithSsoCodeRequest request);
 

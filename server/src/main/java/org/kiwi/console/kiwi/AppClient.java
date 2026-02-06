@@ -1,8 +1,6 @@
 package org.kiwi.console.kiwi;
 
-import feign.Headers;
-import feign.Param;
-import feign.RequestLine;
+import feign.*;
 import org.kiwi.console.util.Constants;
 import org.kiwi.console.util.SearchResult;
 import org.kiwi.console.util.Utils;
@@ -11,26 +9,25 @@ import java.util.List;
 
 public interface AppClient {
 
-    @RequestLine("POST /api/application/_search")
-    @Headers("Content-Type: application/json")
-    SearchResult<App> search(AppSearchRequest request);
+    @RequestLine("GET /applications")
+    SearchResult<App> search(@QueryMap AppSearchRequest request);
 
-    @RequestLine("GET /api/application/{id}")
+    @RequestLine("GET /applications/{id}")
     App get(@Param("id") String id);
 
-    @RequestLine("POST /api/application")
+    @RequestLine("POST /applications")
     @Headers("Content-Type: application/json")
     String save(App app);
 
-    @RequestLine("POST /api/application/update-name")
+    @RequestLine("POST /applications/{id}/update-name")
     @Headers("Content-Type: application/json")
-    void updateName(UpdateNameRequest request);
+    void updateName(@Param("id") String id, UpdateNameRequest request);
 
-    @RequestLine("POST /api/application-service/delete-app")
+    @RequestLine("POST /application-service/delete-app")
     @Headers("Content-Type: application/json")
     void delete(DeleteAppRequest request);
 
-    @RequestLine(("POST /api/application-service/create-app"))
+    @RequestLine(("POST /application-service/create-app"))
     @Headers("Content-Type: application/json")
     String create(CreateAppRequest request);
 

@@ -68,13 +68,13 @@ public class MockAppClient implements AppClient {
     }
 
     @Override
-    public void updateName(UpdateNameRequest request) {
-        var app = apps.get(request.applicationId());
+    public void updateName(String id, UpdateNameRequest request) {
+        var app = apps.get(id);
         if (app != null) {
             app.setName(request.name());
             apps.put(app.getId(), app);
         } else
-            throw new IllegalArgumentException("Application with ID " + request.applicationId() + " not found.");
+            throw new IllegalArgumentException("Application with ID " + id + " not found.");
     }
 
     @Override

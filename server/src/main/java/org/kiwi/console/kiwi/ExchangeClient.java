@@ -2,6 +2,7 @@ package org.kiwi.console.kiwi;
 
 import feign.Headers;
 import feign.Param;
+import feign.QueryMap;
 import feign.RequestLine;
 import org.kiwi.console.util.Constants;
 import org.kiwi.console.util.SearchResult;
@@ -11,41 +12,40 @@ import java.util.List;
 
 public interface ExchangeClient {
 
-    @RequestLine("POST /api/exchange/_search")
-    @Headers("Content-Type: application/json")
-    SearchResult<Exchange> search(ExchangeSearchRequest request);
+    @RequestLine("GET /exchanges")
+    SearchResult<Exchange> search(@QueryMap ExchangeSearchRequest request);
 
-    @RequestLine("GET /api/exchange/{id}")
+    @RequestLine("GET /exchanges/{id}")
     Exchange get(@Param("id") String id);
 
-    @RequestLine("POST /api/exchange")
+    @RequestLine("POST /exchanges")
     @Headers("Content-Type: application/json")
     String save(Exchange exchange);
 
-    @RequestLine("DELETE /api/exchange/{id}")
+    @RequestLine("DELETE /exchanges/{id}")
     void delete(@Param("id") String id);
 
-    @RequestLine("POST /api/exchange/cancel")
+    @RequestLine("POST /exchanges/{id}/cancel")
     @Headers("Content-Type: application/json")
-    void cancel(ExchangeCancelRequest request);
+    void cancel(@Param("id") String id);
 
-    @RequestLine("POST /api/exchange/retry")
+    @RequestLine("POST /exchanges/{id}/retry")
     @Headers("Content-Type: application/json")
-    void retry(ExchangeIdRequest request);
+    void retry(@Param("id") String id);
 
-    @RequestLine("POST /api/exchange-service/revert-exchange")
+    @RequestLine("POST /exchange-service/revert-exchange")
     @Headers("Content-Type: application/json")
     void revert(ExchangeIdRequest request);
 
-    @RequestLine("POST /api/exchange-service/fail-expired-exchanges")
+    @RequestLine("POST /exchange-service/fail-expired-exchanges")
     @Headers("Content-Type: application/json")
     List<String> failExpiredExchanges();
 
-    @RequestLine("POST /api/exchange/send-heart-beat")
+    @RequestLine("POST /exchanges/{id}/send-heart-beat")
     @Headers("Content-Type: application/json")
-    void sendHeartBeat(ExchangeHeartBeatRequest request);
+    void sendHeartBeat(@Param("id") String id);
 
-    @RequestLine("POST /api/exchange-service/is-generating")
+    @RequestLine("POST /exchange-service/is-generating")
     @Headers("Content-Type: application/json")
     boolean isGenerating(IsGeneratingRequest request);
 

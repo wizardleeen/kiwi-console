@@ -236,7 +236,7 @@ public class GenerationService {
         for (var task : runningTasks.values()) {
             if (task.getExchange().isRunning()) {
                 try {
-                    exchClient.sendHeartBeat(new ExchangeHeartBeatRequest(task.getExchange().getId()));
+                    exchClient.sendHeartBeat(task.getExchange().getId());
                 } catch (Exception e) {
                     log.warn("Failed to send heartbeat for exchange {}", task.getExchange().getId(), e);
                 }
@@ -253,7 +253,7 @@ public class GenerationService {
     }
 
     public void cancel(CancelRequest request) {
-        exchClient.cancel(new ExchangeCancelRequest(request.exchangeId()));
+        exchClient.cancel(request.exchangeId());
         var task = runningTasks.get(request.exchangeId());
         if (task != null)
             task.cancel();
@@ -263,7 +263,7 @@ public class GenerationService {
         var exch = exchClient.get(request.exchangeId());
         var app = appClient.get(exch.getAppId());
         ensureNotGenerating(app.getId());
-        exchClient.retry(new ExchangeIdRequest(request.exchangeId()));
+        exchClient.retry(request.exchangeId());
         var attachments = Utils.map(exch.getAttachmentUrls(), this::readAttachment);
         exch = exchClient.get(request.exchangeId());  // Reload
         var user = userClient.get(userId);

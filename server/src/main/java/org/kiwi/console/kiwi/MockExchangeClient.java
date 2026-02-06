@@ -98,14 +98,14 @@ public class MockExchangeClient implements ExchangeClient {
     }
 
     @Override
-    public void cancel(ExchangeCancelRequest request) {
-        var exch = exchanges.get(request.exchangeId());
+    public void cancel(String id) {
+        var exch = exchanges.get(id);
         exch.setStatus(ExchangeStatus.CANCELLED);
     }
 
     @Override
-    public void retry(ExchangeIdRequest request) {
-        var exch = exchanges.get(request.exchangeId());
+    public void retry(String id) {
+        var exch = exchanges.get(id);
         if (exch.getStatus() != ExchangeStatus.FAILED)
             throw new IllegalStateException("Exchange is not in FAILED state");
         exch.setStatus(ExchangeStatus.PLANNING);
@@ -143,10 +143,10 @@ public class MockExchangeClient implements ExchangeClient {
     }
 
     @Override
-    public void sendHeartBeat(ExchangeHeartBeatRequest request) {
-        var exch = Objects.requireNonNull(exchanges.get(request.exchangeId()), "Exchange not found: " + request.exchangeId());
+    public void sendHeartBeat(String id) {
+        var exch = Objects.requireNonNull(exchanges.get(id), "Exchange not found: " + id);
         if (exch.isRunning())
-            throw new IllegalStateException("Exchange is not running: " + request.exchangeId() +
+            throw new IllegalStateException("Exchange is not running: " + id +
                     " (status: " + exch.getStatus() + ")");
         exch.setLastHeartBeatAt(System.currentTimeMillis());
     }
