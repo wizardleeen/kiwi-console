@@ -8,11 +8,11 @@ import org.kiwi.console.util.Utils;
 
 public interface PlanConfigClient {
 
-    @RequestLine("POST /api/plan-config")
+    @RequestLine("POST /plan-configs")
     @Headers("Content-Type: application/json")
     String save(PlanConfig planConfig);
 
-    @RequestLine("GET /api/plan-config/{id}")
+    @RequestLine("GET /plan-configs/{id}")
     PlanConfig get(@Param("id") String id);
 
     static void main(String[] args) {

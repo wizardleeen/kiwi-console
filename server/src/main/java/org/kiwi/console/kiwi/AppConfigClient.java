@@ -8,11 +8,11 @@ import org.kiwi.console.util.Utils;
 
 public interface AppConfigClient {
 
-    @RequestLine("POST /api/app-config")
+    @RequestLine("POST /app-configs")
     @Headers("Content-Type: application/json")
     String save(AppConfig appConfig);
 
-    @RequestLine("GET /api/app-config/{id}")
+    @RequestLine("GET /app-configs/{id}")
     AppConfig get(@Param("id") String id);
 
     static void main(String[] args) {

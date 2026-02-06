@@ -1,5 +1,6 @@
 package org.kiwi.console.kiwi;
 
+import org.kiwi.console.util.SearchResult;
 import org.kiwi.console.util.Utils;
 
 import java.util.HashMap;
@@ -29,8 +30,8 @@ public class MockModuleTypeClient implements ModuleTypeClient {
     }
 
     @Override
-    public List<ModuleType> multiGet(MultiGetRequest request) {
-        return Utils.map(request.ids(), this::get);
+    public SearchResult<ModuleType> multiGet(List<String> ids) {
+        return new SearchResult<>(Utils.map(ids, this::get), ids.size());
     }
 
     private ModuleType copy(ModuleType config) {

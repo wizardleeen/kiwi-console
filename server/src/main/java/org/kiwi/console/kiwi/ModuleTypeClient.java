@@ -4,22 +4,22 @@ import feign.Headers;
 import feign.Param;
 import feign.RequestLine;
 import org.kiwi.console.util.Constants;
+import org.kiwi.console.util.SearchResult;
 import org.kiwi.console.util.Utils;
 
 import java.util.List;
 
 public interface ModuleTypeClient {
 
-    @RequestLine("POST /api/module-type")
+    @RequestLine("POST /module-types")
     @Headers("Content-Type: application/json")
     String save(ModuleType moduleType);
 
-    @RequestLine("GET /api/module-type/{id}")
+    @RequestLine("GET /module-types/{id}")
     ModuleType get(@Param("id") String id);
 
-    @RequestLine("POST /api/module-type/_multi-get")
-    @Headers("Content-Type: application/json")
-    List<ModuleType> multiGet(MultiGetRequest request);
+    @RequestLine("GET /module-types?id={ids}")
+    SearchResult<ModuleType> multiGet(@Param("ids") List<String> ids);
 
     static void main(String[] args) {
         var client = Utils.createKiwiFeignClient(

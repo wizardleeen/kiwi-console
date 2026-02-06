@@ -14,7 +14,7 @@ public class AppRT {
         modTypeIdSet.add(appConfig.getFrontendModTypeId());
         modTypeIdSet.add(appConfig.getBackendModTypeId());
         var modTypeIds = new ArrayList<>(modTypeIdSet);
-        var modTypes = modTypeClient.multiGet(new MultiGetRequest(modTypeIds));
+        var modTypes = modTypeClient.multiGet(modTypeIds).items();
         var modTypeMap = Utils.toMap(modTypeIds, modTypes);
         var mods = new ArrayList<ModuleRT>();
         var dependencyIds = new HashMap<String, List<String>>();
@@ -106,7 +106,7 @@ public class AppRT {
 
     public void setName(String name) {
         this.name = name;
-        appClient.updateName(new UpdateNameRequest(id, name));
+        appClient.updateName(id, new UpdateNameRequest(name));
     }
 
     public ModuleRT addModule(String name, String description, Tech tech, List<ModuleRT> dependencies) {

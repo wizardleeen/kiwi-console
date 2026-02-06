@@ -49,8 +49,8 @@ public class AppService implements AppClient {
     }
 
     @Override
-    public void updateName(UpdateNameRequest request) {
-        appClient.updateName(request);
+    public void updateName(String id, UpdateNameRequest request) {
+        appClient.updateName(id, request);
     }
 
     @Override

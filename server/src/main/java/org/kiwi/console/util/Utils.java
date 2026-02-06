@@ -17,6 +17,7 @@ import feign.Feign;
 import feign.RequestInterceptor;
 import feign.gson.GsonDecoder;
 import feign.gson.GsonEncoder;
+import feign.querymap.FieldQueryMapEncoder;
 import jakarta.annotation.Nullable;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -250,9 +251,8 @@ public class Utils {
 
     public static <T> T createKiwiFeignClient(String url, Class<T> type, long appId) {
         return createFeignClient(url, type, rt -> {
-            assert rt.path().startsWith("/api/");
             var path = rt.path();
-            var newPath = "/api/" + appId + path.substring(4);
+            var newPath = "/" + appId + path;
             rt.uri(newPath);
         });
     }
@@ -286,6 +286,7 @@ public class Utils {
         var builder = Feign.builder()
                 .encoder(gsonEncoder)
                 .decoder(gsonDecoder)
+                .queryMapEncoder(new FieldQueryMapEncoder())
                 .errorDecoder(feignErrorDecoder);
         if (interceptor != null)
             builder = builder.requestInterceptor(interceptor);
