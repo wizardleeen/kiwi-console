@@ -67,12 +67,17 @@ public class MockAppConfigClient implements AppConfigClient {
     }
 
     @Override
-    public String save(AppConfig appConfig) {
+    public String create(AppConfig appConfig) {
         var copy = copy(appConfig);
-        if (copy.getId() == null)
-            copy.setId(UUID.randomUUID().toString());
+        copy.setId(UUID.randomUUID().toString());
         map.put(copy.getId(), copy);
         return copy.getId();
+    }
+
+    @Override
+    public void update(String id, AppConfig appConfig) {
+        var copy = copy(appConfig);
+        map.put(copy.getId(), copy);
     }
 
     @Override

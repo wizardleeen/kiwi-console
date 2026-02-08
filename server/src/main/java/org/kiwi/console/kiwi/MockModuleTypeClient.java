@@ -22,6 +22,20 @@ public class MockModuleTypeClient implements ModuleTypeClient {
     }
 
     @Override
+    public String create(ModuleType moduleType) {
+        var copy = copy(moduleType);
+        copy.setId(UUID.randomUUID().toString());
+        map.put(copy.getId(), copy);
+        return copy.getId();
+    }
+
+    @Override
+    public void update(String id, ModuleType moduleType) {
+        var copy = copy(moduleType);
+        map.put(copy.getId(), copy);
+    }
+
+    @Override
     public ModuleType get(String id) {
         var type = map.get(id);
         if (type == null)

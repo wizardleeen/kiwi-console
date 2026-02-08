@@ -8,9 +8,22 @@ import org.kiwi.console.util.Utils;
 
 public interface PlanConfigClient {
 
+    default String save(PlanConfig planConfig) {
+        if (planConfig.getId() != null) {
+            update(planConfig.getId(), planConfig);
+            return planConfig.getId();
+        } else {
+            return create(planConfig);
+        }
+    }
+
     @RequestLine("POST /plan-configs")
     @Headers("Content-Type: application/json")
-    String save(PlanConfig planConfig);
+    String create(PlanConfig planConfig);
+
+    @RequestLine("PATCH /plan-configs/{id}")
+    @Headers("Content-Type: application/json")
+    void update(@Param("id") String id, PlanConfig planConfig);
 
     @RequestLine("GET /plan-configs/{id}")
     PlanConfig get(@Param("id") String id);

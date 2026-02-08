@@ -25,10 +25,21 @@ public class MockExchangeClient implements ExchangeClient {
     }
 
     @Override
-    public String save(Exchange exchange) {
+    public String create(Exchange exchange) {
         exchange = copy(exchange);
-        if (exchange.getId() == null)
-            exchange.setId(UUID.randomUUID().toString());
+        exchange.setId(UUID.randomUUID().toString());
+        put(exchange);
+        return exchange.getId();
+    }
+
+    @Override
+    public void update(String id, Exchange exchange) {
+        exchange = copy(exchange);
+        put(exchange);
+        exchanges.put(exchange.getId(), exchange);
+    }
+
+    private void put(Exchange exchange) {
         for (ExchangeTask task : exchange.getTasks()) {
             if (task.getId() == null)
                 task.setId(UUID.randomUUID().toString());
@@ -38,7 +49,6 @@ public class MockExchangeClient implements ExchangeClient {
             }
         }
         exchanges.put(exchange.getId(), exchange);
-        return exchange.getId();
     }
 
     private Exchange copy(Exchange exchange) {

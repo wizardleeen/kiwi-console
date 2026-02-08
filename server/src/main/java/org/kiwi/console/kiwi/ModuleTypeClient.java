@@ -11,9 +11,22 @@ import java.util.List;
 
 public interface ModuleTypeClient {
 
+    default String save(ModuleType moduleType) {
+        if (moduleType.getId() != null) {
+            update(moduleType.getId(), moduleType);
+            return moduleType.getId();
+        } else {
+            return create(moduleType);
+        }
+    }
+
     @RequestLine("POST /module-types")
     @Headers("Content-Type: application/json")
-    String save(ModuleType moduleType);
+    String create(ModuleType moduleType);
+
+    @RequestLine("PATCH /module-types/{id}")
+    @Headers("Content-Type: application/json")
+    void update(@Param("id") String id, ModuleType moduleType);
 
     @RequestLine("GET /module-types/{id}")
     ModuleType get(@Param("id") String id);

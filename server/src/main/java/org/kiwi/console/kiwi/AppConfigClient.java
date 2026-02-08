@@ -8,9 +8,22 @@ import org.kiwi.console.util.Utils;
 
 public interface AppConfigClient {
 
+    default String save(AppConfig appConfig) {
+        if (appConfig.getId() != null) {
+            update(appConfig.getId(), appConfig);
+            return appConfig.getId();
+        } else {
+            return create(appConfig);
+        }
+    }
+
     @RequestLine("POST /app-configs")
     @Headers("Content-Type: application/json")
-    String save(AppConfig appConfig);
+    String create(AppConfig appConfig);
+
+    @RequestLine("PATCH /app-configs/{id}")
+    @Headers("Content-Type: application/json")
+    void update(@Param("id") String id, AppConfig appConfig);
 
     @RequestLine("GET /app-configs/{id}")
     AppConfig get(@Param("id") String id);

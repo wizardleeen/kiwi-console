@@ -11,6 +11,7 @@
     <modules>
         <module>server</module>
         <module>dist</module>
+        <module>cdc-test</module>
     </modules>
 
     <parent>
