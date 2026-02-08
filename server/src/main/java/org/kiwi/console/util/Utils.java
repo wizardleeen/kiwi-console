@@ -17,6 +17,7 @@ import feign.Feign;
 import feign.RequestInterceptor;
 import feign.gson.GsonDecoder;
 import feign.gson.GsonEncoder;
+import feign.okhttp.OkHttpClient;
 import feign.querymap.FieldQueryMapEncoder;
 import jakarta.annotation.Nullable;
 import lombok.SneakyThrows;
@@ -284,6 +285,7 @@ public class Utils {
 
     public static <T> T createFeignClient(String url, Class<T> type, @Nullable RequestInterceptor interceptor) {
         var builder = Feign.builder()
+                .client(new OkHttpClient())
                 .encoder(gsonEncoder)
                 .decoder(gsonDecoder)
                 .queryMapEncoder(new FieldQueryMapEncoder())

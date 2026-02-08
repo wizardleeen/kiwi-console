@@ -20,7 +20,20 @@ public interface ExchangeClient {
 
     @RequestLine("POST /exchanges")
     @Headers("Content-Type: application/json")
-    String save(Exchange exchange);
+    String create(Exchange exchange);
+
+    @RequestLine("PATCH /exchanges/{id}")
+    @Headers("Content-Type: application/json")
+    void update(@Param("id") String id, Exchange exchange);
+
+    default String save(Exchange exchange) {
+        if (exchange.getId() != null) {
+            update(exchange.getId(), exchange);
+            return exchange.getId();
+        } else {
+            return create(exchange);
+        }
+    }
 
     @RequestLine("DELETE /exchanges/{id}")
     void delete(@Param("id") String id);
