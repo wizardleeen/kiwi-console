@@ -23,7 +23,7 @@ import java.util.stream.StreamSupport;
 
 public class ClaudeClient {
     private static final String BASE_URL = "https://api.anthropic.com/v1";
-    private static final String DEFAULT_MODEL = "claude-opus-4-1-20250805";
+    private static final String DEFAULT_MODEL = "claude-opus-4-6";
     private static final String API_VERSION = "2023-06-01";
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
 
