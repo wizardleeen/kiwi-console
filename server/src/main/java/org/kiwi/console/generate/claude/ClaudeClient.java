@@ -69,6 +69,7 @@ public class ClaudeClient {
                     .header("Content-Type", "application/json")
                     .header("x-api-key", apiKey)
                     .header("anthropic-version", API_VERSION)
+                    .header("anthropic-beta", "interleaved-thinking-2025-05-14")
                     .header("Accept", "text/event-stream")
                     .header("Cache-Control", "no-cache")
                     .header("User-Agent", "Claude-Java-Client-OkHttp/1.0")
