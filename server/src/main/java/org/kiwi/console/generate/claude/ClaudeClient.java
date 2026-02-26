@@ -23,7 +23,7 @@ import java.util.stream.StreamSupport;
 
 public class ClaudeClient {
     private static final String BASE_URL = "https://api.anthropic.com/v1";
-    private static final String DEFAULT_MODEL = "claude-opus-4-1-20250805";
+    private static final String DEFAULT_MODEL = "claude-opus-4-6";
     private static final String API_VERSION = "2023-06-01";
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
 
@@ -69,6 +69,7 @@ public class ClaudeClient {
                     .header("Content-Type", "application/json")
                     .header("x-api-key", apiKey)
                     .header("anthropic-version", API_VERSION)
+                    .header("anthropic-beta", "interleaved-thinking-2025-05-14")
                     .header("Accept", "text/event-stream")
                     .header("Cache-Control", "no-cache")
                     .header("User-Agent", "Claude-Java-Client-OkHttp/1.0")
